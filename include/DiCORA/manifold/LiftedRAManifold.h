@@ -8,12 +8,12 @@
 #ifndef LIFTEDRAMANIFOLD_H
 #define LIFTEDRAMANIFOLD_H
 
-#include <DPGO/manifold/LiftedSEManifold.h>
+#include <DiCORA/manifold/LiftedSEManifold.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
  * @brief This class represents a manifold for the RA SLAM synchronization problem
@@ -51,6 +51,6 @@ class LiftedRAManifold : public LiftedSEManifold {
   ROPTLIB::Oblique *ObliqueManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

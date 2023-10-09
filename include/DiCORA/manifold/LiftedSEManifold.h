@@ -8,15 +8,15 @@
 #ifndef LIFTEDSEMANIFOLD_H
 #define LIFTEDSEMANIFOLD_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/manifold/Poses.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/manifold/Poses.h>
 
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
  * @brief This class represents a manifold for the SE(n) synchronization problem
@@ -53,6 +53,6 @@ class LiftedSEManifold {
   ROPTLIB::ProductManifold *CartanManifold;
   ROPTLIB::ProductManifold *MySEManifold;
 };
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

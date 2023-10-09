@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/manifold/LiftedRAManifold.h>
+#include <DiCORA/DiCORA_utils.h>
+#include <DiCORA/manifold/LiftedRAManifold.h>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l)
     : LiftedSEManifold(r, d, n), b_(b), l_(l) {
   EuclideanLandmarkManifold = new ROPTLIB::Euclidean((int) r, (int) b);
@@ -37,4 +37,4 @@ Matrix LiftedRAManifold::project(const Matrix &M) const {
   return createRAMatrix(X_SE, X_E, X_OB);
 }
 
-}  // namespace DPGO
+}  // namespace DiCORA

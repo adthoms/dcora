@@ -5,13 +5,13 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGO_INCLUDE_DPGO_MANIFOLD_POSES_H_
-#define DPGO_INCLUDE_DPGO_MANIFOLD_POSES_H_
+#ifndef DiCORA_INCLUDE_DiCORA_MANIFOLD_POSES_H_
+#define DiCORA_INCLUDE_DiCORA_MANIFOLD_POSES_H_
 
 #include <set>
-#include "DPGO/DPGO_types.h"
+#include "DiCORA/DiCORA_types.h"
 
-namespace DPGO {
+namespace DiCORA {
 /**
  * @brief A class representing an array of n "lifted" elements of dimension r by dim
  * Elements consist of poses Ti = [Yi pi] and translations pj, where:
@@ -320,4 +320,4 @@ typedef std::map<PoseID, LiftedPose, ComparePoseID> PoseDict;
 typedef std::set<PoseID, ComparePoseID> PoseSet;
 
 }
-#endif //DPGO_INCLUDE_DPGO_MANIFOLD_POSES_H_
+#endif //DiCORA_INCLUDE_DiCORA_MANIFOLD_POSES_H_

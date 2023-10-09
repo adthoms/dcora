@@ -1,15 +1,15 @@
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
-#include <DPGO/manifold/LiftedSEVariable.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/DiCORA_utils.h>
+#include <DiCORA/manifold/LiftedSEManifold.h>
+#include <DiCORA/manifold/LiftedSEVariable.h>
 #include <iostream>
 #include <random>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DiCORA;
 
-TEST(testDPGO, EigenMap) {
+TEST(testDiCORA, EigenMap) {
   size_t d = 3;
   size_t n = 10;
   LiftedSEVariable x(d, d, n);

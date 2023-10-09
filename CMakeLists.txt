@@ -1,7 +1,7 @@
 # PROJECT CONFIGURATION
 cmake_minimum_required(VERSION 3.5)
 
-project(DPGO)
+project(DiCORA)
 
 if(NOT CMAKE_BUILD_TYPE)
     # Options: Debug, Release, MinSizeRel, RelWithDebInfo
@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -O3")
 
 include(GNUInstallDirs)
-set(DPGO_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/DPGO)
+set(DiCORA_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/DiCORA)
 SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 # Directory for built libraries
@@ -71,7 +71,7 @@ set(EXTERNAL_INCLUDES
 	${GLOG_INCLUDE_DIRS}
 	CACHE INTERNAL "")
 
-add_library(DPGO SHARED
+add_library(DiCORA SHARED
 	src/manifold/Poses.cpp
   src/manifold/LiftedSEManifold.cpp
 	src/manifold/LiftedRAManifold.cpp
@@ -83,18 +83,18 @@ add_library(DPGO SHARED
 	src/PGOAgent.cpp
 	src/QuadraticProblem.cpp
 	src/QuadraticOptimizer.cpp
-	src/DPGO_utils.cpp
-	src/DPGO_solver.cpp
-  src/DPGO_robust.cpp
+	src/DiCORA_utils.cpp
+	src/DiCORA_solver.cpp
+  src/DiCORA_robust.cpp
 	src/PGOLogger.cpp)
 
-target_include_directories(DPGO PUBLIC
+target_include_directories(DiCORA PUBLIC
 	${EXTERNAL_INCLUDES}
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	# INSTALL
-	$<INSTALL_INTERFACE:${DPGO_INSTALL_INCLUDEDIR}>
+	$<INSTALL_INTERFACE:${DiCORA_INSTALL_INCLUDEDIR}>
 	)
-target_link_libraries(DPGO
+target_link_libraries(DiCORA
 		${CMAKE_THREAD_LIBS_INIT}
 		roptlib
 		${GLOG_LIBRARIES}
@@ -104,32 +104,32 @@ target_link_libraries(DPGO
 
 if(OPENMP_FOUND)
 # Add additional compilation flags to enable OpenMP support
-	set_target_properties(DPGO PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
-	set_target_properties(DPGO PROPERTIES LINK_FLAGS "-fopenmp")
-	target_link_libraries(DPGO)
+	set_target_properties(DiCORA PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
+	set_target_properties(DiCORA PROPERTIES LINK_FLAGS "-fopenmp")
+	target_link_libraries(DiCORA)
 endif()
 
 # Build Distributed PGO example
 add_executable(multi-robot-example
 		examples/MultiRobotExample.cpp)
-target_link_libraries(multi-robot-example DPGO)
+target_link_libraries(multi-robot-example DiCORA)
 
 add_executable(chordal-initialization-example
 		examples/ChordalInitializationExample.cpp)
-target_link_libraries(chordal-initialization-example DPGO)
+target_link_libraries(chordal-initialization-example DiCORA)
 
 add_executable(single-robot-example
 	examples/SingleRobotExample.cpp)
-target_link_libraries(single-robot-example DPGO)
+target_link_libraries(single-robot-example DiCORA)
 
 add_executable(single-robot-gnc-example
 		examples/SingleRobotGNCExample.cpp)
-target_link_libraries(single-robot-gnc-example DPGO)
+target_link_libraries(single-robot-gnc-example DiCORA)
 
 ############################### TESTS ##########################################
 ### Add testing
-option(BUILD_DPGO_TESTS "Build tests" ON)
-if(BUILD_DPGO_TESTS)
+option(BUILD_DiCORA_TESTS "Build tests" ON)
+if(BUILD_DiCORA_TESTS)
 
 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake googletest-download/CMakeLists.txt)
 	execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -163,7 +163,7 @@ if(BUILD_DPGO_TESTS)
 	endif()
 
 	add_executable(
-			testDPGO
+			testDiCORA
 			tests/testUtils.cpp
 			tests/testPGO.cpp
       tests/testPoses.cpp
@@ -172,59 +172,59 @@ if(BUILD_DPGO_TESTS)
 			tests/testLineGraph.cpp
 			tests/testTriangleGraph.cpp
 			tests/testOptimizationThread.cpp)
-	target_include_directories(testDPGO PUBLIC
+	target_include_directories(testDiCORA PUBLIC
 		${EXTERNAL_INCLUDES}
 		${CMAKE_CURRENT_SOURCE_DIR}/include>
 		${CMAKE_SOURCE_DIR}/eigen>
 	)
 	target_link_libraries(
-		testDPGO
+		testDiCORA
 		gtest_main
-		DPGO
+		DiCORA
 		)
 	add_test(
-		NAME testDPGO
+		NAME testDiCORA
 		COMMAND ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}/unit_tests
 		)
-endif(BUILD_DPGO_TESTS)
+endif(BUILD_DiCORA_TESTS)
 
 ############################### INSTALL ##########################################
 include(CMakePackageConfigHelpers)
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/DPGO)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/DiCORA)
 
-write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/DPGOConfigVersion.cmake
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/DiCORAConfigVersion.cmake
   VERSION 1.0
   COMPATIBILITY AnyNewerVersion
 )
 
-configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/DPGOConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/DPGOConfig.cmake
+configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/DiCORAConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/DiCORAConfig.cmake
   INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
 )
 
 # install the configuration file
 install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/DPGOConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/DiCORAConfig.cmake
   DESTINATION ${INSTALL_CONFIGDIR}
 )
 
 # Install header files
 install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/
-  DESTINATION ${DPGO_INSTALL_INCLUDEDIR}
+  DESTINATION ${DiCORA_INSTALL_INCLUDEDIR}
   FILES_MATCHING PATTERN "*.h"
 )
 
-install(TARGETS DPGO
-		EXPORT 	DPGOTargets
+install(TARGETS DiCORA
+		EXPORT 	DiCORATargets
 		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 		)
 
-install(EXPORT DPGOTargets
-		FILE DPGOTargets.cmake
+install(EXPORT DiCORATargets
+		FILE DiCORATargets.cmake
 		DESTINATION ${INSTALL_CONFIGDIR}
 		)
 
-export(TARGETS DPGO FILE DPGOTargets.cmake)
+export(TARGETS DiCORA FILE DiCORATargets.cmake)
 
 ############################### UNINSTALL ##########################################
 if(NOT TARGET uninstall)

@@ -8,15 +8,15 @@
 #ifndef PGOAGENT_H
 #define PGOAGENT_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/PGOLogger.h>
-#include <DPGO/DPGO_robust.h>
-#include <DPGO/QuadraticProblem.h>
-#include <DPGO/RelativeSEMeasurement.h>
-#include <DPGO/manifold/Poses.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
-#include <DPGO/manifold/LiftedSEVariable.h>
-#include <DPGO/manifold/LiftedSEVector.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/PGOLogger.h>
+#include <DiCORA/DiCORA_robust.h>
+#include <DiCORA/QuadraticProblem.h>
+#include <DiCORA/RelativeSEMeasurement.h>
+#include <DiCORA/manifold/Poses.h>
+#include <DiCORA/manifold/LiftedSEManifold.h>
+#include <DiCORA/manifold/LiftedSEVariable.h>
+#include <DiCORA/manifold/LiftedSEVector.h>
 
 #include <Eigen/Dense>
 #include <map>
@@ -39,7 +39,7 @@ using std::thread;
 using std::vector;
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
 This class contains parameter settings for PGOAgent
@@ -771,6 +771,6 @@ class PGOAgent {
   Pose computeNeighborTransform(const RelativeSEMeasurement &measurement, const LiftedPose &neighbor_pose);
 };
 
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

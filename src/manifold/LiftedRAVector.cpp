@@ -5,10 +5,10 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/manifold/LiftedRAVector.h>
+#include <DiCORA/manifold/LiftedRAVector.h>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 LiftedRAVector::LiftedRAVector(int r, int d, int n, int b, int l) 
     : LiftedSEVector(r, d, n) {
@@ -53,4 +53,4 @@ void LiftedRAVector::setSize() {
   CHECK_EQ(col_e, col_ob);
 }
 
-}  // namespace DPGO
+}  // namespace DiCORA

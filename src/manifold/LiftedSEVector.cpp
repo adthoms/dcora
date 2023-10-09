@@ -5,10 +5,10 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/manifold/LiftedSEVector.h>
+#include <DiCORA/manifold/LiftedSEVector.h>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 LiftedSEVector::LiftedSEVector(int r, int d, int n) {
   StiefelVector = new ROPTLIB::StieVector(r, d);
@@ -49,4 +49,4 @@ void LiftedSEVector::setSize() {
   LiftedSEVector::getSize(MySEVector, r_, d_, n_);
 }
 
-}  // namespace DPGO
+}  // namespace DiCORA

@@ -5,14 +5,14 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGO_INCLUDE_DPGO_PGOSOLVER_H_
-#define DPGO_INCLUDE_DPGO_PGOSOLVER_H_
+#ifndef DiCORA_INCLUDE_DiCORA_PGOSOLVER_H_
+#define DiCORA_INCLUDE_DiCORA_PGOSOLVER_H_
 
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/DPGO_robust.h>
-#include <DPGO/manifold/Poses.h>
+#include <DiCORA/DiCORA_utils.h>
+#include <DiCORA/DiCORA_robust.h>
+#include <DiCORA/manifold/Poses.h>
 
-namespace DPGO {
+namespace DiCORA {
 /**
  * @brief Single translation averaging using the Euclidean distance
  * @param tOpt
@@ -135,4 +135,4 @@ PoseArray solveRobustPGO(std::vector<RelativeSEMeasurement> &mutable_measurement
 
 }
 
-#endif //DPGO_INCLUDE_DPGO_PGOSOLVER_H_
+#endif //DiCORA_INCLUDE_DiCORA_PGOSOLVER_H_

@@ -8,15 +8,15 @@
 #ifndef LIFTEDSEVECTOR_H
 #define LIFTEDSEVECTOR_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_utils.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/DiCORA_utils.h>
 
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
  * @brief This class represents a SE(n) synchronization vector
@@ -70,6 +70,6 @@ class LiftedSEVector {
   ROPTLIB::ProductElement* CartanVector;
   ROPTLIB::ProductElement* MySEVector;
 };
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

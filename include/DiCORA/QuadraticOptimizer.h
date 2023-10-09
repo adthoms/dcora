@@ -8,14 +8,14 @@
 #ifndef QUADRATICOPTIMIZER_H
 #define QUADRATICOPTIMIZER_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/PGOAgent.h>
-#include <DPGO/QuadraticProblem.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
-#include <DPGO/manifold/LiftedSEVariable.h>
-#include <DPGO/manifold/LiftedSEVector.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/PGOAgent.h>
+#include <DiCORA/QuadraticProblem.h>
+#include <DiCORA/manifold/LiftedSEManifold.h>
+#include <DiCORA/manifold/LiftedSEVariable.h>
+#include <DiCORA/manifold/LiftedSEVector.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 class QuadraticOptimizer {
  public:
@@ -103,6 +103,6 @@ class QuadraticOptimizer {
   Matrix gradientDescentLS(const Matrix &Yinit);
 };
 
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

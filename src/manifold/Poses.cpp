@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include "DPGO/manifold/Poses.h"
-#include "DPGO/DPGO_utils.h"
+#include "DiCORA/manifold/Poses.h"
+#include "DiCORA/DiCORA_utils.h"
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 LiftedArray::LiftedArray(unsigned int r, unsigned int d, unsigned int n) :
     r_(r), d_(d), n_(n), dim_(d+1) {}

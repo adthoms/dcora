@@ -8,12 +8,12 @@
 #ifndef LIFTEDRAVECTOR_H
 #define LIFTEDRAVECTOR_H
 
-#include <DPGO/manifold/LiftedSEVector.h>
+#include <DiCORA/manifold/LiftedSEVector.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
  * @brief This class represents a RA SLAM synchronization vector
@@ -62,6 +62,6 @@ class LiftedRAVector : public LiftedSEVector {
   ROPTLIB::ProductElement* MyOBVector;
   ROPTLIB::ProductElement* MyRAVector;
 };
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

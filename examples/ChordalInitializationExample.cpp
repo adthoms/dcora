@@ -6,9 +6,9 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/QuadraticProblem.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/DiCORA_solver.h>
+#include <DiCORA/QuadraticProblem.h>
 
 #include <cstdlib>
 #include <cassert>
@@ -16,7 +16,7 @@
 #include <fstream>
 
 using namespace std;
-using namespace DPGO;
+using namespace DiCORA;
 
 int main(int argc, char **argv) {
   /**

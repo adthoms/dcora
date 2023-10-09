@@ -1,0 +1,9 @@
+get_filename_component(DiCORA_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+
+include(CMakeFindDependencyMacro)
+
+find_dependency(roptlib)
+
+if(NOT TARGET DiCORA)
+    include("${DiCORA_CMAKE_DIR}/DiCORATargets.cmake")
+endif()

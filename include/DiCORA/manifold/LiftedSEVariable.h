@@ -8,15 +8,15 @@
 #ifndef LIFTEDSEVARIABLE_H
 #define LIFTEDSEVARIABLE_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/manifold/Poses.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/manifold/Poses.h>
 
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductElement.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
  * @brief This class represents a collection of "lifted" poses X = [X1 X2 ... Xn]
@@ -128,6 +128,6 @@ class LiftedSEVariable {
   Eigen::Map<Matrix> X_SE_;
 };
 
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

@@ -5,14 +5,14 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/manifold/LiftedRAVariable.h>
+#include <DiCORA/DiCORA_utils.h>
+#include <DiCORA/manifold/LiftedRAVariable.h>
 #include <glog/logging.h>
 
 using namespace std;
 using namespace ROPTLIB;
 
-namespace DPGO {
+namespace DiCORA {
 LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l) :
     LiftedSEVariable(r, d, n), b_(b), l_(l),
     translation_landmark_var_(std::make_unique<ROPTLIB::EucVariable>((int) r)),
@@ -94,4 +94,4 @@ Vector LiftedRAVariable::translationRange(unsigned int index) const {
   return Xi.col(0);
 }
 
-}  // namespace DPGO
+}  // namespace DiCORA

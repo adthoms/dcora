@@ -1,10 +1,10 @@
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/PoseGraph.h>
+#include <DiCORA/DiCORA_solver.h>
+#include <DiCORA/PoseGraph.h>
 #include <cstdlib>
 #include <iostream>
 
 using namespace std;
-using namespace DPGO;
+using namespace DiCORA;
 
 #include <string>
 #include <fstream>

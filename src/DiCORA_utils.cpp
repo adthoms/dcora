@@ -5,8 +5,8 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/DPGO_robust.h>
+#include <DiCORA/DiCORA_utils.h>
+#include <DiCORA/DiCORA_robust.h>
 #include <Eigen/Geometry>
 #include <Eigen/SPQRSupport>
 #include <algorithm>
@@ -16,7 +16,7 @@
 #include <boost/math/distributions/chi_squared.hpp>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 std::string ROptParameters::ROptMethodToString(ROptParameters::ROptMethod method) {
   switch (method) {
@@ -113,10 +113,10 @@ Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
 std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
                                                  size_t &num_poses) {
   // Preallocate output vector
-  std::vector<DPGO::RelativeSEMeasurement> measurements;
+  std::vector<DiCORA::RelativeSEMeasurement> measurements;
 
   // A single measurement, whose values we will fill in
-  DPGO::RelativeSEMeasurement measurement;
+  DiCORA::RelativeSEMeasurement measurement;
   measurement.weight = 1.0;
 
   // A string used to contain the contents of a single line
@@ -602,4 +602,4 @@ void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, d
   memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
 }
 
-}  // namespace DPGO
+}  // namespace DiCORA

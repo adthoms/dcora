@@ -1,15 +1,15 @@
 //
 // Created by yulun on 11/17/21.
 //
-#include <DPGO/manifold/Poses.h>
-#include <DPGO/DPGO_utils.h>
+#include <DiCORA/manifold/Poses.h>
+#include <DiCORA/DiCORA_utils.h>
 #include <iostream>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DiCORA;
 
-TEST(testDPGO, testLiftedPoseArray) {
+TEST(testDiCORA, testLiftedPoseArray) {
   for (int trial = 0; trial < 50; ++trial) {
     int r = 5;
     int d = 3;
@@ -34,7 +34,7 @@ TEST(testDPGO, testLiftedPoseArray) {
   }
 }
 
-TEST(testDPGO, testLiftedTranslationArray) {
+TEST(testDiCORA, testLiftedTranslationArray) {
   for (int trial = 0; trial < 50; ++trial) {
     int r = 5;
     int d = 3;
@@ -61,7 +61,7 @@ TEST(testDPGO, testLiftedTranslationArray) {
   }
 }
 
-TEST(testDPGO, testLiftedPose) {
+TEST(testDiCORA, testLiftedPose) {
   int d = 3;
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
@@ -74,7 +74,7 @@ TEST(testDPGO, testLiftedPose) {
   }
 }
 
-TEST(testDPGO, testLiftedTranslation) {
+TEST(testDiCORA, testLiftedTranslation) {
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
     Matrix Xi = randomEuclideanVariable(r, 1);
@@ -85,7 +85,7 @@ TEST(testDPGO, testLiftedTranslation) {
   }
 }
 
-TEST(testDPGO, testPoseIdentity) {
+TEST(testDiCORA, testPoseIdentity) {
   int d = 3;
   Pose T(d);
   ASSERT_LE((T.identity().rotation() - Matrix::Identity(d, d)).norm(), 1e-6);
@@ -93,13 +93,13 @@ TEST(testDPGO, testPoseIdentity) {
   ASSERT_LE((T.identity().matrix() - Matrix::Identity(d + 1, d + 1)).norm(), 1e-6);
 }
 
-TEST(testDPGO, testTranslationZeroVector) {
+TEST(testDiCORA, testTranslationZeroVector) {
   int d = 3;
   Translation P(d);
   ASSERT_LE((P.zeroVector().translation() - Vector::Zero(d)).norm(), 1e-6);
 }
 
-TEST(testDPGO, testPoseInverse) {
+TEST(testDiCORA, testPoseInverse) {
   for (int trial = 0; trial < 50; ++trial) {
     int d = 3;
     Pose T(d);
@@ -111,7 +111,7 @@ TEST(testDPGO, testPoseInverse) {
   }
 }
 
-TEST(testDPGO, testPoseMultiplication) {
+TEST(testDiCORA, testPoseMultiplication) {
   for (int trial = 0; trial < 50; ++trial) {
     int d = 3;
     Pose T1(d);

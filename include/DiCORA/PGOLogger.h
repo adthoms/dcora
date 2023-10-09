@@ -5,17 +5,17 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DISTRIBUTEDPGO_DPGO_INCLUDE_DPGO_PGOLOGGER_H_
-#define DISTRIBUTEDPGO_DPGO_INCLUDE_DPGO_PGOLOGGER_H_
+#ifndef DISTRIBUTEDiCORA_DiCORA_INCLUDE_DiCORA_PGOLOGGER_H_
+#define DISTRIBUTEDiCORA_DiCORA_INCLUDE_DiCORA_PGOLOGGER_H_
 
 #include <string>
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <DPGO/DPGO_types.h>
-#include <DPGO/RelativeSEMeasurement.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/RelativeSEMeasurement.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 class PGOLogger {
  public:
@@ -62,6 +62,6 @@ class PGOLogger {
   std::string logDirectory;
 };
 
-} // end namespace DPGO
+} // end namespace DiCORA
 
-#endif //DISTRIBUTEDPGO_DPGO_INCLUDE_DPGO_PGOLOGGER_H_
+#endif //DISTRIBUTEDiCORA_DiCORA_INCLUDE_DiCORA_PGOLOGGER_H_

@@ -5,10 +5,10 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/DPGO_robust.h>
-#include <DPGO/PoseGraph.h>
-#include <DPGO/QuadraticOptimizer.h>
+#include <DiCORA/DiCORA_solver.h>
+#include <DiCORA/DiCORA_robust.h>
+#include <DiCORA/PoseGraph.h>
+#include <DiCORA/QuadraticOptimizer.h>
 #include <Eigen/Geometry>
 #include <Eigen/SPQRSupport>
 #include <algorithm>
@@ -18,7 +18,7 @@
 #include <boost/math/distributions/chi_squared.hpp>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 
 void singleTranslationAveraging(Vector &tOpt,
                                 const std::vector<Vector> &tVec,

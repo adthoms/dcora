@@ -8,12 +8,12 @@
 #ifndef LIFTEDRAVARIABLE_H
 #define LIFTEDRAVARIABLE_H
 
-#include <DPGO/manifold/LiftedSEVariable.h>
+#include <DiCORA/manifold/LiftedSEVariable.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DiCORA {
 
 /**
  * @brief This object represents a collection of "lifted" poses and translations X = [Y1 p1 ... Yn pn | l1 ... ln | r1 ... rn]
@@ -113,6 +113,6 @@ class LiftedRAVariable : public LiftedSEVariable {
   Eigen::Map<Matrix> X_RA_;
 };
 
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

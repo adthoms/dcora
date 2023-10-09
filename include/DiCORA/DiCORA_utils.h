@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGOUTILS_H
-#define DPGOUTILS_H
+#ifndef DiCORAUTILS_H
+#define DiCORAUTILS_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/RelativeSEMeasurement.h>
+#include <DiCORA/DiCORA_types.h>
+#include <DiCORA/RelativeSEMeasurement.h>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -20,7 +20,7 @@
 #include "Manifolds/Oblique/Oblique.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
-namespace DPGO {
+namespace DiCORA {
 
 class SimpleTimer {
  public:
@@ -253,6 +253,6 @@ Matrix createRAMatrix(const Matrix &X_SE, const Matrix &X_E, const Matrix &X_OB)
  */
 void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, double mem_size);
 
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

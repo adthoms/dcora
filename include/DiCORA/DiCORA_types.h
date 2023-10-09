@@ -5,8 +5,8 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGO_TYPES_H
-#define DPGO_TYPES_H
+#ifndef DiCORA_TYPES_H
+#define DiCORA_TYPES_H
 
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
@@ -18,7 +18,7 @@
 #include <tuple>
 #include <boost/functional/hash.hpp>
 
-namespace DPGO {
+namespace DiCORA {
 
 typedef Eigen::VectorXd Vector;
 typedef Eigen::MatrixXd Matrix;
@@ -189,6 +189,6 @@ struct HashEdgeID
       return seed;
   }
 };
-}  // namespace DPGO
+}  // namespace DiCORA
 
 #endif

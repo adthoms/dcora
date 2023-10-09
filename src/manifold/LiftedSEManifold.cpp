@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
+#include <DiCORA/DiCORA_utils.h>
+#include <DiCORA/manifold/LiftedSEManifold.h>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DiCORA {
 LiftedSEManifold::LiftedSEManifold(unsigned int r, unsigned int d, unsigned int n) :
     r_(r), d_(d), n_(n) {
   StiefelManifold = new ROPTLIB::Stiefel((int) r, (int) d);
@@ -38,4 +38,4 @@ Matrix LiftedSEManifold::project(const Matrix &M) const {
   return X;
 }
 
-}  // namespace DPGO
+}  // namespace DiCORA
