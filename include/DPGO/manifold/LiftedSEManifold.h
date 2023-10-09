@@ -10,6 +10,7 @@
 
 #include <DPGO/DPGO_types.h>
 #include <DPGO/manifold/Poses.h>
+
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
@@ -17,6 +18,9 @@
 /*Define the namespace*/
 namespace DPGO {
 
+/**
+ * @brief This class represents a manifold for the SE(n) synchronization problem
+ */
 class LiftedSEManifold {
  public:
   /**
@@ -29,25 +33,25 @@ class LiftedSEManifold {
   /**
    * @brief Destructor
    */
-  ~LiftedSEManifold();
+  virtual ~LiftedSEManifold();
   /**
    * @brief Get the underlying ROPTLIB product manifold
    * @return
    */
-  ROPTLIB::ProductManifold *getManifold() { return MyManifold; }
+  virtual ROPTLIB::ProductManifold *getManifold() { return MySEManifold; }
   /**
    * @brief Utility function to project a given matrix onto this manifold
    * @param M
    * @return orthogonal projection of M onto this manifold
    */
-  Matrix project(const Matrix &M) const;
+  virtual Matrix project(const Matrix &M) const;
 
- private:
+ protected:
   unsigned int r_, d_, n_;
   ROPTLIB::Stiefel *StiefelManifold;
   ROPTLIB::Euclidean *EuclideanManifold;
   ROPTLIB::ProductManifold *CartanManifold;
-  ROPTLIB::ProductManifold *MyManifold;
+  ROPTLIB::ProductManifold *MySEManifold;
 };
 }  // namespace DPGO
 

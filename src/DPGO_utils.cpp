@@ -485,17 +485,52 @@ Matrix projectToStiefelManifold(const Matrix &M) {
   return svd.matrixU() * svd.matrixV().transpose();
 }
 
-Matrix fixedStiefelVariable(unsigned d, unsigned r) {
+Matrix projectToObliqueManifold(const Matrix &M) {
+  size_t r = M.rows();
+  size_t d = M.cols();
+  CHECK(r >= d);
+
+  Matrix X = M;
+
+#pragma omp parallel for
+  for (size_t i = 0; i < d; ++i) {
+    Vector X_col =  X.block(0, i, r, 1);
+    X.block(0, i, r, 1) = X_col.normalized();
+  }
+  return X;
+}
+
+Matrix fixedStiefelVariable(unsigned r, unsigned d) {
   std::srand(1);
+  return randomStiefelVariable(r, d);
+}
+
+Matrix fixedEuclideanVariable(unsigned r, unsigned b) {
+  std::srand(1);
+  return randomEuclideanVariable(r, b);
+}
+
+Matrix fixedObliqueVariable(unsigned r, unsigned l) {
+  std::srand(1);
+  return randomObliqueVariable(r, l);
+}
+
+Matrix randomStiefelVariable(unsigned r, unsigned d) {
   ROPTLIB::StieVariable var(r, d);
   var.RandInManifold();
   return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
 }
 
-Matrix randomStiefelVariable(unsigned d, unsigned r) {
-  ROPTLIB::StieVariable var(r, d);
+Matrix randomEuclideanVariable(unsigned r, unsigned b) {
+  ROPTLIB::EucVariable var(r, b);
   var.RandInManifold();
-  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
+  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, b);
+}
+
+Matrix randomObliqueVariable(unsigned r, unsigned l) {
+  ROPTLIB::ObliqueVariable var(r, l);
+  var.RandInManifold();
+  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, l);
 }
 
 double computeMeasurementError(const RelativeSEMeasurement &m,
@@ -535,6 +570,36 @@ void checkStiefelMatrix(const Matrix &Y) {
         << "[checkStiefelMatrix] Invalid Stiefel: err_norm="
         << err_norm;
   }
+}
+
+void checkSEMatrixSize(const Matrix &X, double r, double d, double n) {
+  CHECK_EQ(X.rows(), r);
+  CHECK_EQ(X.cols(), (d + 1) * n);
+}
+
+void checkRAMatrixSize(const Matrix &X, double r, double d, double n, double b, double l) {
+  CHECK_EQ(X.rows(), r);
+  CHECK_EQ(X.cols(), (d + 1) * n + b + l);
+}
+
+std::tuple<Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, double r, double d, double n, double b, double l) {
+  checkRAMatrixSize(X, r, d, n, b, l);
+  Matrix X_SE = X.block(0, 0, r, (d+ 1) * n);
+  Matrix X_E = X.block(0, (d + 1) * n, r, b);
+  Matrix X_OB = X.block(0, (d + 1) * n + b, r, l);
+  return std::make_tuple(X_SE, X_E, X_OB);
+}
+
+Matrix createRAMatrix(const Matrix &X_SE, const Matrix &X_E, const Matrix &X_OB) {
+  Matrix X(X_SE.rows(), X_SE.cols() + X_E.cols() + X_OB.cols());
+  X << X_SE, X_E, X_OB;
+  return X;
+}
+
+void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, double memSize) {
+  const double *matrix_data = Y.data();
+  double *prodvar_data = var->ObtainWriteEntireData();
+  memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
 }
 
 }  // namespace DPGO

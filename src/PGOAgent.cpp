@@ -40,7 +40,7 @@ PGOAgent::PGOAgent(unsigned ID, const PGOAgentParameters &params)
       mTrajectoryResetCount(0),
       mLogger(params.logDirectory),
       gamma(0), alpha(0), Y(X), V(X), XPrev(X) {
-  if (mID == 0) setLiftingMatrix(fixedStiefelVariable(d, r));
+  if (mID == 0) setLiftingMatrix(fixedStiefelVariable(r, d));
   mTeamRobotActive.assign(mParams.numRobots, true);
 }
 
@@ -403,7 +403,7 @@ bool PGOAgent::iterate(bool doOptimization) {
       mStatus.state = mState;
       mStatus.instanceNumber = instance_number();
       mStatus.iterationNumber = iteration_number();
-      mStatus.relativeChange = LiftedPoseArray::maxTranslationDistance(X, XPrev);
+      mStatus.relativeChange = LiftedArray::maxTranslationDistance(X, XPrev);
       // Check local termination condition
       bool readyToTerminate = true;
       if (!success) readyToTerminate = false;

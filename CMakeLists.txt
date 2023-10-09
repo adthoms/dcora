@@ -73,16 +73,19 @@ set(EXTERNAL_INCLUDES
 
 add_library(DPGO SHARED
 	src/manifold/Poses.cpp
-	src/manifold/LiftedSEManifold.cpp
+  src/manifold/LiftedSEManifold.cpp
+	src/manifold/LiftedRAManifold.cpp
 	src/manifold/LiftedSEVariable.cpp
+	src/manifold/LiftedRAVariable.cpp
 	src/manifold/LiftedSEVector.cpp
+	src/manifold/LiftedRAVector.cpp
 	src/PoseGraph.cpp
 	src/PGOAgent.cpp
 	src/QuadraticProblem.cpp
 	src/QuadraticOptimizer.cpp
 	src/DPGO_utils.cpp
 	src/DPGO_solver.cpp
-    src/DPGO_robust.cpp
+  src/DPGO_robust.cpp
 	src/PGOLogger.cpp)
 
 target_include_directories(DPGO PUBLIC
@@ -163,7 +166,7 @@ if(BUILD_DPGO_TESTS)
 			testDPGO
 			tests/testUtils.cpp
 			tests/testPGO.cpp
-            tests/testPoses.cpp
+      tests/testPoses.cpp
 			tests/testEigenMap.cpp
 			tests/testConstruction.cpp
 			tests/testLineGraph.cpp

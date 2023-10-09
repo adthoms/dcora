@@ -19,7 +19,7 @@
 namespace DPGO {
 
 /**
- * @brief This object represent a collection of "lifted" poses X = [X1 X2 ... Xn]
+ * @brief This class represents a collection of "lifted" poses X = [X1 X2 ... Xn]
  * that can be used by ROPTLIB to perform Riemannian optimization
  */
 class LiftedSEVariable {
@@ -41,10 +41,6 @@ class LiftedSEVariable {
    * @param other
    */
   LiftedSEVariable(const LiftedSEVariable &other);
-  /**
-   * @brief Destructor
-   */
-  ~LiftedSEVariable() = default;
   /**
    * @brief Copy assignment operator
    * @param other
@@ -70,22 +66,24 @@ class LiftedSEVariable {
    * @brief Obtain the variable as an ROPTLIB::ProductElement
    * @return
    */
-  ROPTLIB::ProductElement *var() { return var_.get(); }
+  virtual ROPTLIB::ProductElement *var() { return varSE_.get(); }
   /**
    * @brief Obtain the variable as an Eigen matrix
-   * @return r by d+1 matrix [Y1 p1 ... Yn pn]
+   * @return r by (d+1)n matrix [Y1 p1 ... Yn pn]
    */
-  Matrix getData() const;
+  virtual Matrix getData() const;
   /**
    * @brief Set this variable from an Eigen matrix
-   * @param X r by d+1 matrix [Y1 p1 ... Yn pn]
+   * @param X r by (d+1)n matrix [Y1 p1 ... Yn pn]
    */
-  void setData(const Matrix &X);
+  virtual void setData(const Matrix &X);
   /**
    * @brief Obtain the writable pose at the specified index, expressed as an r-by-(d+1) matrix
    * @param index
    * @return
    */
+
+ private:
   Eigen::Ref<Matrix> pose(unsigned int index);
   /**
    * @brief Obtain the read-only pose at the specified index, expressed as an r-by-(d+1) matrix
@@ -125,9 +123,9 @@ class LiftedSEVariable {
   std::unique_ptr<ROPTLIB::StieVariable> rotation_var_;
   std::unique_ptr<ROPTLIB::EucVariable> translation_var_;
   std::unique_ptr<ROPTLIB::ProductElement> pose_var_;
-  std::unique_ptr<ROPTLIB::ProductElement> var_;
-  // Internal view of the variable as an eigen matrix of dimension r-by-(d+1)*n
-  Eigen::Map<Matrix> X_;
+  std::shared_ptr<ROPTLIB::ProductElement> varSE_;
+  // Internal view of the variable as an eigen matrix of dimension r-by-(d+1)n
+  Eigen::Map<Matrix> X_SE_;
 };
 
 }  // namespace DPGO
