@@ -1,10 +1,11 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>dpgo</name>
+  <name>dcora</name>
   <version>0.0.1</version>
   <description>DPGO</description>
 
-  <maintainer email="yulun@mit.edu">Yulun Tian</maintainer>
+  <maintainer email="adthoms@ucla.edu">Alexander Thoms</maintainer>
+  <maintainer email="apapalia@mit.edu">Alan Papalia</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>cmake</buildtool_depend>
