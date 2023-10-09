@@ -5,13 +5,13 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/manifold/LiftedSEVector.h>
+#include <DCORA/manifold/LiftedSEVector.h>
 #include <glog/logging.h>
 
 using namespace std;
 using namespace ROPTLIB;
 
-namespace DPGO {
+namespace DCORA {
 
 LiftedSEVector::LiftedSEVector(int r, int d, int n) {
   StiefelVector = new StieVector(r, d);
@@ -53,4 +53,4 @@ void LiftedSEVector::setData(const Matrix &Y) {
   memcpy(prodvar_data, matrix_data, sizeof(double) * r * (d + 1) * n);
 }
 
-}  // namespace DPGO
+}  // namespace DCORA

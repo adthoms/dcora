@@ -5,7 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/QuadraticOptimizer.h>
+#include <DCORA/QuadraticOptimizer.h>
 #include <glog/logging.h>
 #include <iostream>
 
@@ -13,7 +13,7 @@
 #include "RTRNewton.h"
 #include "SolversLS.h"
 
-namespace DPGO {
+namespace DCORA {
 
 QuadraticOptimizer::QuadraticOptimizer(QuadraticProblem *p, ROptParameters params)
     : problem_(p),
@@ -159,4 +159,4 @@ Matrix QuadraticOptimizer::gradientDescentLS(const Matrix &Yinit) {
   return VarOpt.getData();
 }
 
-}  // namespace DPGO
+}  // namespace DCORA

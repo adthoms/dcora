@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGOUTILS_H
-#define DPGOUTILS_H
+#ifndef DCORAUTILS_H
+#define DCORAUTILS_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/RelativeSEMeasurement.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/RelativeSEMeasurement.h>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -18,7 +18,7 @@
 // ROPTLIB includes
 #include "Manifolds/Stiefel/Stiefel.h"
 
-namespace DPGO {
+namespace DCORA {
 
 class SimpleTimer {
  public:
@@ -171,6 +171,6 @@ void checkRotationMatrix(const Matrix &R);
  */
 void checkStiefelMatrix(const Matrix &Y);
 
-}  // namespace DPGO
+}  // namespace DCORA
 
 #endif

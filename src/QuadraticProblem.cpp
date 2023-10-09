@@ -5,14 +5,14 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/QuadraticProblem.h>
+#include <DCORA/QuadraticProblem.h>
 #include <iostream>
 #include <glog/logging.h>
 
 using namespace std;
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DCORA {
 
 QuadraticProblem::QuadraticProblem(const std::shared_ptr<PoseGraph> &pose_graph)
     : pose_graph_(pose_graph),
@@ -94,4 +94,4 @@ void QuadraticProblem::setElement(ROPTLIB::Element *element, const Matrix *matri
          sizeof(double) * relaxation_rank() * (dimension() + 1) * num_poses());
 }
 
-}  // namespace DPGO
+}  // namespace DCORA

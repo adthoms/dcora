@@ -8,14 +8,14 @@
 #ifndef LIFTEDSEVECTOR_H
 #define LIFTEDSEVECTOR_H
 
-#include <DPGO/DPGO_types.h>
+#include <DCORA/DCORA_types.h>
 
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DCORA {
 
 class LiftedSEVector {
  public:
@@ -52,6 +52,6 @@ class LiftedSEVector {
   ROPTLIB::ProductElement* CartanVector;
   ROPTLIB::ProductElement* MyVector;
 };
-}  // namespace DPGO
+}  // namespace DCORA
 
 #endif

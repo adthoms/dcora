@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGO_INCLUDE_DPGO_POSEGRAPH_H_
-#define DPGO_INCLUDE_DPGO_POSEGRAPH_H_
+#ifndef DCORA_INCLUDE_DCORA_POSEGRAPH_H_
+#define DCORA_INCLUDE_DCORA_POSEGRAPH_H_
 
-#include "DPGO_types.h"
-#include "DPGO_utils.h"
+#include "DCORA_types.h"
+#include "DCORA_utils.h"
 #include "manifold/Poses.h"
 #include "RelativeSEMeasurement.h"
 #include <glog/logging.h>
@@ -19,7 +19,7 @@
 #include <unordered_map>
 #include <memory>
 
-namespace DPGO {
+namespace DCORA {
 
 /**
  * @brief A pose graph class representing the local optimization problem in distributed PGO.
@@ -390,4 +390,4 @@ class PoseGraph {
 
 }
 
-#endif //DPGO_INCLUDE_DPGO_POSEGRAPH_H_
+#endif //DCORA_INCLUDE_DCORA_POSEGRAPH_H_

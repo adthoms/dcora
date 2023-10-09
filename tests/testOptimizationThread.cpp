@@ -1,13 +1,13 @@
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_utils.h>
-#include <DPGO/PGOAgent.h>
-#include <DPGO/QuadraticProblem.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/DCORA_utils.h>
+#include <DCORA/CORAAgent.h>
+#include <DCORA/QuadraticProblem.h>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DCORA;
 
-TEST(testDPGO, OptimizationThreadBasic) {
+TEST(testDCORA, OptimizationThreadBasic) {
   unsigned int d, r;
   d = 3;
   r = 3;
@@ -26,7 +26,7 @@ TEST(testDPGO, OptimizationThreadBasic) {
   }
 }
 
-TEST(testDPGO, OptimizationThreadTriangleGraph) {
+TEST(testDCORA, OptimizationThreadTriangleGraph) {
   unsigned int id = 0;
   unsigned int d, r;
   d = 3;

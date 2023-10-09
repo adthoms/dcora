@@ -5,14 +5,14 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGOROBUST_H
-#define DPGOROBUST_H
+#ifndef DCORAROBUST_H
+#define DCORAROBUST_H
 
-#include <DPGO/DPGO_utils.h>
+#include <DCORA/DCORA_utils.h>
 #include <iostream>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DCORA {
 
 /**
  * @brief Parameters for robust cost functions
@@ -132,6 +132,6 @@ class RobustCost {
 
 };
 
-}  // namespace DPGO
+}  // namespace DCORA
 
 #endif

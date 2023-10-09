@@ -5,13 +5,13 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DPGO_INCLUDE_DPGO_MANIFOLD_POSES_H_
-#define DPGO_INCLUDE_DPGO_MANIFOLD_POSES_H_
+#ifndef DCORA_INCLUDE_DCORA_MANIFOLD_POSES_H_
+#define DCORA_INCLUDE_DCORA_MANIFOLD_POSES_H_
 
 #include <set>
-#include "DPGO/DPGO_types.h"
+#include "DCORA/DCORA_types.h"
 
-namespace DPGO {
+namespace DCORA {
 /**
  * @brief A class representing an array of "lifted" poses
  * Internally store as r by (d+1)n matrix X = [X1, ... Xn], where each Xi = [Yi pi]
@@ -220,4 +220,4 @@ typedef std::map<PoseID, LiftedPose, ComparePoseID> PoseDict;
 typedef std::set<PoseID, ComparePoseID> PoseSet;
 
 }
-#endif //DPGO_INCLUDE_DPGO_MANIFOLD_POSES_H_
+#endif //DCORA_INCLUDE_DCORA_MANIFOLD_POSES_H_

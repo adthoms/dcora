@@ -5,11 +5,11 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include "DPGO/PoseGraph.h"
-#include "DPGO/DPGO_utils.h"
+#include "DCORA/PoseGraph.h"
+#include "DCORA/DCORA_utils.h"
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DCORA {
 
 PoseGraph::PoseGraph(unsigned int id, unsigned int r, unsigned int d)
     : id_(id), r_(r), d_(d), n_(0), 

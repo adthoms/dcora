@@ -1,10 +1,10 @@
-#include <DPGO/PGOAgent.h>
+#include <DCORA/CORAAgent.h>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DCORA;
 
-TEST(testDPGO, LineGraph) {
+TEST(testDCORA, LineGraph) {
   unsigned int id = 0;
   unsigned int d, r;
   d = 3;

@@ -5,14 +5,14 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_robust.h>
+#include <DCORA/DCORA_robust.h>
 
 #include <cmath>
-#include <DPGO/DPGO_utils.h>
+#include <DCORA/DCORA_utils.h>
 
 using namespace std;
 
-namespace DPGO {
+namespace DCORA {
 
 //"L2", "L1", "TLS", "Huber", "GM", "GNC_TLS"
 std::string RobustCostParameters::robustCostName(RobustCostParameters::Type type) {
@@ -133,4 +133,4 @@ void RobustCost::update() {
   }
 }
 
-}  // namespace DPGO
+}  // namespace DCORA

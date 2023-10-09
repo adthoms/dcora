@@ -1,17 +1,17 @@
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/DPGO_robust.h>
-#include <DPGO/PoseGraph.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
-#include <DPGO/QuadraticOptimizer.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/DCORA_solver.h>
+#include <DCORA/DCORA_robust.h>
+#include <DCORA/PoseGraph.h>
+#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/QuadraticOptimizer.h>
 #include <iostream>
 #include <random>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DCORA;
 
-TEST(testDPGO, testRobustSingleRotationAveragingTrivial) {
+TEST(testDCORA, testRobustSingleRotationAveragingTrivial) {
   for (int trial = 0; trial < 50; ++trial) {
     const Matrix RTrue = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
     const double cbar = angular2ChordalSO3(0.5);  // approximately 30 deg
@@ -29,7 +29,7 @@ TEST(testDPGO, testRobustSingleRotationAveragingTrivial) {
   }
 }
 
-TEST(testDPGO, testRobustSingleRotationAveraging) {
+TEST(testDCORA, testRobustSingleRotationAveraging) {
   for (int trial = 0; trial < 50; ++trial) {
     const double tol = angular2ChordalSO3(0.02);
     const double cbar = angular2ChordalSO3(0.3);
@@ -59,7 +59,7 @@ TEST(testDPGO, testRobustSingleRotationAveraging) {
   }
 }
 
-TEST(testDPGO, testRobustSinglePoseAveragingTrivial) {
+TEST(testDCORA, testRobustSinglePoseAveragingTrivial) {
   for (int trial = 0; trial < 50; ++trial) {
     const Matrix RTrue = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
     const Vector tTrue = Eigen::Vector3d::Zero();
@@ -83,7 +83,7 @@ TEST(testDPGO, testRobustSinglePoseAveragingTrivial) {
   }
 }
 
-TEST(testDPGO, testRobustSinglePoseAveraging) {
+TEST(testDCORA, testRobustSinglePoseAveraging) {
   for (int trial = 0; trial < 50; ++trial) {
     const double RMaxError = angular2ChordalSO3(0.02);
     const double tMaxError = 1e-2;
@@ -128,7 +128,7 @@ TEST(testDPGO, testRobustSinglePoseAveraging) {
 }
 
 
-TEST(testDPGO, testPrior) {
+TEST(testDCORA, testPrior) {
   size_t dimension = 3;
   size_t num_poses = 2;
   size_t robot_id = 0;
@@ -190,7 +190,7 @@ TEST(testDPGO, testPrior) {
 }
 
 
-TEST(testDPGO, testRobustPGO) {
+TEST(testDCORA, testRobustPGO) {
   int d = 3;
   int n = 4;
   double kappa = 10000;

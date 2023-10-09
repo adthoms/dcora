@@ -5,9 +5,9 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/PGOAgent.h>
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/QuadraticOptimizer.h>
+#include <DCORA/CORAAgent.h>
+#include <DCORA/DCORA_solver.h>
+#include <DCORA/QuadraticOptimizer.h>
 #include <glog/logging.h>
 
 #include <Eigen/CholmodSupport>
@@ -24,7 +24,7 @@ using std::set;
 using std::thread;
 using std::vector;
 
-namespace DPGO {
+namespace DCORA {
 
 PGOAgent::PGOAgent(unsigned ID, const PGOAgentParameters &params)
     : mID(ID), d(params.d), r(params.r), X(r, d, 1),
@@ -1211,4 +1211,4 @@ bool PGOAgent::anchorFirstPose(const LiftedPose &prior) {
   return true;
 }
 
-}  // namespace DPGO
+}  // namespace DCORA

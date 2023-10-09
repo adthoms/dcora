@@ -4,12 +4,12 @@
  * Authors: Yulun Tian, et al. (see README for the full author list)
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
-#include <DPGO/PGOLogger.h>
+#include <DCORA/CORALogger.h>
 #include <Eigen/Geometry>
 #include <utility>
 #include <glog/logging.h>
 
-namespace DPGO {
+namespace DCORA {
 
 PGOLogger::PGOLogger(std::string logDir) : logDirectory(std::move(logDir)) {}
 

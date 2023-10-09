@@ -2,7 +2,7 @@
 
 
 ## Introduction
-This repository contains implementation of synchronous and asynchronous Distributed Pose Graph Optimization (DPGO).  The algorithms are described in the following publications:
+This repository contains implementation of synchronous and asynchronous Distributed Pose Graph Optimization (DCORA).  The algorithms are described in the following publications:
 
  - Y. Tian, K. Khosoussi, D. M. Rosen, J. P. How. [**Distributed Certifiably Correct Pose-Graph Optimization**](https://arxiv.org/abs/1911.03721), in IEEE Transactions on Robotics, 2021, **honorable mention for 2021 King-Sun Fu Memorial Best Paper Award**.
  
@@ -34,7 +34,7 @@ The built executables are located in directory build/bin. For a minimal demo of 
 
 Optionally, run the unit tests by,
 ```
-./bin/testDPGO
+./bin/testDCORA
 ```
 
 ## More Examples in ROS
@@ -43,7 +43,7 @@ A ROS wrapper of dpgo is provided: [dpgo_ros](https://github.com/mit-acl/dpgo_ro
 
 ## Usage in multi-robot collaborative SLAM
 
-DPGO is currently used as the distributed back-end in [Kimera-Multi](https://github.com/MIT-SPARK/Kimera-Multi), which is a robust and fully distributed system for multi-robot collaborative SLAM. Check out the [full system](https://github.com/MIT-SPARK/Kimera-Multi) as well as the accompanying [datasets](https://github.com/MIT-SPARK/Kimera-Multi-Data)!
+DCORA is currently used as the distributed back-end in [Kimera-Multi](https://github.com/MIT-SPARK/Kimera-Multi), which is a robust and fully distributed system for multi-robot collaborative SLAM. Check out the [full system](https://github.com/MIT-SPARK/Kimera-Multi) as well as the accompanying [datasets](https://github.com/MIT-SPARK/Kimera-Multi-Data)!
 
 ## Citations
 

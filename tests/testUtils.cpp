@@ -1,23 +1,23 @@
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/DPGO_robust.h>
-#include <DPGO/PoseGraph.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/DCORA_solver.h>
+#include <DCORA/DCORA_robust.h>
+#include <DCORA/PoseGraph.h>
+#include <DCORA/manifold/LiftedSEManifold.h>
 #include <iostream>
 #include <random>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DCORA;
 
-TEST(testDPGO, testStiefelGeneration) {
+TEST(testDCORA, testStiefelGeneration) {
   Matrix Y = fixedStiefelVariable(3, 5);
   Matrix I = Matrix::Identity(3, 3);
   Matrix D = Y.transpose() * Y - I;
   ASSERT_LE(D.norm(), 1e-5);
 }
 
-TEST(testDPGO, testStiefelRepeat) {
+TEST(testDCORA, testStiefelRepeat) {
   Matrix Y = fixedStiefelVariable(3, 5);
   for (size_t i = 0; i < 10; ++i) {
     Matrix Y_ = fixedStiefelVariable(3, 5);
@@ -25,7 +25,7 @@ TEST(testDPGO, testStiefelRepeat) {
   }
 }
 
-TEST(testDPGO, testStiefelProjection) {
+TEST(testDCORA, testStiefelProjection) {
   size_t d = 3;
   size_t r = 5;
   Matrix I = Matrix::Identity(d, d);
@@ -37,7 +37,7 @@ TEST(testDPGO, testStiefelProjection) {
   }
 }
 
-TEST(testDPGO, testLiftedSEManifoldProjection) {
+TEST(testDCORA, testLiftedSEManifoldProjection) {
   int d = 3;
   int r = 5;
   int n = 100;
@@ -53,7 +53,7 @@ TEST(testDPGO, testLiftedSEManifoldProjection) {
   }
 }
 
-TEST(testDPGO, testChi2Inv) {
+TEST(testDCORA, testChi2Inv) {
   unsigned dof = 4;
   double quantile = 0.95;
   double threshold = chi2inv(quantile, dof);

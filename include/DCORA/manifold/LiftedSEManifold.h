@@ -8,14 +8,14 @@
 #ifndef LIFTEDSEMANIFOLD_H
 #define LIFTEDSEMANIFOLD_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/manifold/Poses.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/manifold/Poses.h>
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DCORA {
 
 class LiftedSEManifold {
  public:
@@ -49,6 +49,6 @@ class LiftedSEManifold {
   ROPTLIB::ProductManifold *CartanManifold;
   ROPTLIB::ProductManifold *MyManifold;
 };
-}  // namespace DPGO
+}  // namespace DCORA
 
 #endif

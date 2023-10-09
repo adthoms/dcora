@@ -8,12 +8,12 @@
 #ifndef RELATIVESEMEASUREMENT_H
 #define RELATIVESEMEASUREMENT_H
 
-#include <DPGO/DPGO_types.h>
+#include <DCORA/DCORA_types.h>
 
 #include <Eigen/Dense>
 #include <iostream>
 
-namespace DPGO {
+namespace DCORA {
 
 /** A simple struct that contains the elements of a relative SE measurement
     from pose (r1, p1) to (r2, p2)
@@ -87,5 +87,5 @@ struct RelativeSEMeasurement {
     return os;
   }
 };
-};  // namespace DPGO
+};  // namespace DCORA
 #endif

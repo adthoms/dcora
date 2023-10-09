@@ -1,15 +1,15 @@
 //
 // Created by yulun on 11/17/21.
 //
-#include <DPGO/manifold/Poses.h>
-#include <DPGO/DPGO_utils.h>
+#include <DCORA/manifold/Poses.h>
+#include <DCORA/DCORA_utils.h>
 #include <iostream>
 
 #include "gtest/gtest.h"
 
-using namespace DPGO;
+using namespace DCORA;
 
-TEST(testDPGO, testLiftedPoseArray) {
+TEST(testDCORA, testLiftedPoseArray) {
   for (int trial = 0; trial < 50; ++trial) {
     int r = 5;
     int d = 3;
@@ -34,7 +34,7 @@ TEST(testDPGO, testLiftedPoseArray) {
   }
 }
 
-TEST(testDPGO, testLiftedPose) {
+TEST(testDCORA, testLiftedPose) {
   int d = 3;
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
@@ -47,7 +47,7 @@ TEST(testDPGO, testLiftedPose) {
   }
 }
 
-TEST(testDPGO, testPoseIdentity) {
+TEST(testDCORA, testPoseIdentity) {
   int d = 3;
   Pose T(d);
   ASSERT_LE((T.identity().rotation() - Matrix::Identity(d, d)).norm(), 1e-6);
@@ -55,7 +55,7 @@ TEST(testDPGO, testPoseIdentity) {
   ASSERT_LE((T.identity().matrix() - Matrix::Identity(d + 1, d + 1)).norm(), 1e-6);
 }
 
-TEST(testDPGO, testPoseInverse) {
+TEST(testDCORA, testPoseInverse) {
   for (int trial = 0; trial < 50; ++trial) {
     int d = 3;
     Pose T(d);
@@ -67,7 +67,7 @@ TEST(testDPGO, testPoseInverse) {
   }
 }
 
-TEST(testDPGO, testPoseMultiplication) {
+TEST(testDCORA, testPoseMultiplication) {
   for (int trial = 0; trial < 50; ++trial) {
     int d = 3;
     Pose T1(d);

@@ -1,7 +1,7 @@
 # PROJECT CONFIGURATION
 cmake_minimum_required(VERSION 3.5)
 
-project(DPGO)
+project(DCORA)
 
 if(NOT CMAKE_BUILD_TYPE)
     # Options: Debug, Release, MinSizeRel, RelWithDebInfo
@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -pthread -O3")
 
 include(GNUInstallDirs)
-set(DPGO_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/DPGO)
+set(DCORA_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/DCORA)
 SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 # Directory for built libraries
@@ -71,27 +71,27 @@ set(EXTERNAL_INCLUDES
 	${GLOG_INCLUDE_DIRS}
 	CACHE INTERNAL "")
 
-add_library(DPGO SHARED
+add_library(DCORA SHARED
 	src/manifold/Poses.cpp
 	src/manifold/LiftedSEManifold.cpp
 	src/manifold/LiftedSEVariable.cpp
 	src/manifold/LiftedSEVector.cpp
 	src/PoseGraph.cpp
-	src/PGOAgent.cpp
+	src/CORAAgent.cpp
 	src/QuadraticProblem.cpp
 	src/QuadraticOptimizer.cpp
-	src/DPGO_utils.cpp
-	src/DPGO_solver.cpp
-    src/DPGO_robust.cpp
-	src/PGOLogger.cpp)
+	src/DCORA_utils.cpp
+	src/DCORA_solver.cpp
+  src/DCORA_robust.cpp
+	src/CORALogger.cpp)
 
-target_include_directories(DPGO PUBLIC
+target_include_directories(DCORA PUBLIC
 	${EXTERNAL_INCLUDES}
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 	# INSTALL
-	$<INSTALL_INTERFACE:${DPGO_INSTALL_INCLUDEDIR}>
+	$<INSTALL_INTERFACE:${DCORA_INSTALL_INCLUDEDIR}>
 	)
-target_link_libraries(DPGO
+target_link_libraries(DCORA
 		${CMAKE_THREAD_LIBS_INIT}
 		roptlib
 		${GLOG_LIBRARIES}
@@ -101,32 +101,32 @@ target_link_libraries(DPGO
 
 if(OPENMP_FOUND)
 # Add additional compilation flags to enable OpenMP support
-	set_target_properties(DPGO PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
-	set_target_properties(DPGO PROPERTIES LINK_FLAGS "-fopenmp")
-	target_link_libraries(DPGO)
+	set_target_properties(DCORA PROPERTIES COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
+	set_target_properties(DCORA PROPERTIES LINK_FLAGS "-fopenmp")
+	target_link_libraries(DCORA)
 endif()
 
-# Build Distributed PGO example
+# Build Distributed CORA example
 add_executable(multi-robot-example
 		examples/MultiRobotExample.cpp)
-target_link_libraries(multi-robot-example DPGO)
+target_link_libraries(multi-robot-example DCORA)
 
 add_executable(chordal-initialization-example
 		examples/ChordalInitializationExample.cpp)
-target_link_libraries(chordal-initialization-example DPGO)
+target_link_libraries(chordal-initialization-example DCORA)
 
 add_executable(single-robot-example
 	examples/SingleRobotExample.cpp)
-target_link_libraries(single-robot-example DPGO)
+target_link_libraries(single-robot-example DCORA)
 
 add_executable(single-robot-gnc-example
 		examples/SingleRobotGNCExample.cpp)
-target_link_libraries(single-robot-gnc-example DPGO)
+target_link_libraries(single-robot-gnc-example DCORA)
 
 ############################### TESTS ##########################################
 ### Add testing
-option(BUILD_DPGO_TESTS "Build tests" ON)
-if(BUILD_DPGO_TESTS)
+option(BUILD_DCORA_TESTS "Build tests" ON)
+if(BUILD_DCORA_TESTS)
 
 	configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gtest.cmake googletest-download/CMakeLists.txt)
 	execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -160,68 +160,68 @@ if(BUILD_DPGO_TESTS)
 	endif()
 
 	add_executable(
-			testDPGO
+			testDCORA
 			tests/testUtils.cpp
-			tests/testPGO.cpp
-            tests/testPoses.cpp
+			tests/testCORA.cpp
+      tests/testPoses.cpp
 			tests/testEigenMap.cpp
 			tests/testConstruction.cpp
 			tests/testLineGraph.cpp
 			tests/testTriangleGraph.cpp
 			tests/testOptimizationThread.cpp)
-	target_include_directories(testDPGO PUBLIC
+	target_include_directories(testDCORA PUBLIC
 		${EXTERNAL_INCLUDES}
 		${CMAKE_CURRENT_SOURCE_DIR}/include>
 		${CMAKE_SOURCE_DIR}/eigen>
 	)
 	target_link_libraries(
-		testDPGO
+		testDCORA
 		gtest_main
-		DPGO
+		DCORA
 		)
 	add_test(
-		NAME testDPGO
+		NAME testDCORA
 		COMMAND ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}/unit_tests
 		)
-endif(BUILD_DPGO_TESTS)
+endif(BUILD_DCORA_TESTS)
 
 ############################### INSTALL ##########################################
 include(CMakePackageConfigHelpers)
-set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/DPGO)
+set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/DCORA)
 
-write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/DPGOConfigVersion.cmake
+write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/DCORAConfigVersion.cmake
   VERSION 1.0
   COMPATIBILITY AnyNewerVersion
 )
 
-configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/DPGOConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/DPGOConfig.cmake
+configure_package_config_file(${CMAKE_CURRENT_LIST_DIR}/cmake/DCORAConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/DCORAConfig.cmake
   INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
 )
 
 # install the configuration file
 install(FILES
-  ${CMAKE_CURRENT_BINARY_DIR}/DPGOConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/DCORAConfig.cmake
   DESTINATION ${INSTALL_CONFIGDIR}
 )
 
 # Install header files
 install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/include/
-  DESTINATION ${DPGO_INSTALL_INCLUDEDIR}
+  DESTINATION ${DCORA_INSTALL_INCLUDEDIR}
   FILES_MATCHING PATTERN "*.h"
 )
 
-install(TARGETS DPGO
-		EXPORT 	DPGOTargets
+install(TARGETS DCORA
+		EXPORT 	DCORATargets
 		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 		)
 
-install(EXPORT DPGOTargets
-		FILE DPGOTargets.cmake
+install(EXPORT DCORATargets
+		FILE DCORATargets.cmake
 		DESTINATION ${INSTALL_CONFIGDIR}
 		)
 
-export(TARGETS DPGO FILE DPGOTargets.cmake)
+export(TARGETS DCORA FILE DCORATargets.cmake)
 
 ############################### UNINSTALL ##########################################
 if(NOT TARGET uninstall)

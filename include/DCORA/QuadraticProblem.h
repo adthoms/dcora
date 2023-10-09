@@ -8,11 +8,11 @@
 #ifndef QUADRATICPROBLEM_H
 #define QUADRATICPROBLEM_H
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/manifold/LiftedSEManifold.h>
-#include <DPGO/manifold/LiftedSEVariable.h>
-#include <DPGO/manifold/LiftedSEVector.h>
-#include <DPGO/PoseGraph.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/manifold/LiftedSEVariable.h>
+#include <DCORA/manifold/LiftedSEVector.h>
+#include <DCORA/PoseGraph.h>
 
 #include <Eigen/CholmodSupport>
 #include <Eigen/Dense>
@@ -23,7 +23,7 @@
 #include "Problems/Problem.h"
 
 /*Define the namespace*/
-namespace DPGO {
+namespace DCORA {
 
 /** This class implements a ROPTLIB problem with the following cost function:
     f(X) = 0.5*<Q, XtX> + <X,G>
@@ -114,6 +114,6 @@ class QuadraticProblem : public ROPTLIB::Problem {
   void setElement(ROPTLIB::Element *element, const Matrix *matrix) const;
 };
 
-}  // namespace DPGO
+}  // namespace DCORA
 
 #endif

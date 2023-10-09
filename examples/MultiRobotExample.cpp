@@ -6,17 +6,17 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DPGO/DPGO_types.h>
-#include <DPGO/DPGO_solver.h>
-#include <DPGO/PGOAgent.h>
-#include <DPGO/QuadraticProblem.h>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/DCORA_solver.h>
+#include <DCORA/CORAAgent.h>
+#include <DCORA/QuadraticProblem.h>
 
 #include <cstdlib>
 #include <cassert>
 #include <iostream>
 
 using namespace std;
-using namespace DPGO;
+using namespace DCORA;
 
 int main(int argc, char **argv) {
   /**
