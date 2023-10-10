@@ -16,6 +16,8 @@
 #include <chrono>
 
 // ROPTLIB includes
+#include "Manifolds/Euclidean/Euclidean.h"
+#include "Manifolds/Oblique/Oblique.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
 namespace DCORA {
@@ -52,6 +54,20 @@ class SimpleTimer {
  * @param filename
  */
 void writeMatrixToFile(const Matrix &M, const std::string &filename);
+
+/**
+ * @brief Map a Matrix to a Vector
+ * @param M
+ * @return
+ */
+Vector mapMatrixToVector(const Matrix &M);
+
+/**
+ * @brief Map a Vector to a Matrix
+ * @param P
+ * @return
+ */
+Matrix mapVectorToMatrix(const Vector &P);
 
 /**
  * @brief Write a sparse matrix to file
@@ -117,18 +133,62 @@ Matrix projectToRotationGroup(const Matrix &M);
 Matrix projectToStiefelManifold(const Matrix &M);
 
 /**
-  Generate a fixed element of the Stiefel element
-  The returned value is guaranteed to be the same for each d and r
-*/
-Matrix fixedStiefelVariable(unsigned d, unsigned r);
+ * @brief project an input matrix M to the Oblique manifold
+ * @param M
+ * @return orthogonal projection of M to Oblique manifold
+ */
+Matrix projectToObliqueManifold(const Matrix &M);
+
+/**
+  @brief Generate a fixed element of the Stiefel element
+  The returned value is guaranteed to be the same for each r and d
+ * @param r
+ * @param b
+ * @return
+ */
+Matrix fixedStiefelVariable(unsigned r, unsigned d);
+
+/**
+ * @brief Generate a fixed element of the Euclidean element
+ *  The returned value is guaranteed to be the same for each r and b
+ * @param r
+ * @param b
+ * @return
+ */
+Matrix fixedEuclideanVariable(unsigned r, unsigned b);
+
+/**
+ * @brief Generate a fixed element of the Oblique element
+ *  The returned value is guaranteed to be the same for each r and l
+ * @param r
+ * @param l
+ * @return
+ */
+Matrix fixedObliqueVariable(unsigned r, unsigned l);
 
 /**
  * @brief Generate a random element of the Stiefel manifold
- * @param d
- * @param r
- * @return
+  * @param d
+  * @param r
+  * @return
  */
 Matrix randomStiefelVariable(unsigned d, unsigned r);
+
+/**
+ * @brief Generate a random element of the Euclidean manifold
+ * @param r
+ * @param b
+ * @return
+ */
+Matrix randomEuclideanVariable(unsigned r, unsigned b);
+
+/**
+ * @brief Generate a random element of the Oblique manifold
+ * @param r
+ * @param l
+ * @return
+ */
+Matrix randomObliqueVariable(unsigned r, unsigned l);
 
 /**
  * @brief Compute the error term (weighted squared residual)
@@ -170,6 +230,42 @@ void checkRotationMatrix(const Matrix &R);
  * @param Y
  */
 void checkStiefelMatrix(const Matrix &Y);
+
+/**
+ * @brief Check that the SE input matrix is of dimension r-by-(d+1)*n
+ * @param X
+ */
+void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n);
+
+/**
+ * @brief Check that the RA input matrix is of dimension r-by-(d+1)*n+b+l
+ * @param X
+ */
+void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
+
+/**
+ * @brief partition the RA input matrix into SE, E, and OB matrices, respectively
+ * @param X
+ * @return
+ */
+std::tuple<Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
+
+/**
+ * @brief create RA matrix from SE, E, and OB matrices
+ * @param X_SE
+ * @param X_E
+ * @param X_OB
+ * @return
+ */
+Matrix createRAMatrix(const Matrix &X_SE, const Matrix &X_E, const Matrix &X_OB);
+
+/**
+ * @brief Copy array data from Eigen matrix to ROPTLIB element
+ * @param Y
+ * @param var
+ * @param mem_size
+ */
+void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, double mem_size);
 
 }  // namespace DCORA
 

@@ -17,7 +17,7 @@ TEST(testDCORA, testLiftedPoseArray) {
     LiftedPoseArray var(r, d, n);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
-      auto Yi = randomStiefelVariable(d, r);
+      auto Yi = randomStiefelVariable(r, d);
       auto pi = (i + 1) * Vector::Ones(r);
       var.rotation(i) = Yi;
       var.translation(i) = pi;
@@ -34,16 +34,48 @@ TEST(testDCORA, testLiftedPoseArray) {
   }
 }
 
+TEST(testDCORA, testLiftedTranslationArray) {
+  for (int trial = 0; trial < 50; ++trial) {
+    int r = 5;
+    int d = 3;
+    int n = 3;
+    LiftedTranslationArray var(r, d, n);
+    // Test setter and getter methods
+    for (int i = 0; i < n; ++i) {
+      auto pi = randomEuclideanVariable(r, 1);
+      var.translation(i) = pi;
+      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
+    }
+    // Test copy constructor
+    LiftedTranslationArray var2(var);
+    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+    // Test assignment
+    LiftedTranslationArray var3(r, d, n);
+    var3 = var;
+    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  }
+}
+
 TEST(testDCORA, testLiftedPose) {
   int d = 3;
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
     Matrix Xi = Matrix::Zero(r, d + 1);;
-    Xi.block(0, 0, r, d) = randomStiefelVariable(d, r);
+    Xi.block(0, 0, r, d) = randomStiefelVariable(r, d);
     Xi.col(d) = (trial + 1) * Vector::Ones(r);
     // Test constructor from Eigen matrix
     LiftedPose var(Xi);
     ASSERT_LE((Xi - var.getData()).norm(), 1e-6);
+  }
+}
+
+TEST(testDCORA, testLiftedTranslation) {
+  int r = 5;
+  for (int trial = 0; trial < 50; ++trial) {
+    Vector Pi = mapMatrixToVector(randomEuclideanVariable(r, 1));
+    // Test constructor from Eigen vector
+    LiftedTranslation var(Pi);
+    ASSERT_LE((Pi - var.getData()).norm(), 1e-6);
   }
 }
 
@@ -53,6 +85,12 @@ TEST(testDCORA, testPoseIdentity) {
   ASSERT_LE((T.identity().rotation() - Matrix::Identity(d, d)).norm(), 1e-6);
   ASSERT_LE((T.identity().translation() - Vector::Zero(d)).norm(), 1e-6);
   ASSERT_LE((T.identity().matrix() - Matrix::Identity(d + 1, d + 1)).norm(), 1e-6);
+}
+
+TEST(testDCORA, testTranslationZeroVector) {
+  int d = 3;
+  Translation P(d);
+  ASSERT_LE((P.zeroVector().translation() - Vector::Zero(d)).norm(), 1e-6);
 }
 
 TEST(testDCORA, testPoseInverse) {

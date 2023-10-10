@@ -8,16 +8,13 @@
 #include <DCORA/manifold/LiftedSEVector.h>
 #include <glog/logging.h>
 
-using namespace std;
-using namespace ROPTLIB;
-
 namespace DCORA {
 
 LiftedSEVector::LiftedSEVector(int r, int d, int n) {
-  StiefelVector = new StieVector(r, d);
-  EuclideanVector = new EucVector(r);
-  CartanVector = new ProductElement(2, StiefelVector, 1, EuclideanVector, 1);
-  MyVector = new ProductElement(1, CartanVector, n);
+  StiefelVector = new ROPTLIB::StieVector(r, d);
+  EuclideanVector = new ROPTLIB::EucVector(r);
+  CartanVector = new ROPTLIB::ProductElement(2, StiefelVector, 1, EuclideanVector, 1);
+  MySEVector = new ROPTLIB::ProductElement(1, CartanVector, n);
 }
 
 LiftedSEVector::~LiftedSEVector() {
@@ -25,32 +22,30 @@ LiftedSEVector::~LiftedSEVector() {
   delete StiefelVector;
   delete EuclideanVector;
   delete CartanVector;
-  delete MyVector;
+  delete MySEVector;
 }
 
 Matrix LiftedSEVector::getData() {
-  auto *T = dynamic_cast<ProductElement *>(MyVector->GetElement(0));
-  const int *sizes = T->GetElement(0)->Getsize();
-  unsigned int r = sizes[0];
-  unsigned int d = sizes[1];
-  unsigned int n = MyVector->GetNumofElement();
-  return Eigen::Map<Matrix>((double *)MyVector->ObtainReadData(), r,
-                            n * (d + 1));
+  setSize();
+  return Eigen::Map<Matrix>((double *)MySEVector->ObtainReadData(), r_,
+                            n_ * (d_ + 1));
+}
+void LiftedSEVector::setData(const Matrix &X) {
+  setSize();
+  checkSEMatrixSize(X, r_, d_, n_);
+  copyEigenMatrixToROPTLIBVariable(X, MySEVector, r_ * (d_ + 1) * n_);
 }
 
-void LiftedSEVector::setData(const Matrix &Y) {
-  auto *T = dynamic_cast<ROPTLIB::ProductElement *>(MyVector->GetElement(0));
+void LiftedSEVector::getSize(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el) {
+  auto *T = dynamic_cast<ROPTLIB::ProductElement *>(productElement->GetElement(0));
   const int *sizes = T->GetElement(0)->Getsize();
-  unsigned int r = sizes[0];
-  unsigned int d = sizes[1];
-  unsigned int n = MyVector->GetNumofElement();
-  CHECK_EQ(Y.rows(), r);
-  CHECK_EQ(Y.cols(), (d+1) * n);
+  row = sizes[0];
+  col = sizes[1];
+  num_el = productElement->GetNumofElement();
+}
 
-  // Copy array data from Eigen matrix to ROPTLIB variable
-  const double *matrix_data = Y.data();
-  double *prodvar_data = MyVector->ObtainWriteEntireData();
-  memcpy(prodvar_data, matrix_data, sizeof(double) * r * (d + 1) * n);
+void LiftedSEVector::setSize() {
+  LiftedSEVector::getSize(MySEVector, r_, d_, n_);
 }
 
 }  // namespace DCORA
