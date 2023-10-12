@@ -30,10 +30,8 @@ LiftedRAVector::~LiftedRAVector() {
 
 Matrix LiftedRAVector::getData() {
   setSize();
-  Matrix X_SE = Eigen::Map<Matrix>((double *)MySEVector->ObtainReadData(), r_,  n_ * (d_ + 1));
-  Matrix X_E = Eigen::Map<Matrix>((double *)MyEVector->ObtainReadData(), r_, b_);
-  Matrix X_OB = Eigen::Map<Matrix>((double *)MyOBVector->ObtainReadData(), r_, l_);
-  return createRAMatrix(X_SE, X_E, X_OB);
+  return Eigen::Map<Matrix>((double *)MyRAVector->ObtainReadData(), r_,
+                          n_ * (d_ + 1) + b_ + l_);
 }
 
 void LiftedRAVector::setData(const Matrix &X) {
@@ -42,15 +40,14 @@ void LiftedRAVector::setData(const Matrix &X) {
   copyEigenMatrixToROPTLIBVariable(X_SE, MySEVector, r_ * (d_ + 1) * n_);
   copyEigenMatrixToROPTLIBVariable(X_E, MyEVector, r_ * b_);
   copyEigenMatrixToROPTLIBVariable(X_OB, MyOBVector, r_ * l_);
+  copyEigenMatrixToROPTLIBVariable(X, MyRAVector, r_ * ((d_ + 1) * n_ + b_ + l_));
 }
 
 void LiftedRAVector::setSize() {
   LiftedSEVector::setSize();
-  unsigned int col_e, col_ob;
-  LiftedSEVector::getSize(MyEVector, r_, col_e, b_);
-  LiftedSEVector::getSize(MyOBVector, r_, col_ob, l_);
-  CHECK_EQ(col_e, 1);
-  CHECK_EQ(col_e, col_ob);
+  unsigned int row, col;
+  LiftedSEVector::setSizeFromProductElement(MyEVector, row, col, b_);
+  LiftedSEVector::setSizeFromProductElement(MyOBVector, row, col, l_);
 }
 
 }  // namespace DCORA

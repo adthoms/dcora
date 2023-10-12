@@ -9,9 +9,6 @@
 #include <DCORA/manifold/LiftedRAVariable.h>
 #include <glog/logging.h>
 
-using namespace std;
-using namespace ROPTLIB;
-
 namespace DCORA {
 LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l) :
     LiftedSEVariable(r, d, n), b_(b), l_(l),
@@ -63,11 +60,11 @@ Matrix LiftedRAVariable::getData() const {
 }
 
 void LiftedRAVariable::setData(const Matrix &X) {
-  checkRAMatrixSize(X, r_, d_, n_, b_ , l_);
   auto [X_SE, X_E, X_OB] = partitionRAMatrix(X, r_, d_, n_, b_ , l_);
   copyEigenMatrixToROPTLIBVariable(X_SE, varSE_.get(), r_ * (d_ + 1) * n_);
   copyEigenMatrixToROPTLIBVariable(X_E, varE_.get(), r_ * b_);
   copyEigenMatrixToROPTLIBVariable(X_OB, varOB_.get(), r_ * l_);
+  copyEigenMatrixToROPTLIBVariable(X, varRA_.get(), r_ * ((d_ + 1) * n_ + b_ + l_));
 }
 
 Eigen::Ref<Vector> LiftedRAVariable::translationLandmark(unsigned int index) {

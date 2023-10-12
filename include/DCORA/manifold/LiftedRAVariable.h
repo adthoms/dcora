@@ -96,7 +96,7 @@ class LiftedRAVariable : public LiftedSEVariable {
    */
   Vector translationRange(unsigned int index) const;
 
- protected:
+ private:
   // const dimensions
   unsigned int b_, l_;
   // The actual content of this variable is stored inside a ROPTLIB::ProductElement

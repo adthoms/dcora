@@ -36,16 +36,16 @@ void LiftedSEVector::setData(const Matrix &X) {
   copyEigenMatrixToROPTLIBVariable(X, MySEVector, r_ * (d_ + 1) * n_);
 }
 
-void LiftedSEVector::getSize(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el) {
+void LiftedSEVector::setSize() {
+  LiftedSEVector::setSizeFromProductElement(MySEVector, r_, d_, n_);
+}
+
+void LiftedSEVector::setSizeFromProductElement(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el) {
   auto *T = dynamic_cast<ROPTLIB::ProductElement *>(productElement->GetElement(0));
   const int *sizes = T->GetElement(0)->Getsize();
   row = sizes[0];
   col = sizes[1];
   num_el = productElement->GetNumofElement();
-}
-
-void LiftedSEVector::setSize() {
-  LiftedSEVector::getSize(MySEVector, r_, d_, n_);
 }
 
 }  // namespace DCORA

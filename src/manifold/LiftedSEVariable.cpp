@@ -9,9 +9,6 @@
 #include <DCORA/manifold/LiftedSEVariable.h>
 #include <glog/logging.h>
 
-using namespace std;
-using namespace ROPTLIB;
-
 namespace DCORA {
 LiftedSEVariable::LiftedSEVariable(unsigned int r, unsigned int d, unsigned int n) :
     r_(r), d_(d), n_(n),

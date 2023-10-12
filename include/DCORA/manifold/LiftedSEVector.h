@@ -50,18 +50,18 @@ class LiftedSEVector {
    */
   virtual void setData(const Matrix& X);
   /**
-   * @brief Get underlying ROPTLIB vector size as rows, columns, and number of elements, respectively
+   * @brief Set underlying ROPTLIB vector size
+   * @return
+   */
+  virtual void setSize();
+  /**
+   * @brief Set underlying ROPTLIB vector size from ROPTLIB product element size
    * @param productElement
    * @param row
    * @param col
    * @param num_el
    */
-  static void getSize(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el);
-  /**
-   * @brief Set underlying ROPTLIB vector size
-   * @return
-   */
-  virtual void setSize();
+  static void setSizeFromProductElement(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el);
 
  protected:
   unsigned int r_, d_, n_;
