@@ -16,7 +16,7 @@
 namespace DCORA {
 
 /**
- * @brief This class represents a RA SLAM synchronization vector
+ * @brief This class acts as container for ROPTLIB::ProductElement vectors for RA SLAM synchronization
  */
 class LiftedRAVector : public LiftedSEVector {
  public:

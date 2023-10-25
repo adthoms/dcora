@@ -19,7 +19,7 @@
 namespace DCORA {
 
 /**
- * @brief This class represents a SE(n) synchronization vector
+ * @brief This class acts as container for ROPTLIB::ProductElement vectors for SE(n) synchronization
  */
 class LiftedSEVector {
  public:
