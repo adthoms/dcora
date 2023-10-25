@@ -76,25 +76,25 @@ class LiftedRAVariable : public LiftedSEVariable {
    * @param index
    * @return
    */
-  Eigen::Ref<Vector> translationLandmark(unsigned int index);
+  Eigen::Ref<Vector> landmarkTranslation(unsigned int index);
   /**
    * @brief Obtain the read-only landmark translation at the specified index, expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Vector translationLandmark(unsigned int index) const;
+  Vector landmarkTranslation(unsigned int index) const;
   /**
-   * @brief Obtain the writable range translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the writable unit-sphere auxiliary variable for a range measurement at the specified index, expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Eigen::Ref<Vector> translationRange(unsigned int index);
+  Eigen::Ref<Vector> rangeUnitSphereVariable(unsigned int index);
   /**
-   * @brief Obtain the read-only range translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the read-only unit-sphere auxiliary variable at the specified index, expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Vector translationRange(unsigned int index) const;
+  Vector rangeUnitSphereVariable(unsigned int index) const;
 
  private:
   // const dimensions

@@ -21,10 +21,10 @@ LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d, unsigned int 
     X_OB_((double *) varOB_->ObtainWriteEntireData(), r, l),
     X_RA_((double *) varRA_->ObtainWriteEntireData(), r, (d + 1) * n + b + l) {
   for (unsigned int i = 0; i < b_; ++i) {
-    translationLandmark(i) = Vector::Zero(r_);
+    landmarkTranslation(i) = Vector::Zero(r_);
   }
   for (unsigned int i = 0; i < l_; ++i) {
-    translationRange(i) = Vector::Zero(r_);
+    rangeUnitSphereVariable(i) = Vector::Zero(r_);
   }
   X_RA_ = createRAMatrix(X_SE_, X_E_, X_OB_);
 }
@@ -67,25 +67,25 @@ void LiftedRAVariable::setData(const Matrix &X) {
   copyEigenMatrixToROPTLIBVariable(X, varRA_.get(), r_ * ((d_ + 1) * n_ + b_ + l_));
 }
 
-Eigen::Ref<Vector> LiftedRAVariable::translationLandmark(unsigned int index) {
+Eigen::Ref<Vector> LiftedRAVariable::landmarkTranslation(unsigned int index) {
   CHECK(index < b_);
   auto Xi = X_E_.block(0, index, r_, 1);
   return Xi.col(0);
 }
 
-Vector LiftedRAVariable::translationLandmark(unsigned int index) const {
+Vector LiftedRAVariable::landmarkTranslation(unsigned int index) const {
   CHECK(index < b_);
   auto Xi = X_E_.block(0, index, r_, 1);
   return Xi.col(0);
 }
 
-Eigen::Ref<Vector> LiftedRAVariable::translationRange(unsigned int index) {
+Eigen::Ref<Vector> LiftedRAVariable::rangeUnitSphereVariable(unsigned int index) {
   CHECK(index < l_);
   auto Xi = X_OB_.block(0, index, r_, 1);
   return Xi.col(0);
 }
 
-Vector LiftedRAVariable::translationRange(unsigned int index) const {
+Vector LiftedRAVariable::rangeUnitSphereVariable(unsigned int index) const {
   CHECK(index < l_);
   auto Xi = X_OB_.block(0, index, r_, 1);
   return Xi.col(0);
