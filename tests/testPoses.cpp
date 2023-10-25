@@ -72,7 +72,7 @@ TEST(testDCORA, testLiftedPose) {
 TEST(testDCORA, testLiftedTranslation) {
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
-    Vector Pi = mapMatrixToVector(randomEuclideanVariable(r, 1));
+    Vector Pi = convertMatrixTypeToVectorType(randomEuclideanVariable(r, 1));
     // Test constructor from Eigen vector
     LiftedTranslation var(Pi);
     ASSERT_LE((Pi - var.getData()).norm(), 1e-6);

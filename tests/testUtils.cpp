@@ -10,6 +10,26 @@
 
 using namespace DCORA;
 
+TEST(testDCORA, testConvertMatrixTypeToVectorType) {
+  Matrix A0 = Matrix::Random(3,1);
+  Vector P0 = convertMatrixTypeToVectorType(A0);
+  ASSERT_EQ(P0(0), A0(0,0));
+  ASSERT_EQ(P0(1), A0(1,0));
+  ASSERT_EQ(P0(2), A0(2,0));
+  Matrix A1 = Matrix::Random(3,2);
+  EXPECT_DEATH({
+    Vector P1 = convertMatrixTypeToVectorType(A1);
+  }, ".*");
+}
+
+TEST(testDCORA, testConvertVectorTypeToMatrixType) {
+  Vector P0 = Vector::Random(3);
+  Matrix A0 = convertVectorTypeToMatrixType(P0);
+  ASSERT_EQ(P0(0), A0(0,0));
+  ASSERT_EQ(P0(1), A0(1,0));
+  ASSERT_EQ(P0(2), A0(2,0));
+}
+
 TEST(testDCORA, testStiefelGeneration) {
   Matrix Y = fixedStiefelVariable(5, 3);
   Matrix I = Matrix::Identity(3, 3);

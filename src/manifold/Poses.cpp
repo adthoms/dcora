@@ -104,7 +104,7 @@ LiftedTranslationArray::LiftedTranslationArray(unsigned int r, unsigned int d, u
 
 void LiftedTranslationArray::setData(const Vector &P) {
   CHECK_EQ(P.rows(), r_);
-  X_ = mapVectorToMatrix(P);
+  X_ = convertVectorTypeToMatrixType(P);
 }
 
 Pose::Pose(const Matrix &T)

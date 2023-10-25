@@ -67,12 +67,12 @@ double SimpleTimer::Toc(const std::chrono::time_point<std::chrono::high_resoluti
   return t_elapsed.count();
 }
 
-Vector mapMatrixToVector(const Matrix &M) {
+Vector convertMatrixTypeToVectorType(const Matrix &M) {
   CHECK_EQ(M.cols(), 1);
   return Eigen::Map<Vector>((double *) M.data(), M.rows());
 }
 
-Matrix mapVectorToMatrix(const Vector &P) {
+Matrix convertVectorTypeToMatrixType(const Vector &P) {
   return Eigen::Map<Matrix>((double *) P.data(), P.rows(), 1);
 }
 
