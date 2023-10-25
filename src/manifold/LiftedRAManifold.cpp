@@ -28,12 +28,7 @@ Matrix LiftedRAManifold::project(const Matrix &M) const {
   auto [X_SE, X_E, X_OB] = partitionRAMatrix(M, r_, d_, n_, b_ , l_);
 
   X_SE = LiftedSEManifold::project(X_SE);
-#pragma omp parallel for
-  for (size_t i = 0; i < l_; ++i) {
-    X_OB.block(0, i, r_, 1) =
-        projectToObliqueManifold(X_OB.block(0, i, r_, 1));
-  }
-
+  X_OB = projectToObliqueManifold(X_OB);
   return createRAMatrix(X_SE, X_E, X_OB);
 }
 

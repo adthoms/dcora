@@ -495,16 +495,11 @@ Matrix projectToStiefelManifold(const Matrix &M) {
 }
 
 Matrix projectToObliqueManifold(const Matrix &M) {
-  size_t r = M.rows();
-  size_t d = M.cols();
-  CHECK(r >= d);
-
+  size_t l = M.cols();
   Matrix X = M;
-
 #pragma omp parallel for
-  for (size_t i = 0; i < d; ++i) {
-    Vector X_col =  X.block(0, i, r, 1);
-    X.block(0, i, r, 1) = X_col.normalized();
+  for (size_t i = 0; i < l; ++i) {
+    X.col(i) =  X.col(i).normalized();
   }
   return X;
 }
