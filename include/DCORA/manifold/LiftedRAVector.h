@@ -25,10 +25,10 @@ class LiftedRAVector : public LiftedSEVector {
    * @param r
    * @param d
    * @param n
-   * @param b
    * @param l
+   * @param b
    */
-  LiftedRAVector(int r, int d, int n, int b, int l);
+  LiftedRAVector(int r, int d, int n, int l, int b);
   /**
    * @brief Destructor
    */
@@ -55,11 +55,11 @@ class LiftedRAVector : public LiftedSEVector {
   void setSize() override;
 
  private:
-  unsigned int b_, l_;
-  ROPTLIB::EucVector* EuclideanLandmarkVector;
+  unsigned int l_, b_;
   ROPTLIB::ObliqueVector* ObliqueRangeVector;
-  ROPTLIB::ProductElement* MyEVector;
+  ROPTLIB::EucVector* EuclideanLandmarkVector;
   ROPTLIB::ProductElement* MyOBVector;
+  ROPTLIB::ProductElement* MyEVector;
   ROPTLIB::ProductElement* MyRAVector;
 };
 }  // namespace DCORA

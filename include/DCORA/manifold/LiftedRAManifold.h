@@ -25,10 +25,10 @@ class LiftedRAManifold : public LiftedSEManifold {
    * @param r
    * @param d
    * @param n
-   * @param b
    * @param l
+   * @param b
    */
-  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
+  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
   /**
    * @brief Destructor
    */
@@ -46,9 +46,9 @@ class LiftedRAManifold : public LiftedSEManifold {
   Matrix project(const Matrix &M) const override;
 
  private:
-  unsigned int b_, l_;
-  ROPTLIB::Euclidean *EuclideanLandmarkManifold;
+  unsigned int l_, b_;
   ROPTLIB::Oblique *ObliqueManifold;
+  ROPTLIB::Euclidean *EuclideanLandmarkManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };
 }  // namespace DCORA

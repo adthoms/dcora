@@ -244,20 +244,36 @@ void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned
 void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
 
 /**
- * @brief partition the RA input matrix into SE, E, and OB matrices, respectively
+ * @brief partition the SE input matrix into SE_R and SE_t matrices, respectively
  * @param X
  * @return
  */
-std::tuple<Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
+std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n);
 
 /**
- * @brief create RA matrix from SE, E, and OB matrices
- * @param X_SE
- * @param X_E
- * @param X_OB
+ * @brief partition the RA input matrix into SE_R, OB, SE_t, and E matrices, respectively
+ * @param X
  * @return
  */
-Matrix createRAMatrix(const Matrix &X_SE, const Matrix &X_E, const Matrix &X_OB);
+std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+
+/**
+ * @brief create SE matrix from X_SE_R and X_SE_t matrices
+ * @param X_SE_R
+ * @param X_SE_t
+ * @return
+ */
+Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t);
+
+/**
+ * @brief create RA matrix from SE_R, OB, X_SE_t, and E matrices
+ * @param X_SE_R
+ * @param X_OB
+ * @param X_SE_t
+ * @param X_E
+ * @return
+ */
+Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB, const Matrix &X_SE_t, const Matrix &X_E);
 
 /**
  * @brief Copy array data from Eigen matrix to ROPTLIB element

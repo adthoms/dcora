@@ -16,7 +16,7 @@
 namespace DCORA {
 
 /**
- * @brief This object represents a collection of "lifted" poses and translations X = [Y1 p1 ... Yn pn | l1 ... ln | r1 ... rn]
+ * @brief This object represents a collection of "lifted" poses, unit sphere variables, and translations X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
  * that can be used by ROPTLIB to perform Riemannian optimization
  */
 class LiftedRAVariable : public LiftedSEVariable {
@@ -26,13 +26,13 @@ class LiftedRAVariable : public LiftedSEVariable {
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param b number of landmarks
    * @param l number of ranges
+   * @param b number of landmarks
    */
-  LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
+  LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
   /**
-   * @brief Constructor from lifted pose and translation array objects
-   * @param poses
+   * @brief Constructor from lifted pose and translation array objects (TODO: replace with LiftedRangeAidedArray)
+   * @param poses TODO: update doc string to reflect new variable ordering
    */
   LiftedRAVariable(const LiftedPoseArray &poses, const LiftedTranslationArray &landmarks, const LiftedTranslationArray &ranges);
   /**
@@ -47,15 +47,15 @@ class LiftedRAVariable : public LiftedSEVariable {
    */
   LiftedRAVariable &operator=(const LiftedRAVariable &other);
   /**
-   * @brief Get number of landmarks
-   * @return
-   */
-  unsigned int b() const { return b_; }
-  /**
    * @brief Get number of ranges
    * @return
    */
   unsigned int l() const { return l_; }
+  /**
+   * @brief Get number of landmarks
+   * @return
+   */
+  unsigned int b() const { return b_; }
   /**
    * @brief Obtain the variable as an ROPTLIB::ProductElement
    * @return
@@ -63,12 +63,12 @@ class LiftedRAVariable : public LiftedSEVariable {
   ROPTLIB::ProductElement *var() override { return varRA_.get(); }
   /**
    * @brief Obtain the variable as an Eigen matrix
-   * @return r by (d+1)n+b+l matrix [Y1 p1 ... Yn pn | l1 ... ln | r1 ... rn]
+   * @return r by (d+1)n+l+b matrix [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
    */
   Matrix getData() const override;
   /**
    * @brief Set this variable from an Eigen matrix
-   * @param X r by (d+1)n+b+l matrix [Y1 p1 ... Yn pn | l1 ... ln | r1 ... rn]
+   * @param X r by (d+1)n+l+b matrix [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
    */
   void setData(const Matrix &X) override;
   /**
@@ -98,18 +98,18 @@ class LiftedRAVariable : public LiftedSEVariable {
 
  private:
   // const dimensions
-  unsigned int b_, l_;
+  unsigned int l_, b_;
   // The actual content of this variable is stored inside a ROPTLIB::ProductElement
-  std::unique_ptr<ROPTLIB::EucVariable> translation_landmark_var_;
   std::unique_ptr<ROPTLIB::ObliqueVariable> translation_ranges_var_;
-  std::unique_ptr<ROPTLIB::ProductElement> varE_;
+  std::unique_ptr<ROPTLIB::EucVariable> translation_landmark_var_;
   std::unique_ptr<ROPTLIB::ProductElement> varOB_;
+  std::unique_ptr<ROPTLIB::ProductElement> varE_;
   std::unique_ptr<ROPTLIB::ProductElement> varRA_;
-  // Internal view of the landmark variable as an eigen matrix of dimension r-by-b
-  Eigen::Map<Matrix> X_E_;
   // Internal view of the range variable as an eigen matrix of dimension r-by-l
   Eigen::Map<Matrix> X_OB_;
-  // Internal view of the RA SLAM domain variable as an eigen matrix of dimension r-by-(d+1)n+b+l
+  // Internal view of the landmark variable as an eigen matrix of dimension r-by-b
+  Eigen::Map<Matrix> X_E_;
+  // Internal view of the RA SLAM domain variable as an eigen matrix of dimension r-by-(d+1)n+l+b
   Eigen::Map<Matrix> X_RA_;
 };
 

@@ -506,7 +506,7 @@ Matrix projectToObliqueManifold(const Matrix &M) {
 
 Matrix fixedStiefelVariable(unsigned r, unsigned d) {
   std::srand(1);
-    ROPTLIB::StieVariable var(r, d);
+  ROPTLIB::StieVariable var(r, d);
   var.RandInManifold();
   return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
 }
@@ -583,22 +583,51 @@ void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned
   CHECK_EQ(X.cols(), (int) (d + 1) * n);
 }
 
-void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l) {
+void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
   CHECK_EQ(X.rows(), (int) r);
-  CHECK_EQ(X.cols(), (int) (d + 1) * n + b + l);
+  CHECK_EQ(X.cols(), (int) (d + 1) * n + l + b);
 }
 
-std::tuple<Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l) {
-  checkRAMatrixSize(X, r, d, n, b, l);
-  Matrix X_SE = X.block(0, 0, r, (d + 1) * n);
-  Matrix X_E = X.block(0, (d + 1) * n, r, b);
-  Matrix X_OB = X.block(0, (d + 1) * n + b, r, l);
-  return std::make_tuple(X_SE, X_E, X_OB);
+std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n) {
+  checkSEMatrixSize(X, r, d, n);
+
+  // preallocate
+  Matrix X_SE_R = Matrix::Zero(r, d * n);
+  Matrix X_SE_t = Matrix::Zero(r, n);
+
+  // partition
+#pragma omp parallel for
+  for (size_t i = 0; i < n; ++i) {
+    auto Y = X.block(0, i * (d + 1), r, d + 1);
+    X_SE_R.block(0, i * d, r, d) = Y.block(0, 0, r, d);
+    X_SE_t.block(0, i, r, 1) = Y.col(d);
+  }
+
+  return std::make_tuple(X_SE_R, X_SE_t);
 }
 
-Matrix createRAMatrix(const Matrix &X_SE, const Matrix &X_E, const Matrix &X_OB) {
-  Matrix X(X_SE.rows(), X_SE.cols() + X_E.cols() + X_OB.cols());
-  X << X_SE, X_E, X_OB;
+
+std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
+  checkRAMatrixSize(X, r, d, n, l, b);
+
+  // partition
+  Matrix X_SE_R = X.block(0, 0, r, d * n);
+  Matrix X_OB = X.block(0, d * n, r, l);
+  Matrix X_SE_t = X.block(0, d * n + l, r, n);
+  Matrix X_E = X.block(0, d * n + l + n, r, b);
+
+  return std::make_tuple(X_SE_R, X_OB, X_SE_t, X_E);
+}
+
+Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
+  Matrix X(X_SE_R.rows(), X_SE_R.cols() + X_SE_t.cols());
+  X << X_SE_R, X_SE_t;
+  return X;
+}
+
+Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB, const Matrix &X_SE_t, const Matrix &X_E) {
+  Matrix X(X_SE_R.rows(), X_SE_R.cols() + X_OB.cols() + X_SE_t.cols() + X_E.cols());
+  X << X_SE_R, X_OB, X_SE_t, X_E;
   return X;
 }
 
