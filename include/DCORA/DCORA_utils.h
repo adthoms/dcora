@@ -238,10 +238,10 @@ void checkStiefelMatrix(const Matrix &Y);
 void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n);
 
 /**
- * @brief Check that the RA input matrix is of dimension r-by-(d+1)*n+b+l
+ * @brief Check that the RA input matrix is of dimension r-by-(d+1)*n+l+b
  * @param X
  */
-void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int b, unsigned int l);
+void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
 
 /**
  * @brief partition the SE input matrix into SE_R and SE_t matrices, respectively
