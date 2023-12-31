@@ -506,9 +506,7 @@ Matrix projectToObliqueManifold(const Matrix &M) {
 
 Matrix fixedStiefelVariable(unsigned r, unsigned d) {
   std::srand(1);
-  ROPTLIB::StieVariable var(r, d);
-  var.RandInManifold();
-  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
+  return randomStiefelVariable(r, d);
 }
 
 Matrix fixedEuclideanVariable(unsigned r, unsigned b) {

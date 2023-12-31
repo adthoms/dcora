@@ -168,11 +168,11 @@ Matrix fixedObliqueVariable(unsigned r, unsigned l);
 
 /**
  * @brief Generate a random element of the Stiefel manifold
+ * @param r
   * @param d
-  * @param r
   * @return
  */
-Matrix randomStiefelVariable(unsigned d, unsigned r);
+Matrix randomStiefelVariable(unsigned r, unsigned d);
 
 /**
  * @brief Generate a random element of the Euclidean manifold
