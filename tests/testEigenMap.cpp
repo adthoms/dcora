@@ -26,8 +26,8 @@ TEST(testDCORA, EigenMapSE) {
 
   // Modify x through eigen map
   for (size_t i = 0; i < n; ++i) {
-    xMat.block(0, i * (d+1),     d, d) = Matrix::Identity(d, d);
-    xMat.block(0, i * (d+1) + d, d, 1) = Matrix::Zero(d, 1);
+    xMat.block(0, i * (d+1), d, d) = randomStiefelVariable(d, d);
+    xMat.col(i * (d+1) + d) = randomEuclideanVariable(d);
   }
 
   // Check that the internal value of x is modified accordingly
@@ -55,14 +55,14 @@ TEST(testDCORA, EigenMapRA) {
   // Modify x through eigen map
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(xMat, d, d, n, l, b);
   for (size_t i = 0; i < n; ++i) {
-    X_SE_R.block(0, i * d, d, d) = Matrix::Identity(d, d);
-    X_SE_t.block(0, i, d, 1) = Matrix::Zero(d, 1);
+    X_SE_R.block(0, i * d, d, d) = randomStiefelVariable(d, d);
+    X_SE_t.col(i) = randomEuclideanVariable(d);
   }
   for (size_t i = 0; i < l; ++i) {
-    X_OB.block(0, i, d, 1) = Matrix::Zero(d, 1);
+    X_OB.col(i) = randomObliqueVariable(d);
   }
   for (size_t i = 0; i < b; ++i) {
-    X_E.block(0, i, d, 1) = Matrix::Zero(d, 1);
+    X_E.col(i) = randomEuclideanVariable(d);
   }
   xMat = createRAMatrix(X_SE_R, X_OB, X_SE_t, X_E);
 
