@@ -56,20 +56,6 @@ class SimpleTimer {
 void writeMatrixToFile(const Matrix &M, const std::string &filename);
 
 /**
- * @brief Convert a Matrix data type to a Vector data type preserving order
- * @param M
- * @return
- */
-Vector convertMatrixTypeToVectorType(const Matrix &M);
-
-/**
- * @brief Convert a Vector data type to a Matrix data type preserving order
- * @param P
- * @return
- */
-Matrix convertVectorTypeToMatrixType(const Vector &P);
-
-/**
  * @brief Write a sparse matrix to file
  * @param M
  * @param filename

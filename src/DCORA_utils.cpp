@@ -67,15 +67,6 @@ double SimpleTimer::Toc(const std::chrono::time_point<std::chrono::high_resoluti
   return t_elapsed.count();
 }
 
-Vector convertMatrixTypeToVectorType(const Matrix &M) {
-  CHECK_EQ(M.cols(), 1);
-  return Eigen::Map<Vector>((double *) M.data(), M.rows());
-}
-
-Matrix convertVectorTypeToMatrixType(const Vector &P) {
-  return Eigen::Map<Matrix>((double *) P.data(), P.rows(), 1);
-}
-
 void writeMatrixToFile(const Matrix &M, const std::string &filename) {
   std::ofstream file;
   file.open(filename);
