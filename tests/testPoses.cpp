@@ -56,6 +56,47 @@ TEST(testDCORA, testLiftedTranslationArray) {
   }
 }
 
+TEST(testDCORA, testLiftedRangeAidedArray) {
+  int r = 5;
+  int d = 3;
+  int n = 3;
+  int l = 5;
+  int b = 7;
+  for (int trial = 0; trial < 50; ++trial) {
+    LiftedRangeAidedArray var(r, d, n, l, b);
+    // Test setter and getter methods
+    for (int i = 0; i < n; ++i) {
+      // poses
+      auto Yi = randomStiefelVariable(r, d);
+      auto pi = randomEuclideanVariable(r);
+      var.GetLiftedPoseArray()->rotation(i) = Yi;
+      var.GetLiftedPoseArray()->translation(i) = pi;
+      ASSERT_LE((Yi - var.GetLiftedPoseArray()->rotation(i)).norm(), 1e-6);
+      ASSERT_LE((pi - var.GetLiftedPoseArray()->translation(i)).norm(), 1e-6);
+    }
+    for (int i = 0; i < l; ++i) {
+      // ranges
+      auto ri = randomObliqueVariable(r);
+      var.GetLiftedUnitSphereAuxiliaryArray()->translation(i) = ri;
+      ASSERT_LE((ri - var.GetLiftedUnitSphereAuxiliaryArray()->translation(i)).norm(), 1e-6);
+    }
+    for (int i = 0; i < b; ++i) {
+      // landmarks
+      auto li = randomEuclideanVariable(r);
+      var.GetLiftedLandmarkArray()->translation(i) = li;
+      ASSERT_LE((li - var.GetLiftedLandmarkArray()->translation(i)).norm(), 1e-6);
+    }
+    // Test copy constructor
+    LiftedRangeAidedArray var2(var);
+    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+
+    // Test assignment
+    LiftedRangeAidedArray var3(r, d, n, l, b);
+    var3 = var;
+    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  }
+}
+
 TEST(testDCORA, testLiftedPose) {
   int d = 3;
   int r = 5;
