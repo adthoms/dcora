@@ -12,12 +12,14 @@
 #include "DCORA/DCORA_types.h"
 
 namespace DCORA {
+
 /**
  * @brief A class representing an array of n "lifted" elements of dimension r by dim
  * Elements consist of poses Ti = [Yi pi] and translations pj, where:
  * dim = d + 1 for a pose array, dim = 1 for a translation array
  * Each rotation Yi is a r-by-d matrix representing an element of the Stiefel manifold
- * Each translation pi is a r-dimensional vector
+ * Each translation pi is a r-dimensional vector representing an element of the Euclidean space
+ * Note that translations can also represent unit-sphere auxiliary variables.
  */
 class LiftedArray {
  public:
@@ -138,7 +140,7 @@ class LiftedPoseArray : public LiftedArray {
 class LiftedTranslationArray : public LiftedArray {
  public:
   /**
-   * @brief Constructor. The value of the translation array is guaranteed to be valid.
+   * @brief Constructor
    * @param r
    * @param d
    * @param n

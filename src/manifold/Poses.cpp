@@ -12,7 +12,9 @@
 namespace DCORA {
 
 LiftedArray::LiftedArray(unsigned int r, unsigned int d, unsigned int n) :
-    r_(r), d_(d), n_(n), dim_(d+1) {}
+    r_(r), d_(d), n_(n), dim_(d+1) {
+  X_ = Matrix::Zero(r_, dim_ * n_);
+}
 
 Matrix LiftedArray::getData() const {
   return X_;
@@ -59,7 +61,6 @@ double LiftedArray::maxTranslationDistance(const LiftedArray &array1, const Lift
 
 LiftedPoseArray::LiftedPoseArray(unsigned int r, unsigned int d, unsigned int n) :
     LiftedArray(r, d, n) {
-  X_ = Matrix::Zero(r_, dim_ * n_);
   Matrix Yinit = Matrix::Zero(r_, d_);
   Yinit.block(0, 0, d_, d_) = Matrix::Identity(d_, d_);
   for (unsigned int i = 0; i < n; ++i) {
