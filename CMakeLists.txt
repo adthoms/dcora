@@ -73,7 +73,7 @@ set(EXTERNAL_INCLUDES
 
 add_library(DCORA SHARED
 	src/manifold/Poses.cpp
-  	src/manifold/LiftedSEManifold.cpp
+	src/manifold/LiftedSEManifold.cpp
 	src/manifold/LiftedRAManifold.cpp
 	src/manifold/LiftedSEVariable.cpp
 	src/manifold/LiftedRAVariable.cpp
