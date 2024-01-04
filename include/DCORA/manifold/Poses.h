@@ -159,11 +159,11 @@ class LiftedRangeAidedArray {
  public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
-   * @param l
-   * @param b
+   * @param r relaxation rank
+   * @param d dimension of pose element
+   * @param n number of pose elements
+   * @param l number of range elements
+   * @param b number of landmark elements
    */
   LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
   /**
@@ -227,7 +227,7 @@ class LiftedRangeAidedArray {
    * @return
    */
   LiftedLandmarkArray* GetLiftedLandmarkArray() const { return landmarks_.get(); };
- protected:
+ private:
   // Dimension constants
   unsigned int r_, d_, n_, l_, b_;
   // "Lifted" arrays

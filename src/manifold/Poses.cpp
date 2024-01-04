@@ -194,4 +194,4 @@ Vector Translation::vector() const {
   return translation();
 }
 
-}
+}  // namespace DCORA

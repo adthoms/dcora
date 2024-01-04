@@ -63,13 +63,16 @@ void writeMatrixToFile(const Matrix &M, const std::string &filename);
 void writeSparseMatrixToFile(const SparseMatrix &M, const std::string &filename);
 
 /**
-Helper function to read a dataset in .g2o format
-*/
+ * @brief Helper function to read a dataset in .g2o format
+ * @param filename
+ * @param num_poses
+ * @return
+ */
 std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
                                                  size_t &num_poses);
 
 /**
- * @brief
+ * @brief Get the dimension and number of poses from a vector of relative pose measurements
  * @param measurements
  * @param dimension
  * @param num_poses
@@ -79,55 +82,70 @@ void get_dimension_and_num_poses(const std::vector<RelativeSEMeasurement> &measu
                                  size_t &num_poses);
 
 /**
-Helper function to construct connection laplacian matrix in SE(d)
-*/
+ * @brief Helper function to construct connection laplacian matrix in SE(d)
+ * @param measurements
+ * @param AT
+ * @param OmegaT
+ */
 void constructOrientedConnectionIncidenceMatrixSE(
     const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix &AT,
     DiagonalMatrix &OmegaT);
 
 /**
-Helper function to construct connection laplacian matrix in SE(d)
-*/
+ * @brief Helper function to construct connection laplacian matrix in SE(d)
+ * @param measurements
+ * @return
+ */
 SparseMatrix constructConnectionLaplacianSE(
     const std::vector<RelativeSEMeasurement> &measurements);
 
 /**
-Given a vector of relative pose measurements, this function computes and returns
-the B matrices defined in equation (69) of the tech report
-*/
+ * @brief Given a vector of relative pose measurements, this function computes and returns
+ * the B matrices defined in equation (69) of the tech report
+ * @param measurements
+ * @param B1
+ * @param B2
+ * @param B3
+ */
 void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements,
                         SparseMatrix &B1, SparseMatrix &B2, SparseMatrix &B3);
 
 /**
-Given the measurement matrices B1 and B2 and a matrix R of rotational state
-estimates, this function computes and returns the corresponding optimal
-translation estimates
-*/
+ * @brief Given the measurement matrices B1 and B2 and a matrix R of rotational state
+ * estimates, this function computes and returns the corresponding optimal
+ * translation estimates
+ * @param B1
+ * @param B2
+ * @param R
+ * @return
+ */
 Matrix recoverTranslations(const SparseMatrix &B1, const SparseMatrix &B2,
                            const Matrix &R);
 
 /**
-Project a given matrix to the rotation group
-*/
+ * @brief Project a given matrix to the Rotation Group
+ * @param M
+ * @return Orthogonal projection of M to the Rotation Group
+ */
 Matrix projectToRotationGroup(const Matrix &M);
 
 /**
- * @brief project an input matrix M to the Stiefel manifold
+ * @brief Project an input matrix M to the Stiefel manifold
  * @param M
- * @return orthogonal projection of M to Stiefel manifold
+ * @return Orthogonal projection of M to the Stiefel manifold
  */
 Matrix projectToStiefelManifold(const Matrix &M);
 
 /**
- * @brief project an input matrix M to the Oblique manifold
+ * @brief Project an input matrix M to the Oblique manifold
  * @param M
- * @return orthogonal projection of M to Oblique manifold
+ * @return Orthogonal projection of M to the Oblique manifold
  */
 Matrix projectToObliqueManifold(const Matrix &M);
 
 /**
-  @brief Generate a fixed element of the Stiefel element
-  The returned value is guaranteed to be the same for each r and d
+ * @brief Generate a fixed element of the Stiefel element
+ * The returned value is guaranteed to be the same for each r and d
  * @param r
  * @param b
  * @return
@@ -136,7 +154,7 @@ Matrix fixedStiefelVariable(unsigned r, unsigned d);
 
 /**
  * @brief Generate a fixed element of the Euclidean element
- *  The returned value is guaranteed to be the same for each r and b
+ * The returned value is guaranteed to be the same for each r and b
  * @param r
  * @param b
  * @return
@@ -145,7 +163,7 @@ Matrix fixedEuclideanVariable(unsigned r, unsigned b = 1);
 
 /**
  * @brief Generate a fixed element of the Oblique element
- *  The returned value is guaranteed to be the same for each r and l
+ * The returned value is guaranteed to be the same for each r and l
  * @param r
  * @param l
  * @return
@@ -230,21 +248,21 @@ void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned
 void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
 
 /**
- * @brief partition the SE input matrix into SE_R and SE_t matrices, respectively
+ * @brief Partition the SE input matrix into SE_R and SE_t matrices, respectively
  * @param X
  * @return
  */
 std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n);
 
 /**
- * @brief partition the RA input matrix into SE_R, OB, SE_t, and E matrices, respectively
+ * @brief Partition the RA input matrix into SE_R, OB, SE_t, and E matrices, respectively
  * @param X
  * @return
  */
 std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
 
 /**
- * @brief create SE matrix from X_SE_R and X_SE_t matrices
+ * @brief Create SE matrix from X_SE_R and X_SE_t matrices
  * @param X_SE_R
  * @param X_SE_t
  * @return
@@ -252,7 +270,7 @@ std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, un
 Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t);
 
 /**
- * @brief create RA matrix from SE_R, OB, X_SE_t, and E matrices
+ * @brief Create RA matrix from SE_R, OB, X_SE_t, and E matrices
  * @param X_SE_R
  * @param X_OB
  * @param X_SE_t
