@@ -141,7 +141,7 @@ Matrix fixedStiefelVariable(unsigned r, unsigned d);
  * @param b
  * @return
  */
-Matrix fixedEuclideanVariable(unsigned r, unsigned b);
+Matrix fixedEuclideanVariable(unsigned r, unsigned b = 1);
 
 /**
  * @brief Generate a fixed element of the Oblique element
@@ -150,13 +150,13 @@ Matrix fixedEuclideanVariable(unsigned r, unsigned b);
  * @param l
  * @return
  */
-Matrix fixedObliqueVariable(unsigned r, unsigned l);
+Matrix fixedObliqueVariable(unsigned r, unsigned l = 1);
 
 /**
  * @brief Generate a random element of the Stiefel manifold
  * @param r
-  * @param d
-  * @return
+ * @param d
+ * @return
  */
 Matrix randomStiefelVariable(unsigned r, unsigned d);
 
@@ -166,7 +166,7 @@ Matrix randomStiefelVariable(unsigned r, unsigned d);
  * @param b
  * @return
  */
-Matrix randomEuclideanVariable(unsigned r, unsigned b);
+Matrix randomEuclideanVariable(unsigned r, unsigned b = 1);
 
 /**
  * @brief Generate a random element of the Oblique manifold
@@ -174,7 +174,7 @@ Matrix randomEuclideanVariable(unsigned r, unsigned b);
  * @param l
  * @return
  */
-Matrix randomObliqueVariable(unsigned r, unsigned l);
+Matrix randomObliqueVariable(unsigned r, unsigned l = 1);
 
 /**
  * @brief Compute the error term (weighted squared residual)
