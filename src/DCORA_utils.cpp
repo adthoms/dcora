@@ -485,17 +485,47 @@ Matrix projectToStiefelManifold(const Matrix &M) {
   return svd.matrixU() * svd.matrixV().transpose();
 }
 
-Matrix fixedStiefelVariable(unsigned d, unsigned r) {
+Matrix projectToObliqueManifold(const Matrix &M) {
+  size_t l = M.cols();
+  Matrix X = M;
+#pragma omp parallel for
+  for (size_t i = 0; i < l; ++i) {
+    X.col(i) =  X.col(i).normalized();
+  }
+  return X;
+}
+
+Matrix fixedStiefelVariable(unsigned r, unsigned d) {
   std::srand(1);
+  return randomStiefelVariable(r, d);
+}
+
+Matrix fixedEuclideanVariable(unsigned r, unsigned b) {
+  std::srand(1);
+  return randomEuclideanVariable(r, b);
+}
+
+Matrix fixedObliqueVariable(unsigned r, unsigned l) {
+  std::srand(1);
+  return randomObliqueVariable(r, l);
+}
+
+Matrix randomStiefelVariable(unsigned r, unsigned d) {
   ROPTLIB::StieVariable var(r, d);
   var.RandInManifold();
   return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
 }
 
-Matrix randomStiefelVariable(unsigned d, unsigned r) {
-  ROPTLIB::StieVariable var(r, d);
+Matrix randomEuclideanVariable(unsigned r, unsigned b) {
+  ROPTLIB::EucVariable var(r, b);
   var.RandInManifold();
-  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
+  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, b);
+}
+
+Matrix randomObliqueVariable(unsigned r, unsigned l) {
+  ROPTLIB::ObliqueVariable var(r, l);
+  var.RandInManifold();
+  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, l);
 }
 
 double computeMeasurementError(const RelativeSEMeasurement &m,
@@ -535,6 +565,65 @@ void checkStiefelMatrix(const Matrix &Y) {
         << "[checkStiefelMatrix] Invalid Stiefel: err_norm="
         << err_norm;
   }
+}
+
+void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n) {
+  CHECK_EQ(X.rows(), (int) r);
+  CHECK_EQ(X.cols(), (int) (d + 1) * n);
+}
+
+void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
+  CHECK_EQ(X.rows(), (int) r);
+  CHECK_EQ(X.cols(), (int) (d + 1) * n + l + b);
+}
+
+std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n) {
+  checkSEMatrixSize(X, r, d, n);
+  Matrix X_SE_R = Matrix::Zero(r, d * n);
+  Matrix X_SE_t = Matrix::Zero(r, n);
+#pragma omp parallel for
+  for (size_t i = 0; i < n; ++i) {
+    auto Y = X.block(0, i * (d + 1), r, d + 1);
+    X_SE_R.block(0, i * d, r, d) = Y.block(0, 0, r, d);
+    X_SE_t.col(i) = Y.col(d);
+  }
+  return std::make_tuple(X_SE_R, X_SE_t);
+}
+
+std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
+  checkRAMatrixSize(X, r, d, n, l, b);
+  Matrix X_SE_R = X.block(0, 0, r, d * n);
+  Matrix X_OB = X.block(0, d * n, r, l);
+  Matrix X_SE_t = X.block(0, d * n + l, r, n);
+  Matrix X_E = X.block(0, d * n + l + n, r, b);
+  return std::make_tuple(X_SE_R, X_OB, X_SE_t, X_E);
+}
+
+Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
+  size_t r = X_SE_R.rows();
+  size_t n = X_SE_t.cols();
+  size_t d = X_SE_R.cols() / n;
+  CHECK_EQ(X_SE_R.rows(), X_SE_t.rows());
+  CHECK_EQ(X_SE_R.cols() + X_SE_t.cols(), (d + 1) * n);
+  Matrix X(r, (d + 1) * n);
+#pragma omp parallel for
+  for (size_t i = 0; i < n; ++i) {
+    X.block(0, i * (d + 1), r, d) = X_SE_R.block(0, i * d, r, d);
+    X.col(i * (d + 1) + d) = X_SE_t.col(i);
+  }
+  return X;
+}
+
+Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB, const Matrix &X_SE_t, const Matrix &X_E) {
+  Matrix X(X_SE_R.rows(), X_SE_R.cols() + X_OB.cols() + X_SE_t.cols() + X_E.cols());
+  X << X_SE_R, X_OB, X_SE_t, X_E;
+  return X;
+}
+
+void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, double memSize) {
+  const double *matrix_data = Y.data();
+  double *prodvar_data = var->ObtainWriteEntireData();
+  memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
 }
 
 }  // namespace DCORA

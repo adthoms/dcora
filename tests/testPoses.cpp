@@ -10,15 +10,15 @@
 using namespace DCORA;
 
 TEST(testDCORA, testLiftedPoseArray) {
+  int r = 5;
+  int d = 3;
+  int n = 3;
   for (int trial = 0; trial < 50; ++trial) {
-    int r = 5;
-    int d = 3;
-    int n = 3;
     LiftedPoseArray var(r, d, n);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
-      auto Yi = randomStiefelVariable(d, r);
-      auto pi = (i + 1) * Vector::Ones(r);
+      auto Yi = randomStiefelVariable(r, d);
+      auto pi = randomEuclideanVariable(r);
       var.rotation(i) = Yi;
       var.translation(i) = pi;
       ASSERT_LE((Yi - var.rotation(i)).norm(), 1e-6);
@@ -34,16 +34,89 @@ TEST(testDCORA, testLiftedPoseArray) {
   }
 }
 
+TEST(testDCORA, testLiftedTranslationArray) {
+  int r = 5;
+  int d = 3;
+  int n = 3;
+  for (int trial = 0; trial < 50; ++trial) {
+    LiftedTranslationArray var(r, d, n);
+    // Test setter and getter methods
+    for (int i = 0; i < n; ++i) {
+      auto pi = randomEuclideanVariable(r);
+      var.translation(i) = pi;
+      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
+    }
+    // Test copy constructor
+    LiftedTranslationArray var2(var);
+    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+    // Test assignment
+    LiftedTranslationArray var3(r, d, n);
+    var3 = var;
+    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  }
+}
+
+TEST(testDCORA, testLiftedRangeAidedArray) {
+  int r = 5;
+  int d = 3;
+  int n = 3;
+  int l = 5;
+  int b = 7;
+  for (int trial = 0; trial < 50; ++trial) {
+    LiftedRangeAidedArray var(r, d, n, l, b);
+    // Test setter and getter methods
+    for (int i = 0; i < n; ++i) {
+      // poses
+      auto Yi = randomStiefelVariable(r, d);
+      auto pi = randomEuclideanVariable(r);
+      var.GetLiftedPoseArray()->rotation(i) = Yi;
+      var.GetLiftedPoseArray()->translation(i) = pi;
+      ASSERT_LE((Yi - var.GetLiftedPoseArray()->rotation(i)).norm(), 1e-6);
+      ASSERT_LE((pi - var.GetLiftedPoseArray()->translation(i)).norm(), 1e-6);
+    }
+    for (int i = 0; i < l; ++i) {
+      // ranges
+      auto ri = randomObliqueVariable(r);
+      var.GetLiftedUnitSphereAuxiliaryArray()->translation(i) = ri;
+      ASSERT_LE((ri - var.GetLiftedUnitSphereAuxiliaryArray()->translation(i)).norm(), 1e-6);
+    }
+    for (int i = 0; i < b; ++i) {
+      // landmarks
+      auto li = randomEuclideanVariable(r);
+      var.GetLiftedLandmarkArray()->translation(i) = li;
+      ASSERT_LE((li - var.GetLiftedLandmarkArray()->translation(i)).norm(), 1e-6);
+    }
+    // Test copy constructor
+    LiftedRangeAidedArray var2(var);
+    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+
+    // Test assignment
+    LiftedRangeAidedArray var3(r, d, n, l, b);
+    var3 = var;
+    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  }
+}
+
 TEST(testDCORA, testLiftedPose) {
   int d = 3;
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
-    Matrix Xi = Matrix::Zero(r, d + 1);;
-    Xi.block(0, 0, r, d) = randomStiefelVariable(d, r);
-    Xi.col(d) = (trial + 1) * Vector::Ones(r);
+    Matrix Xi = Matrix::Zero(r, d + 1);
+    Xi.block(0, 0, r, d) = randomStiefelVariable(r, d);
+    Xi.col(d) = randomEuclideanVariable(r);
     // Test constructor from Eigen matrix
     LiftedPose var(Xi);
     ASSERT_LE((Xi - var.getData()).norm(), 1e-6);
+  }
+}
+
+TEST(testDCORA, testLiftedTranslation) {
+  int r = 5;
+  for (int trial = 0; trial < 50; ++trial) {
+    Vector Pi = randomEuclideanVariable(r);
+    // Test constructor from Eigen vector
+    LiftedTranslation var(Pi);
+    ASSERT_LE((Pi - var.getData()).norm(), 1e-6);
   }
 }
 
@@ -53,6 +126,12 @@ TEST(testDCORA, testPoseIdentity) {
   ASSERT_LE((T.identity().rotation() - Matrix::Identity(d, d)).norm(), 1e-6);
   ASSERT_LE((T.identity().translation() - Vector::Zero(d)).norm(), 1e-6);
   ASSERT_LE((T.identity().matrix() - Matrix::Identity(d + 1, d + 1)).norm(), 1e-6);
+}
+
+TEST(testDCORA, testTranslationZeroVector) {
+  int d = 3;
+  Translation P(d);
+  ASSERT_LE((P.zeroVector().translation() - Vector::Zero(d)).norm(), 1e-6);
 }
 
 TEST(testDCORA, testPoseInverse) {

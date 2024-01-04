@@ -9,18 +9,15 @@
 #include <DCORA/manifold/LiftedSEManifold.h>
 #include <glog/logging.h>
 
-using namespace std;
-using namespace ROPTLIB;
-
 namespace DCORA {
 LiftedSEManifold::LiftedSEManifold(unsigned int r, unsigned int d, unsigned int n) :
     r_(r), d_(d), n_(n) {
-  StiefelManifold = new Stiefel((int) r, (int) d);
+  StiefelManifold = new ROPTLIB::Stiefel((int) r, (int) d);
   StiefelManifold->ChooseStieParamsSet3();
-  EuclideanManifold = new Euclidean((int) r);
+  EuclideanManifold = new ROPTLIB::Euclidean((int) r);
   CartanManifold =
-      new ProductManifold(2, StiefelManifold, 1, EuclideanManifold, 1);
-  MyManifold = new ProductManifold(1, CartanManifold, n);
+      new ROPTLIB::ProductManifold(2, StiefelManifold, 1, EuclideanManifold, 1);
+  MySEManifold = new ROPTLIB::ProductManifold(1, CartanManifold, n);
 }
 
 LiftedSEManifold::~LiftedSEManifold() {
@@ -28,14 +25,11 @@ LiftedSEManifold::~LiftedSEManifold() {
   delete StiefelManifold;
   delete EuclideanManifold;
   delete CartanManifold;
-  delete MyManifold;
+  delete MySEManifold;
 }
 
 Matrix LiftedSEManifold::project(const Matrix &M) const {
-  size_t expectedRows = r_;
-  size_t expectedCols = (d_ + 1) * n_;
-  CHECK_EQ(M.rows(), (int) expectedRows);
-  CHECK_EQ(M.cols(), (int) expectedCols);
+  checkSEMatrixSize(M, r_, d_, n_);
   Matrix X = M;
 #pragma omp parallel for
   for (size_t i = 0; i < n_; ++i) {
