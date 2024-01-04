@@ -10,15 +10,15 @@
 using namespace DCORA;
 
 TEST(testDCORA, testLiftedPoseArray) {
+  int r = 5;
+  int d = 3;
+  int n = 3;
   for (int trial = 0; trial < 50; ++trial) {
-    int r = 5;
-    int d = 3;
-    int n = 3;
     LiftedPoseArray var(r, d, n);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
       auto Yi = randomStiefelVariable(r, d);
-      auto pi = (i + 1) * Vector::Ones(r);
+      auto pi = randomEuclideanVariable(r);
       var.rotation(i) = Yi;
       var.translation(i) = pi;
       ASSERT_LE((Yi - var.rotation(i)).norm(), 1e-6);
@@ -35,14 +35,14 @@ TEST(testDCORA, testLiftedPoseArray) {
 }
 
 TEST(testDCORA, testLiftedTranslationArray) {
+  int r = 5;
+  int d = 3;
+  int n = 3;
   for (int trial = 0; trial < 50; ++trial) {
-    int r = 5;
-    int d = 3;
-    int n = 3;
     LiftedTranslationArray var(r, d, n);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
-      auto pi = randomEuclideanVariable(r, 1);
+      auto pi = randomEuclideanVariable(r);
       var.translation(i) = pi;
       ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
     }
@@ -101,9 +101,9 @@ TEST(testDCORA, testLiftedPose) {
   int d = 3;
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
-    Matrix Xi = Matrix::Zero(r, d + 1);;
+    Matrix Xi = Matrix::Zero(r, d + 1);
     Xi.block(0, 0, r, d) = randomStiefelVariable(r, d);
-    Xi.col(d) = (trial + 1) * Vector::Ones(r);
+    Xi.col(d) = randomEuclideanVariable(r);
     // Test constructor from Eigen matrix
     LiftedPose var(Xi);
     ASSERT_LE((Xi - var.getData()).norm(), 1e-6);
