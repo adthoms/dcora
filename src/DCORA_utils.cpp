@@ -589,12 +589,11 @@ std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, un
   for (size_t i = 0; i < n; ++i) {
     auto Y = X.block(0, i * (d + 1), r, d + 1);
     X_SE_R.block(0, i * d, r, d) = Y.block(0, 0, r, d);
-    X_SE_t.block(0, i, r, 1) = Y.col(d);
+    X_SE_t.col(i) = Y.col(d);
   }
 
   return std::make_tuple(X_SE_R, X_SE_t);
 }
-
 
 std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
   checkRAMatrixSize(X, r, d, n, l, b);
