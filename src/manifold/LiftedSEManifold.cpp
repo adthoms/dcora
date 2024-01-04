@@ -10,11 +10,13 @@
 #include <glog/logging.h>
 
 namespace DCORA {
-LiftedSEManifold::LiftedSEManifold(unsigned int r, unsigned int d, unsigned int n) :
-    r_(r), d_(d), n_(n) {
-  StiefelManifold = new ROPTLIB::Stiefel((int) r, (int) d);
+
+LiftedSEManifold::LiftedSEManifold(unsigned int r, unsigned int d,
+                                   unsigned int n)
+    : r_(r), d_(d), n_(n) {
+  StiefelManifold = new ROPTLIB::Stiefel(r, d);
   StiefelManifold->ChooseStieParamsSet3();
-  EuclideanManifold = new ROPTLIB::Euclidean((int) r);
+  EuclideanManifold = new ROPTLIB::Euclidean(r);
   CartanManifold =
       new ROPTLIB::ProductManifold(2, StiefelManifold, 1, EuclideanManifold, 1);
   MySEManifold = new ROPTLIB::ProductManifold(1, CartanManifold, n);
@@ -33,9 +35,10 @@ Matrix LiftedSEManifold::project(const Matrix &M) const {
   Matrix X = M;
 #pragma omp parallel for
   for (size_t i = 0; i < n_; ++i) {
-    X.block(0, i * (d_ + 1), r_, d_) = projectToStiefelManifold(X.block(0, i * (d_ + 1), r_, d_));
+    X.block(0, i * (d_ + 1), r_, d_) =
+        projectToStiefelManifold(X.block(0, i * (d_ + 1), r_, d_));
   }
   return X;
 }
 
-}  // namespace DCORA
+} // namespace DCORA

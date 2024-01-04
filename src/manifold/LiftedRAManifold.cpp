@@ -10,11 +10,15 @@
 #include <glog/logging.h>
 
 namespace DCORA {
-LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b)
+
+LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d,
+                                   unsigned int n, unsigned int l,
+                                   unsigned int b)
     : LiftedSEManifold(r, d, n), l_(l), b_(b) {
-  ObliqueManifold = new ROPTLIB::Oblique((int) r, (int) l);
-  EuclideanLandmarkManifold = new ROPTLIB::Euclidean((int) r, (int) b);
-  MyRAManifold = new ROPTLIB::ProductManifold(3, CartanManifold, n, ObliqueManifold, 1, EuclideanLandmarkManifold, 1);
+  ObliqueManifold = new ROPTLIB::Oblique(r, l);
+  EuclideanLandmarkManifold = new ROPTLIB::Euclidean(r, b);
+  MyRAManifold = new ROPTLIB::ProductManifold(
+      3, CartanManifold, n, ObliqueManifold, 1, EuclideanLandmarkManifold, 1);
 }
 
 LiftedRAManifold::~LiftedRAManifold() {
@@ -26,9 +30,8 @@ LiftedRAManifold::~LiftedRAManifold() {
 
 Matrix LiftedRAManifold::project(const Matrix &M) const {
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(M, r_, d_, n_, l_, b_);
-  X_SE_R = projectToRotationGroup(X_SE_R);
-  X_OB = projectToObliqueManifold(X_OB);
-  return createRAMatrix(X_SE_R, X_OB, X_SE_t, X_E);
+  return createRAMatrix(projectToRotationGroup(X_SE_R),
+                        projectToObliqueManifold(X_OB), X_SE_t, X_E);
 }
 
-}  // namespace DCORA
+} // namespace DCORA

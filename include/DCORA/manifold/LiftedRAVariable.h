@@ -5,36 +5,39 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDRAVARIABLE_H
-#define LIFTEDRAVARIABLE_H
+#pragma once
 
 #include <DCORA/manifold/LiftedSEVariable.h>
 
+#include <memory>
+
 #include "Manifolds/Oblique/Oblique.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
- * @brief This object represents a collection of "lifted" poses, unit sphere variables, and translations X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
+ * @brief This class represents a collection of "lifted" poses, unit sphere
+ * variables, and landmarks:
+ * X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
  * that can be used by ROPTLIB to perform Riemannian optimization
  */
 class LiftedRAVariable : public LiftedSEVariable {
- public:
+public:
   /**
-   * @brief Construct a default object
+   * @brief Constructor
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
    * @param l number of ranges
    * @param b number of landmarks
    */
-  LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+  LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n,
+                   unsigned int l, unsigned int b);
   /**
-   * @brief Constructor from a lifted range aided array object
+   * @brief Constructor from a lifted range-aided array object
    * @param rangeAidedArray
    */
-  LiftedRAVariable(const LiftedRangeAidedArray &rangeAidedArray);
+  explicit LiftedRAVariable(const LiftedRangeAidedArray &rangeAidedArray);
   /**
    * @brief Copy constructor
    * @param other
@@ -63,56 +66,61 @@ class LiftedRAVariable : public LiftedSEVariable {
   ROPTLIB::ProductElement *var() override { return varRA_.get(); }
   /**
    * @brief Obtain the variable as an Eigen matrix
-   * @return r by (d+1)n+l+b matrix [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
+   * @return r-by-(d+1)n+l+b matrix of the form:
+   * X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
    */
   Matrix getData() const override;
   /**
    * @brief Set this variable from an Eigen matrix
-   * @param X r by (d+1)n+l+b matrix [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
+   * @param X r-by-(d+1)n+l+b matrix of the form:
+   * X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
    */
   void setData(const Matrix &X) override;
   /**
-   * @brief Obtain the writable landmark translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the writable landmark translation at the specified index,
+   * expressed as an r dimensional vector
    * @param index
    * @return
    */
   Eigen::Ref<Vector> landmarkTranslation(unsigned int index);
   /**
-   * @brief Obtain the read-only landmark translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the read-only landmark translation at the specified index,
+   * expressed as an r dimensional vector
    * @param index
    * @return
    */
   Vector landmarkTranslation(unsigned int index) const;
   /**
-   * @brief Obtain the writable unit-sphere auxiliary variable for a range measurement at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the writable unit-sphere auxiliary variable for a range
+   * measurement at the specified index, expressed as an r dimensional vector
    * @param index
    * @return
    */
   Eigen::Ref<Vector> rangeUnitSphereVariable(unsigned int index);
   /**
-   * @brief Obtain the read-only unit-sphere auxiliary variable at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the read-only unit-sphere auxiliary variable at the specified
+   * index, expressed as an r dimensional vector
    * @param index
    * @return
    */
   Vector rangeUnitSphereVariable(unsigned int index) const;
 
- private:
+private:
   // const dimensions
   unsigned int l_, b_;
-  // The actual content of this variable is stored inside a ROPTLIB::ProductElement
-  std::unique_ptr<ROPTLIB::ObliqueVariable> translation_ranges_var_;
-  std::unique_ptr<ROPTLIB::EucVariable> translation_landmark_var_;
+  // The actual variable content is stored inside a ROPTLIB::ProductElement
+  std::unique_ptr<ROPTLIB::ObliqueVariable> ranges_var_;
+  std::unique_ptr<ROPTLIB::EucVariable> landmark_var_;
   std::unique_ptr<ROPTLIB::ProductElement> varOB_;
   std::unique_ptr<ROPTLIB::ProductElement> varE_;
   std::unique_ptr<ROPTLIB::ProductElement> varRA_;
-  // Internal view of the range variable as an eigen matrix of dimension r-by-l
+  // Internal view of the variable:
+  // ranges as an eigen matrix of dimension r-by-l
   Eigen::Map<Matrix> X_OB_;
-  // Internal view of the landmark variable as an eigen matrix of dimension r-by-b
+  // landmarks as an eigen matrix of dimension r-by-b
   Eigen::Map<Matrix> X_E_;
-  // Internal view of the RA SLAM domain variable as an eigen matrix of dimension r-by-(d+1)n+l+b
+  // RA-SLAM domain as an eigen matrix of dimension r-by-(d+1)n+l+b
   Eigen::Map<Matrix> X_RA_;
 };
 
-}  // namespace DCORA
-
-#endif
+} // namespace DCORA

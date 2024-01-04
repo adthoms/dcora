@@ -5,8 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDSEVECTOR_H
-#define LIFTEDSEVECTOR_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_utils.h>
@@ -15,21 +14,21 @@
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
- * @brief This class acts as container for ROPTLIB::ProductElement vectors for SE(n) synchronization
+ * @brief This class acts as container for ROPTLIB::ProductElement vectors for
+ * SE(n) synchronization
  */
 class LiftedSEVector {
- public:
+public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
    */
-  LiftedSEVector(int r, int d, int n);
+  LiftedSEVector(unsigned int r, unsigned int d, unsigned int n);
   /**
    * @brief Destructor
    */
@@ -38,7 +37,7 @@ class LiftedSEVector {
    * @brief Get underlying ROPTLIB vector
    * @return
    */
-  virtual ROPTLIB::ProductElement* vec() { return MySEVector; }
+  virtual ROPTLIB::ProductElement *vec() { return MySEVector; }
   /**
    * @brief Get data as Eigen matrix
    * @return
@@ -48,7 +47,7 @@ class LiftedSEVector {
    * @brief Set data from Eigen matrix
    * @param X
    */
-  virtual void setData(const Matrix& X);
+  virtual void setData(const Matrix &X);
   /**
    * @brief Set underlying ROPTLIB vector size
    * @return
@@ -61,15 +60,16 @@ class LiftedSEVector {
    * @param col
    * @param num_el
    */
-  static void setSizeFromProductElement(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el);
+  static void setSizeFromProductElement(ROPTLIB::ProductElement *productElement,
+                                        unsigned int *row, unsigned int *col,
+                                        unsigned int *num_el);
 
- protected:
+protected:
   unsigned int r_, d_, n_;
-  ROPTLIB::StieVector* StiefelVector;
-  ROPTLIB::EucVector* EuclideanVector;
-  ROPTLIB::ProductElement* CartanVector;
-  ROPTLIB::ProductElement* MySEVector;
+  ROPTLIB::StieVector *StiefelVector;
+  ROPTLIB::EucVector *EuclideanVector;
+  ROPTLIB::ProductElement *CartanVector;
+  ROPTLIB::ProductElement *MySEVector;
 };
-}  // namespace DCORA
 
-#endif
+} // namespace DCORA

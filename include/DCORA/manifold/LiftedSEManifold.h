@@ -5,8 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDSEMANIFOLD_H
-#define LIFTEDSEMANIFOLD_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/manifold/Poses.h>
@@ -15,19 +14,18 @@
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
  * @brief This class represents a manifold for the SE(n) synchronization problem
  */
 class LiftedSEManifold {
- public:
+public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
    */
   LiftedSEManifold(unsigned int r, unsigned int d, unsigned int n);
   /**
@@ -46,13 +44,12 @@ class LiftedSEManifold {
    */
   virtual Matrix project(const Matrix &M) const;
 
- protected:
+protected:
   unsigned int r_, d_, n_;
   ROPTLIB::Stiefel *StiefelManifold;
   ROPTLIB::Euclidean *EuclideanManifold;
   ROPTLIB::ProductManifold *CartanManifold;
   ROPTLIB::ProductManifold *MySEManifold;
 };
-}  // namespace DCORA
 
-#endif
+} // namespace DCORA

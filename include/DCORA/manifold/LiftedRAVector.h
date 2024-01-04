@@ -5,30 +5,30 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDRAVECTOR_H
-#define LIFTEDRAVECTOR_H
+#pragma once
 
 #include <DCORA/manifold/LiftedSEVector.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
- * @brief This class acts as container for ROPTLIB::ProductElement vectors for RA SLAM synchronization
+ * @brief This class acts as container for ROPTLIB::ProductElement vectors for
+ * RA-SLAM synchronization
  */
 class LiftedRAVector : public LiftedSEVector {
- public:
+public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
-   * @param l
-   * @param b
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
+   * @param l number of ranges
+   * @param b number of landmarks
    */
-  LiftedRAVector(int r, int d, int n, int l, int b);
+  LiftedRAVector(unsigned int r, unsigned int d, unsigned int n, unsigned int l,
+                 unsigned int b);
   /**
    * @brief Destructor
    */
@@ -37,7 +37,7 @@ class LiftedRAVector : public LiftedSEVector {
    * @brief Get underlying ROPTLIB vector
    * @return
    */
-  ROPTLIB::ProductElement* vec() override { return MyRAVector; }
+  ROPTLIB::ProductElement *vec() override { return MyRAVector; }
   /**
    * @brief Get data as Eigen matrix
    * @return
@@ -47,21 +47,20 @@ class LiftedRAVector : public LiftedSEVector {
    * @brief Set data from Eigen matrix
    * @param X
    */
-  void setData(const Matrix& X) override;
+  void setData(const Matrix &X) override;
   /**
    * @brief Set underlying ROPTLIB vector size
    * @return
    */
   void setSize() override;
 
- private:
+private:
   unsigned int l_, b_;
-  ROPTLIB::ObliqueVector* ObliqueRangeVector;
-  ROPTLIB::EucVector* EuclideanLandmarkVector;
-  ROPTLIB::ProductElement* MyOBVector;
-  ROPTLIB::ProductElement* MyEVector;
-  ROPTLIB::ProductElement* MyRAVector;
+  ROPTLIB::ObliqueVector *ObliqueRangeVector;
+  ROPTLIB::EucVector *EuclideanLandmarkVector;
+  ROPTLIB::ProductElement *MyOBVector;
+  ROPTLIB::ProductElement *MyEVector;
+  ROPTLIB::ProductElement *MyRAVector;
 };
-}  // namespace DCORA
 
-#endif
+} // namespace DCORA

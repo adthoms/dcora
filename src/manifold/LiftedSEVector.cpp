@@ -10,10 +10,11 @@
 
 namespace DCORA {
 
-LiftedSEVector::LiftedSEVector(int r, int d, int n) {
+LiftedSEVector::LiftedSEVector(unsigned int r, unsigned int d, unsigned int n) {
   StiefelVector = new ROPTLIB::StieVector(r, d);
   EuclideanVector = new ROPTLIB::EucVector(r);
-  CartanVector = new ROPTLIB::ProductElement(2, StiefelVector, 1, EuclideanVector, 1);
+  CartanVector =
+      new ROPTLIB::ProductElement(2, StiefelVector, 1, EuclideanVector, 1);
   MySEVector = new ROPTLIB::ProductElement(1, CartanVector, n);
 }
 
@@ -27,8 +28,8 @@ LiftedSEVector::~LiftedSEVector() {
 
 Matrix LiftedSEVector::getData() {
   setSize();
-  return Eigen::Map<Matrix>((double *)MySEVector->ObtainReadData(), r_,
-                            n_ * (d_ + 1));
+  return Eigen::Map<Matrix>(const_cast<double *>(MySEVector->ObtainReadData()),
+                            r_, n_ * (d_ + 1));
 }
 void LiftedSEVector::setData(const Matrix &X) {
   setSize();
@@ -37,15 +38,18 @@ void LiftedSEVector::setData(const Matrix &X) {
 }
 
 void LiftedSEVector::setSize() {
-  LiftedSEVector::setSizeFromProductElement(MySEVector, r_, d_, n_);
+  LiftedSEVector::setSizeFromProductElement(MySEVector, &r_, &d_, &n_);
 }
 
-void LiftedSEVector::setSizeFromProductElement(ROPTLIB::ProductElement* productElement, unsigned int &row, unsigned int &col, unsigned int &num_el) {
-  auto *T = dynamic_cast<ROPTLIB::ProductElement *>(productElement->GetElement(0));
+void LiftedSEVector::setSizeFromProductElement(
+    ROPTLIB::ProductElement *productElement, unsigned int *row,
+    unsigned int *col, unsigned int *num_el) {
+  auto *T =
+      dynamic_cast<ROPTLIB::ProductElement *>(productElement->GetElement(0));
   const int *sizes = T->GetElement(0)->Getsize();
-  row = sizes[0];
-  col = sizes[1];
-  num_el = productElement->GetNumofElement();
+  *row = static_cast<unsigned int>(sizes[0]);
+  *col = static_cast<unsigned int>(sizes[1]);
+  *num_el = static_cast<unsigned int>(productElement->GetNumofElement());
 }
 
-}  // namespace DCORA
+} // namespace DCORA

@@ -5,30 +5,30 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDRAMANIFOLD_H
-#define LIFTEDRAMANIFOLD_H
+#pragma once
 
 #include <DCORA/manifold/LiftedSEManifold.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
- * @brief This class represents a manifold for the RA SLAM synchronization problem
+ * @brief This class represents a manifold for the RA-SLAM synchronization
+ * problem
  */
 class LiftedRAManifold : public LiftedSEManifold {
- public:
+public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
-   * @param l
-   * @param b
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
+   * @param l number of ranges
+   * @param b number of landmarks
    */
-  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n,
+                   unsigned int l, unsigned int b);
   /**
    * @brief Destructor
    */
@@ -45,12 +45,11 @@ class LiftedRAManifold : public LiftedSEManifold {
    */
   Matrix project(const Matrix &M) const override;
 
- private:
+private:
   unsigned int l_, b_;
   ROPTLIB::Oblique *ObliqueManifold;
   ROPTLIB::Euclidean *EuclideanLandmarkManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };
-}  // namespace DCORA
 
-#endif
+} // namespace DCORA

@@ -10,13 +10,15 @@
 
 namespace DCORA {
 
-LiftedRAVector::LiftedRAVector(int r, int d, int n, int l, int b)
+LiftedRAVector::LiftedRAVector(unsigned int r, unsigned int d, unsigned int n,
+                               unsigned int l, unsigned int b)
     : LiftedSEVector(r, d, n) {
   ObliqueRangeVector = new ROPTLIB::ObliqueVector(r, l);
   EuclideanLandmarkVector = new ROPTLIB::EucVector(r, b);
   MyOBVector = new ROPTLIB::ProductElement(1, ObliqueRangeVector, 1);
   MyEVector = new ROPTLIB::ProductElement(1, EuclideanLandmarkVector, 1);
-  MyRAVector = new ROPTLIB::ProductElement(3, MySEVector, 1, MyOBVector, 1, MyEVector, 1);
+  MyRAVector = new ROPTLIB::ProductElement(3, MySEVector, 1, MyOBVector, 1,
+                                           MyEVector, 1);
 }
 
 LiftedRAVector::~LiftedRAVector() {
@@ -30,8 +32,8 @@ LiftedRAVector::~LiftedRAVector() {
 
 Matrix LiftedRAVector::getData() {
   setSize();
-  return Eigen::Map<Matrix>((double *)MyRAVector->ObtainReadData(), r_,
-                          n_ * (d_ + 1) + l_ + b_);
+  return Eigen::Map<Matrix>(const_cast<double *>(MyRAVector->ObtainReadData()),
+                            r_, n_ * (d_ + 1) + l_ + b_);
 }
 
 void LiftedRAVector::setData(const Matrix &X) {
@@ -41,17 +43,17 @@ void LiftedRAVector::setData(const Matrix &X) {
   copyEigenMatrixToROPTLIBVariable(X_SE, MySEVector, r_ * (d_ + 1) * n_);
   copyEigenMatrixToROPTLIBVariable(X_OB, MyOBVector, r_ * l_);
   copyEigenMatrixToROPTLIBVariable(X_E, MyEVector, r_ * b_);
-  copyEigenMatrixToROPTLIBVariable(X, MyRAVector, r_ * ((d_ + 1) * n_ + l_ + b_));
+  copyEigenMatrixToROPTLIBVariable(X, MyRAVector,
+                                   r_ * ((d_ + 1) * n_ + l_ + b_));
 }
 
 void LiftedRAVector::setSize() {
   // set r, d, n
   LiftedSEVector::setSize();
-
   // set l and b
   unsigned int row, col;
-  LiftedSEVector::setSizeFromProductElement(MyOBVector, row, col, l_);
-  LiftedSEVector::setSizeFromProductElement(MyEVector, row, col, b_);
+  LiftedSEVector::setSizeFromProductElement(MyOBVector, &row, &col, &l_);
+  LiftedSEVector::setSizeFromProductElement(MyEVector, &row, &col, &b_);
 }
 
-}  // namespace DCORA
+} // namespace DCORA

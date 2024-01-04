@@ -5,27 +5,28 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDSEVARIABLE_H
-#define LIFTEDSEVARIABLE_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/manifold/Poses.h>
+
+#include <memory>
 
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductElement.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
- * @brief This class represents a collection of "lifted" poses X = [X1 X2 ... Xn]
+ * @brief This class represents a collection of "lifted" poses:
+ * X = [Y1 p1 ... Yn pn]
  * that can be used by ROPTLIB to perform Riemannian optimization
  */
 class LiftedSEVariable {
- public:
+public:
   /**
-   * @brief Construct a default object
+   * @brief Constructor
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
@@ -35,7 +36,7 @@ class LiftedSEVariable {
    * @brief Constructor from a lifted pose array object
    * @param poses
    */
-  LiftedSEVariable(const LiftedPoseArray &poses);
+  explicit LiftedSEVariable(const LiftedPoseArray &poses);
   /**
    * @brief Copy constructor
    * @param other
@@ -69,65 +70,69 @@ class LiftedSEVariable {
   virtual ROPTLIB::ProductElement *var() { return varSE_.get(); }
   /**
    * @brief Obtain the variable as an Eigen matrix
-   * @return r by (d+1)n matrix [Y1 p1 ... Yn pn]
+   * @return r-by-(d+1)n matrix of the form: X = [Y1 p1 ... Yn pn]
    */
   virtual Matrix getData() const;
   /**
    * @brief Set this variable from an Eigen matrix
-   * @param X r by (d+1)n matrix [Y1 p1 ... Yn pn]
+   * @param X r-by-(d+1)n matrix of the form: X = [Y1 p1 ... Yn pn]
    */
   virtual void setData(const Matrix &X);
+
+protected:
   /**
-   * @brief Obtain the writable pose at the specified index, expressed as an r-by-(d+1) matrix
+   * @brief Obtain the writable pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
    * @param index
    * @return
    */
-
- private:
   Eigen::Ref<Matrix> pose(unsigned int index);
   /**
-   * @brief Obtain the read-only pose at the specified index, expressed as an r-by-(d+1) matrix
+   * @brief Obtain the read-only pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
    * @param index
    * @return
    */
   Matrix pose(unsigned int index) const;
   /**
-   * @brief Obtain the writable rotation at the specified index, expressed as an r-by-d matrix
+   * @brief Obtain the writable rotation at the specified index, expressed as an
+   * r-by-d matrix
    * @param index
    * @return
    */
   Eigen::Ref<Matrix> rotation(unsigned int index);
   /**
-   * @brief Obtain the read-only rotation at the specified index, expressed as an r-by-d matrix
+   * @brief Obtain the read-only rotation at the specified index, expressed as
+   * an r-by-d matrix
    * @param index
    * @return
    */
   Matrix rotation(unsigned int index) const;
   /**
-   * @brief Obtain the writable translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the writable translation at the specified index, expressed as
+   * an r dimensional vector
    * @param index
    * @return
    */
   Eigen::Ref<Vector> translation(unsigned int index);
   /**
-   * @brief Obtain the read-only translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the read-only translation at the specified index, expressed
+   * as an r dimensional vector
    * @param index
    * @return
    */
   Vector translation(unsigned int index) const;
 
- protected:
   // const dimensions
   unsigned int r_, d_, n_;
-  // The actual content of this variable is stored inside a ROPTLIB::ProductElement
+  // The actual variable content is stored inside a ROPTLIB::ProductElement
   std::unique_ptr<ROPTLIB::StieVariable> rotation_var_;
   std::unique_ptr<ROPTLIB::EucVariable> translation_var_;
   std::unique_ptr<ROPTLIB::ProductElement> pose_var_;
   std::shared_ptr<ROPTLIB::ProductElement> varSE_;
-  // Internal view of the variable as an eigen matrix of dimension r-by-(d+1)n
+  // Internal view of the variable:
+  // SE(n) domain as an eigen matrix of dimension r-by-(d+1)n
   Eigen::Map<Matrix> X_SE_;
 };
 
-}  // namespace DCORA
-
-#endif
+} // namespace DCORA
