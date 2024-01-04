@@ -144,12 +144,94 @@ class LiftedTranslationArray : public LiftedArray {
    * @param n
    */
   LiftedTranslationArray(unsigned int r, unsigned int d, unsigned int n);
+};
 
+typedef LiftedTranslationArray LiftedUnitSphereAuxiliaryArray;
+typedef LiftedTranslationArray LiftedLandmarkArray;
+
+/**
+ * @brief A class representing an array of "lifted" poses, unit-sphere auxiliary variables, and translations in RA ordering
+ * Internally store as r by (d+1)n+l+b matrix X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
+ */
+class LiftedRangeAidedArray {
+ public:
   /**
-   * @brief Set the underlying Eigen matrix
+   * @brief Constructor
+   * @param r
+   * @param d
+   * @param n
+   * @param l
+   * @param b
+   */
+  LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+  /**
+   * @brief Copy constructor
+   * @param other
+   */
+  LiftedRangeAidedArray(const LiftedRangeAidedArray &other);
+  /**
+   * @brief Copy assignment operator
+   * @param other
+   * @return
+   */
+  LiftedRangeAidedArray &operator=(const LiftedRangeAidedArray &other);
+  /**
+   * @brief Get relaxation rank
+   * @return
+   */
+  unsigned int r() const { return r_; }
+  /**
+   * @brief Get dimension
+   * @return
+   */
+  unsigned int d() const { return d_; }
+  /**
+   * @brief Get number of poses
+   * @return
+   */
+  unsigned int n() const { return n_; }
+  /**
+   * @brief Get number of unit-sphere auxiliary variables
+   * @return
+   */
+  unsigned int l() const { return l_; }
+  /**
+   * @brief Get number of landmarks
+   * @return
+   */
+  unsigned int b() const { return b_; }
+  /**
+   * @brief Return the underlying Eigen matrices of contained arrays in RA ordering
+   * @return
+   */
+  Matrix getData() const;
+  /**
+   * @brief Set the underlying Eigen matrices of contained arrays in RA ordering
    * @param X
    */
-  void setData(const Vector &P);
+  void setData(const Matrix &X);
+  /**
+   * @brief Get "lifted" pose array
+   * @return
+   */
+  LiftedPoseArray* GetLiftedPoseArray() const { return poses_.get(); };
+  /**
+   * @brief Get "lifted" unit-sphere auxiliary array
+   * @return
+   */
+  LiftedUnitSphereAuxiliaryArray* GetLiftedUnitSphereAuxiliaryArray() const { return ranges_.get(); };
+  /**
+   * @brief Get "lifted" landmark array
+   * @return
+   */
+  LiftedLandmarkArray* GetLiftedLandmarkArray() const { return landmarks_.get(); };
+ protected:
+  // Dimension constants
+  unsigned int r_, d_, n_, l_, b_;
+  // "Lifted" arrays
+  std::unique_ptr<LiftedPoseArray> poses_;
+  std::unique_ptr<LiftedUnitSphereAuxiliaryArray> ranges_;
+  std::unique_ptr<LiftedLandmarkArray> landmarks_;
 };
 
 /**
@@ -171,6 +253,20 @@ class PoseArray : public LiftedPoseArray {
 class TranslationArray : public LiftedTranslationArray {
  public:
   TranslationArray(unsigned int d, unsigned int n) : LiftedTranslationArray(d, d, n) {}
+};
+
+typedef TranslationArray UnitSphereAuxiliaryArray;
+typedef TranslationArray LandmarkArray;
+
+/**
+ * @brief A class representing an array of poses, unit-sphere auxiliary variables, and translations in RA ordering
+ * Internally store as d by (d+1)n+l+b matrix X = [X1, ... Xn | r1 ... rn | p1 ... pn | l1 ... ln]
+ * See PoseArray, UnitSphereAuxiliaryArray, and TranslationArray for details on variables
+ */
+
+class RangeAidedArray : public LiftedRangeAidedArray {
+ public:
+  RangeAidedArray(unsigned int d, unsigned int n, unsigned int l, unsigned int b) : LiftedRangeAidedArray(d, d, n, l, b) {}
 };
 
 /**

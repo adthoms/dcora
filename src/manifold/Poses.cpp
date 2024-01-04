@@ -102,9 +102,45 @@ LiftedTranslationArray::LiftedTranslationArray(unsigned int r, unsigned int d, u
   X_ = Matrix::Zero(r_, dim_ * n_);
 }
 
-void LiftedTranslationArray::setData(const Vector &P) {
-  CHECK_EQ(P.rows(), r_);
-  X_ = convertVectorTypeToMatrixType(P);
+LiftedRangeAidedArray::LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) :
+    r_(r), d_(d), n_(n), l_(l), b_(b),
+    poses_(std::make_unique<LiftedPoseArray>(r, d, n)),
+    ranges_(std::make_unique<LiftedUnitSphereAuxiliaryArray>(r, d, l)),
+    landmarks_(std::make_unique<LiftedLandmarkArray>(r, d, b)) {}
+
+LiftedRangeAidedArray::LiftedRangeAidedArray(const LiftedRangeAidedArray &other) :
+    LiftedRangeAidedArray(other.r(), other.d(), other.n(), other.l(), other.b()) {
+  setData(other.getData());
+}
+
+LiftedRangeAidedArray &LiftedRangeAidedArray::operator=(const LiftedRangeAidedArray &other) {
+  r_ = other.r();
+  d_ = other.d();
+  n_ = other.n();
+  l_ = other.l();
+  b_ = other.b();
+  poses_ = std::make_unique<LiftedPoseArray>(r_, d_, n_);
+  ranges_ = std::make_unique<LiftedUnitSphereAuxiliaryArray>(r_, d_, l_);
+  landmarks_ = std::make_unique<LiftedLandmarkArray>(r_, d_, b_);
+  poses_->setData(other.GetLiftedPoseArray()->getData());
+  ranges_->setData(other.GetLiftedUnitSphereAuxiliaryArray()->getData());
+  landmarks_->setData(other.GetLiftedLandmarkArray()->getData());
+  return *this;
+}
+
+Matrix LiftedRangeAidedArray::getData() const {
+  auto [X_SE_R, X_SE_t] = partitionSEMatrix(poses_->getData(), r_, d_, n_);
+  return createRAMatrix(X_SE_R, ranges_->getData(), X_SE_t, landmarks_->getData());
+}
+
+void LiftedRangeAidedArray::setData(const Matrix &X) {
+  CHECK_EQ(X.rows(), r_);
+  CHECK_EQ(X.cols(), (d_ + 1) * n_ + l_ + b_);
+
+  auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(X, r_, d_, n_, l_, b_);
+  poses_->setData(createSEMatrix(X_SE_R, X_SE_t));
+  ranges_->setData(X_OB);
+  landmarks_->setData(X_E);
 }
 
 Pose::Pose(const Matrix &T)

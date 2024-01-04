@@ -31,10 +31,10 @@ class LiftedRAVariable : public LiftedSEVariable {
    */
   LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
   /**
-   * @brief Constructor from lifted pose and translation array objects (TODO: replace with LiftedRangeAidedArray)
-   * @param poses TODO: update doc string to reflect new variable ordering
+   * @brief Constructor from a lifted range aided array object
+   * @param rangeAidedArray
    */
-  LiftedRAVariable(const LiftedPoseArray &poses, const LiftedTranslationArray &landmarks, const LiftedTranslationArray &ranges);
+  LiftedRAVariable(const LiftedRangeAidedArray &rangeAidedArray);
   /**
    * @brief Copy constructor
    * @param other

@@ -30,11 +30,12 @@ LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d, unsigned int 
   X_RA_ = createRAMatrix(X_SE_R, X_OB_, X_SE_t, X_E_);
 }
 
-LiftedRAVariable::LiftedRAVariable(const LiftedPoseArray &poses, const LiftedTranslationArray &landmarks, const LiftedTranslationArray &ranges)
-    : LiftedRAVariable(poses.r(), poses.d(), poses.n(), landmarks.n(), ranges.n()) /* TODO: update construction */ {
-  Matrix X_SE = poses.getData(); // TODO: update for LiftedRangeAidedArray
-  auto [X_SE_R, X_SE_t] = partitionSEMatrix(X_SE, r_, d_, n_); // TODO: update for LiftedRangeAidedArray
-  setData(createRAMatrix(X_SE_R, ranges.getData(), X_SE_t, landmarks.getData())); // TODO: update for LiftedRangeAidedArray
+LiftedRAVariable::LiftedRAVariable(const LiftedRangeAidedArray &rangeAidedArray)
+    : LiftedRAVariable(rangeAidedArray.r(), rangeAidedArray.d(), rangeAidedArray.n(), rangeAidedArray.l(), rangeAidedArray.b()) {
+  auto [X_SE_R, X_SE_t] = partitionSEMatrix(rangeAidedArray.GetLiftedPoseArray()->getData(), r_, d_, n_);
+  Matrix X_OB = rangeAidedArray.GetLiftedUnitSphereAuxiliaryArray()->getData();
+  Matrix X_E = rangeAidedArray.GetLiftedLandmarkArray()->getData();
+  setData(createRAMatrix(X_SE_R, X_OB, X_SE_t, X_E));
 }
 
 LiftedRAVariable::LiftedRAVariable(const LiftedRAVariable &other) :
