@@ -609,8 +609,24 @@ std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, un
 }
 
 Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
-  Matrix X(X_SE_R.rows(), X_SE_R.cols() + X_SE_t.cols());
-  X << X_SE_R, X_SE_t;
+  // get and check rows
+  size_t r = X_SE_R.rows();
+  CHECK_EQ(X_SE_R.rows(), X_SE_t.rows());
+
+  // get and check cols
+  size_t n = X_SE_t.cols();
+  size_t d = X_SE_R.cols() / n;
+  CHECK_EQ(X_SE_R.cols() + X_SE_t.cols(), (d + 1) * n);
+
+  // preallocate
+  Matrix X(r, (d + 1) * n);
+
+#pragma omp parallel for
+  for (size_t i = 0; i < n; ++i) {
+    X.block(0, i * (d + 1), r, d) = X_SE_R.block(0, i * d, r, d);
+    X.col(i * (d + 1) + d) = X_SE_t.col(i);
+  }
+
   return X;
 }
 
