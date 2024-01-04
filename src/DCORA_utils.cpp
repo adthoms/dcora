@@ -579,53 +579,38 @@ void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned
 
 std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n) {
   checkSEMatrixSize(X, r, d, n);
-
-  // preallocate
   Matrix X_SE_R = Matrix::Zero(r, d * n);
   Matrix X_SE_t = Matrix::Zero(r, n);
-
-  // partition
 #pragma omp parallel for
   for (size_t i = 0; i < n; ++i) {
     auto Y = X.block(0, i * (d + 1), r, d + 1);
     X_SE_R.block(0, i * d, r, d) = Y.block(0, 0, r, d);
     X_SE_t.col(i) = Y.col(d);
   }
-
   return std::make_tuple(X_SE_R, X_SE_t);
 }
 
 std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
   checkRAMatrixSize(X, r, d, n, l, b);
-
-  // partition
   Matrix X_SE_R = X.block(0, 0, r, d * n);
   Matrix X_OB = X.block(0, d * n, r, l);
   Matrix X_SE_t = X.block(0, d * n + l, r, n);
   Matrix X_E = X.block(0, d * n + l + n, r, b);
-
   return std::make_tuple(X_SE_R, X_OB, X_SE_t, X_E);
 }
 
 Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
-  // get and check rows
   size_t r = X_SE_R.rows();
-  CHECK_EQ(X_SE_R.rows(), X_SE_t.rows());
-
-  // get and check cols
   size_t n = X_SE_t.cols();
   size_t d = X_SE_R.cols() / n;
+  CHECK_EQ(X_SE_R.rows(), X_SE_t.rows());
   CHECK_EQ(X_SE_R.cols() + X_SE_t.cols(), (d + 1) * n);
-
-  // preallocate
   Matrix X(r, (d + 1) * n);
-
 #pragma omp parallel for
   for (size_t i = 0; i < n; ++i) {
     X.block(0, i * (d + 1), r, d) = X_SE_R.block(0, i * d, r, d);
     X.col(i * (d + 1) + d) = X_SE_t.col(i);
   }
-
   return X;
 }
 
