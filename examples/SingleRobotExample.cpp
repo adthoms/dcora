@@ -6,24 +6,19 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/DCORA_types.h>
-#include <DCORA/DCORA_solver.h>
 #include <DCORA/CORAAgent.h>
+#include <DCORA/DCORA_solver.h>
+#include <DCORA/DCORA_types.h>
 #include <DCORA/QuadraticProblem.h>
 
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-
-using namespace std;
-using namespace DCORA;
-
-#include <string>
-#include <fstream>
-#include <vector>
-#include <utility> // std::pair
+#include <sstream>   // std::stringstream
 #include <stdexcept> // std::runtime_error
-#include <sstream> // std::stringstream
+#include <string>
+#include <utility> // std::pair
+#include <vector>
 
 int main(int argc, char **argv) {
   /**
@@ -33,15 +28,16 @@ int main(int argc, char **argv) {
   */
 
   if (argc < 2) {
-    cout << "Single robot pose-graph optimization. " << endl;
-    cout << "Usage: " << argv[0] << " [input .g2o file]" << endl;
+    std::cout << "Single robot pose-graph optimization. " << std::endl;
+    std::cout << "Usage: " << argv[0] << " [input .g2o file]" << std::endl;
     exit(1);
   }
 
-  cout << "Single robot pose-graph optimization demo. " << endl;
+  std::cout << "Single robot pose-graph optimization demo. " << std::endl;
 
   size_t num_poses;
-  vector<RelativeSEMeasurement> dataset = read_g2o_file(argv[1], num_poses);
+  std::vector<DCORA::RelativeSEMeasurement> dataset =
+      DCORA::read_g2o_file(argv[1], num_poses);
 
   /**
   ###########################################
@@ -52,18 +48,18 @@ int main(int argc, char **argv) {
   unsigned int d, r;
   d = (!dataset.empty() ? dataset[0].t.size() : 0);
   r = d;
-  PGOAgentParameters options(d, r, 1);
+  DCORA::PGOAgentParameters options(d, r, 1);
   options.verbose = true;
 
-  vector<RelativeSEMeasurement> odometry;
-  vector<RelativeSEMeasurement> private_loop_closures;
-  vector<RelativeSEMeasurement> shared_loop_closure;
+  std::vector<DCORA::RelativeSEMeasurement> odometry;
+  std::vector<DCORA::RelativeSEMeasurement> private_loop_closures;
+  std::vector<DCORA::RelativeSEMeasurement> shared_loop_closure;
   for (const auto &mIn : dataset) {
     unsigned srcIdx = mIn.p1;
     unsigned dstIdx = mIn.p2;
 
-    RelativeSEMeasurement m(0, 0, srcIdx, dstIdx, mIn.R, mIn.t,
-                            mIn.kappa, mIn.tau);
+    DCORA::RelativeSEMeasurement m(0, 0, srcIdx, dstIdx, mIn.R, mIn.t,
+                                   mIn.kappa, mIn.tau);
 
     if (srcIdx + 1 == dstIdx) {
       // Odometry
@@ -75,9 +71,9 @@ int main(int argc, char **argv) {
   }
 
   // Construct the centralized PGO problem (used for evaluation)
-  auto pose_graph = std::make_shared<PoseGraph>(0, d, d);
+  auto pose_graph = std::make_shared<DCORA::PoseGraph>(0, d, d);
   pose_graph->setMeasurements(dataset);
-  QuadraticProblem problemCentral(pose_graph);
+  DCORA::QuadraticProblem problemCentral(pose_graph);
 
   /**
   ###########################################
@@ -85,10 +81,8 @@ int main(int argc, char **argv) {
   ###########################################
   */
 
-  auto *agent = new PGOAgent(0, options);
-  agent->setMeasurements(odometry,
-                         private_loop_closures,
-                         shared_loop_closure);
+  auto *agent = new DCORA::PGOAgent(0, options);
+  agent->setMeasurements(odometry, private_loop_closures, shared_loop_closure);
   agent->initialize();
 
   /**
@@ -97,11 +91,11 @@ int main(int argc, char **argv) {
   ###########################################
   */
 
-  cout << "Running local pose graph optimization..." << endl;
-  Matrix X = agent->localPoseGraphOptimization();
+  std::cout << "Running local pose graph optimization..." << std::endl;
+  DCORA::Matrix X = agent->localPoseGraphOptimization();
 
   // Evaluate
-  std::cout << "Cost = " << 2 * problemCentral.f(X) << endl;
+  std::cout << "Cost = " << 2 * problemCentral.f(X) << std::endl;
 
   exit(0);
 }

@@ -6,17 +6,14 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_solver.h>
+#include <DCORA/DCORA_types.h>
 #include <DCORA/QuadraticProblem.h>
 
-#include <cstdlib>
 #include <cassert>
-#include <iostream>
+#include <cstdlib>
 #include <fstream>
-
-using namespace std;
-using namespace DCORA;
+#include <iostream>
 
 int main(int argc, char **argv) {
   /**
@@ -26,26 +23,29 @@ int main(int argc, char **argv) {
   */
 
   if (argc != 2) {
-    cout << "Chordal initialization example. " << endl;
-    cout << "Usage: " << argv[0] << " [input .g2o file]" << endl;
+    std::cout << "Chordal initialization example. " << std::endl;
+    std::cout << "Usage: " << argv[0] << " [input .g2o file]" << std::endl;
     exit(1);
   }
 
-  cout << "Chordal Initialization Example. " << endl;
+  std::cout << "Chordal Initialization Example. " << std::endl;
 
   size_t n;
-  vector<RelativeSEMeasurement> dataset = read_g2o_file(argv[1], n);
+  std::vector<DCORA::RelativeSEMeasurement> dataset =
+      DCORA::read_g2o_file(argv[1], n);
   size_t d = (!dataset.empty() ? dataset[0].t.size() : 0);
-  cout << "Loaded dataset from file " << argv[1] << "." << endl;
+  std::cout << "Loaded dataset from file " << argv[1] << "." << std::endl;
 
   // Construct optimization problem
-  std::shared_ptr<PoseGraph> pose_graph = std::make_shared<PoseGraph>(0, d, d);
+  std::shared_ptr<DCORA::PoseGraph> pose_graph =
+      std::make_shared<DCORA::PoseGraph>(0, d, d);
   pose_graph->setMeasurements(dataset);
-  QuadraticProblem problemCentral(pose_graph);
+  DCORA::QuadraticProblem problemCentral(pose_graph);
 
   // Compute chordal relaxation
-  auto TChordal = chordalInitialization(dataset);
-  std::cout << "Chordal initialization cost: " << 2 * problemCentral.f(TChordal.getData()) << std::endl;
+  auto TChordal = DCORA::chordalInitialization(dataset);
+  std::cout << "Chordal initialization cost: "
+            << 2 * problemCentral.f(TChordal.getData()) << std::endl;
 
   exit(0);
 }
