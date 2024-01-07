@@ -5,25 +5,29 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DCORAUTILS_H
-#define DCORAUTILS_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/RelativeSEMeasurement.h>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
-#include <chrono>
+#include <chrono> // NOLINT(build/c++11)
+#include <string>
+#include <tuple>
+#include <vector>
 
-// ROPTLIB includes
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/Oblique/Oblique.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
+using HighResClock =
+    std::chrono::time_point<std::chrono::high_resolution_clock>;
+
 namespace DCORA {
 
 class SimpleTimer {
- public:
+public:
   /**
    * @brief Start timer
    */
@@ -37,15 +41,16 @@ class SimpleTimer {
    * @brief Start timer and return starting time
    * @return
    */
-  static std::chrono::time_point<std::chrono::high_resolution_clock> Tic();
+  static HighResClock Tic();
   /**
    * @brief Return time elapsed since input start_time
    * @param start_time
    * @return elapsed time in ms
    */
-  static double Toc(const std::chrono::time_point<std::chrono::high_resolution_clock> &start_time);
- private:
-  std::chrono::time_point<std::chrono::high_resolution_clock> t_start, t_end;
+  static double Toc(const HighResClock &start_time);
+
+private:
+  HighResClock t_start, t_end;
 };
 
 /**
@@ -60,7 +65,8 @@ void writeMatrixToFile(const Matrix &M, const std::string &filename);
  * @param M
  * @param filename
  */
-void writeSparseMatrixToFile(const SparseMatrix &M, const std::string &filename);
+void writeSparseMatrixToFile(const SparseMatrix &M,
+                             const std::string &filename);
 
 /**
  * @brief Helper function to read a dataset in .g2o format
@@ -69,17 +75,18 @@ void writeSparseMatrixToFile(const SparseMatrix &M, const std::string &filename)
  * @return
  */
 std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
-                                                 size_t &num_poses);
+                                                 size_t *num_poses);
 
 /**
- * @brief Get the dimension and number of poses from a vector of relative pose measurements
+ * @brief Get the dimension and number of poses from a vector of relative pose
+ * measurements
  * @param measurements
  * @param dimension
  * @param num_poses
  */
-void get_dimension_and_num_poses(const std::vector<RelativeSEMeasurement> &measurements,
-                                 size_t &dimension,
-                                 size_t &num_poses);
+void get_dimension_and_num_poses(
+    const std::vector<RelativeSEMeasurement> &measurements, size_t *dimension,
+    size_t *num_poses);
 
 /**
  * @brief Helper function to construct connection laplacian matrix in SE(d)
@@ -88,8 +95,8 @@ void get_dimension_and_num_poses(const std::vector<RelativeSEMeasurement> &measu
  * @param OmegaT
  */
 void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix &AT,
-    DiagonalMatrix &OmegaT);
+    const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix *AT,
+    DiagonalMatrix *OmegaT);
 
 /**
  * @brief Helper function to construct connection laplacian matrix in SE(d)
@@ -100,19 +107,19 @@ SparseMatrix constructConnectionLaplacianSE(
     const std::vector<RelativeSEMeasurement> &measurements);
 
 /**
- * @brief Given a vector of relative pose measurements, this function computes and returns
- * the B matrices defined in equation (69) of the tech report
+ * @brief Given a vector of relative pose measurements, this function computes
+ * and returns the B matrices defined in equation (69) of the tech report
  * @param measurements
  * @param B1
  * @param B2
  * @param B3
  */
 void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements,
-                        SparseMatrix &B1, SparseMatrix &B2, SparseMatrix &B3);
+                        SparseMatrix *B1, SparseMatrix *B2, SparseMatrix *B3);
 
 /**
- * @brief Given the measurement matrices B1 and B2 and a matrix R of rotational state
- * estimates, this function computes and returns the corresponding optimal
+ * @brief Given the measurement matrices B1 and B2 and a matrix R of rotational
+ * state estimates, this function computes and returns the corresponding optimal
  * translation estimates
  * @param B1
  * @param B2
@@ -203,13 +210,13 @@ Matrix randomObliqueVariable(unsigned r, unsigned l = 1);
  * @param t2 translation of second pose
  * @return
  */
-double computeMeasurementError(const RelativeSEMeasurement &m,
-                               const Matrix &R1, const Matrix &t1,
-                               const Matrix &R2, const Matrix &t2);
+double computeMeasurementError(const RelativeSEMeasurement &m, const Matrix &R1,
+                               const Matrix &t1, const Matrix &R2,
+                               const Matrix &t2);
 
 /**
- * @brief Quantile of chi-squared distribution with given degrees of freedom at probability alpha.
- * Equivalent to chi2inv in Matlab.
+ * @brief Quantile of chi-squared distribution with given degrees of freedom at
+ * probability alpha. Equivalent to chi2inv in Matlab.
  * @param quantile
  * @param dof
  * @return
@@ -230,7 +237,8 @@ double angular2ChordalSO3(double rad);
 void checkRotationMatrix(const Matrix &R);
 
 /**
- * @brief Check that the input matrix of dimension r-by-d is a valid element of the Stiefel manifold
+ * @brief Check that the input matrix of dimension r-by-d is a valid element of
+ * the Stiefel manifold
  * @param Y
  */
 void checkStiefelMatrix(const Matrix &Y);
@@ -239,27 +247,34 @@ void checkStiefelMatrix(const Matrix &Y);
  * @brief Check that the SE input matrix is of dimension r-by-(d+1)*n
  * @param X
  */
-void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n);
+void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d,
+                       unsigned int n);
 
 /**
  * @brief Check that the RA input matrix is of dimension r-by-(d+1)*n+l+b
  * @param X
  */
-void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d,
+                       unsigned int n, unsigned int l, unsigned int b);
 
 /**
- * @brief Partition the SE input matrix into SE_R and SE_t matrices, respectively
+ * @brief Partition the SE input matrix into SE_R and SE_t matrices,
+ * respectively
  * @param X
  * @return
  */
-std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n);
+std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r,
+                                             unsigned int d, unsigned int n);
 
 /**
- * @brief Partition the RA input matrix into SE_R, OB, SE_t, and E matrices, respectively
+ * @brief Partition the RA input matrix into SE_R, OB, SE_t, and E matrices,
+ * respectively
  * @param X
  * @return
  */
-std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+std::tuple<Matrix, Matrix, Matrix, Matrix>
+partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d,
+                  unsigned int n, unsigned int l, unsigned int b);
 
 /**
  * @brief Create SE matrix from X_SE_R and X_SE_t matrices
@@ -277,7 +292,8 @@ Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t);
  * @param X_E
  * @return
  */
-Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB, const Matrix &X_SE_t, const Matrix &X_E);
+Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB,
+                      const Matrix &X_SE_t, const Matrix &X_E);
 
 /**
  * @brief Copy array data from Eigen matrix to ROPTLIB element
@@ -285,8 +301,7 @@ Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB, const Matrix &X_
  * @param var
  * @param mem_size
  */
-void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, double mem_size);
+void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
+                                      double mem_size);
 
-}  // namespace DCORA
-
-#endif
+} // namespace DCORA

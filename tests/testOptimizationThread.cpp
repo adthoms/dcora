@@ -77,7 +77,7 @@ TEST(testDCORA, OptimizationThreadTriangleGraph) {
   agent.initialize();
 
   DCORA::Matrix Testimated;
-  agent.getTrajectoryInLocalFrame(Testimated);
+  agent.getTrajectoryInLocalFrame(&Testimated);
   ASSERT_LE((Ttrue - Testimated).norm(), 1e-4);
 
   agent.startOptimizationLoop();
@@ -89,6 +89,6 @@ TEST(testDCORA, OptimizationThreadTriangleGraph) {
   ASSERT_EQ(agent.dimension(), d);
   ASSERT_EQ(agent.relaxation_rank(), r);
 
-  agent.getTrajectoryInLocalFrame(Testimated);
+  agent.getTrajectoryInLocalFrame(&Testimated);
   ASSERT_LE((Ttrue - Testimated).norm(), 1e-4);
 }

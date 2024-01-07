@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
 
   size_t num_poses;
   std::vector<DCORA::RelativeSEMeasurement> dataset =
-      DCORA::read_g2o_file(argv[2], num_poses);
+      DCORA::read_g2o_file(argv[2], &num_poses);
   std::cout << "Loaded dataset from file " << argv[2] << "." << std::endl;
 
   /**
@@ -129,7 +129,8 @@ int main(int argc, char **argv) {
   ###########################################
   */
   std::vector<DCORA::PGOAgent *> agents;
-  for (unsigned robot = 0; robot < (unsigned)num_robots; ++robot) {
+  for (unsigned robot = 0; robot < static_cast<unsigned int>(num_robots);
+       ++robot) {
     DCORA::PGOAgentParameters options(d, r, num_robots);
     options.acceleration = acceleration;
     options.verbose = verbose;
@@ -140,7 +141,7 @@ int main(int argc, char **argv) {
     // which the first agent will generate
     if (robot > 0) {
       DCORA::Matrix M;
-      agents[0]->getLiftingMatrix(M);
+      agents[0]->getLiftingMatrix(&M);
       agent->setLiftingMatrix(M);
     }
 
@@ -194,7 +195,7 @@ int main(int argc, char **argv) {
       if (robotPtr->getID() == selectedRobot)
         continue;
       DCORA::PoseDict sharedPoses;
-      if (!robotPtr->getSharedPoseDict(sharedPoses)) {
+      if (!robotPtr->getSharedPoseDict(&sharedPoses)) {
         continue;
       }
       selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
@@ -207,7 +208,7 @@ int main(int argc, char **argv) {
         if (robotPtr->getID() == selectedRobot)
           continue;
         DCORA::PoseDict auxSharedPoses;
-        if (!robotPtr->getAuxSharedPoseDict(auxSharedPoses)) {
+        if (!robotPtr->getAuxSharedPoseDict(&auxSharedPoses)) {
           continue;
         }
         selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
@@ -227,7 +228,7 @@ int main(int argc, char **argv) {
         endIdx = n;
 
       DCORA::Matrix XRobot;
-      if (agents[robot]->getX(XRobot)) {
+      if (agents[robot]->getX(&XRobot)) {
         Xopt.block(0, startIdx * (d + 1), r, (endIdx - startIdx) * (d + 1)) =
             XRobot;
       }
@@ -265,7 +266,7 @@ int main(int argc, char **argv) {
 
     // Share global anchor for rounding
     DCORA::Matrix M;
-    agents[0]->getSharedPose(0, M);
+    agents[0]->getSharedPose(0, &M);
     for (auto agentPtr : agents) {
       agentPtr->setGlobalAnchor(M);
     }

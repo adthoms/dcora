@@ -20,7 +20,7 @@ TEST(testDCORA, testRobustSingleRotationAveragingTrivial) {
     DCORA::Matrix ROpt;
     std::vector<size_t> inlierIndices;
     const auto kappa = DCORA::Vector::Ones(1);
-    DCORA::robustSingleRotationAveraging(ROpt, inlierIndices, RVec, kappa,
+    DCORA::robustSingleRotationAveraging(&ROpt, &inlierIndices, RVec, kappa,
                                          cbar);
     DCORA::checkRotationMatrix(ROpt);
     double distChordal = (ROpt - RTrue).norm();
@@ -51,7 +51,7 @@ TEST(testDCORA, testRobustSingleRotationAveraging) {
     DCORA::Matrix ROpt;
     std::vector<size_t> inlierIndices;
     const auto kappa = DCORA::Vector::Ones(50);
-    DCORA::robustSingleRotationAveraging(ROpt, inlierIndices, RVec, kappa,
+    DCORA::robustSingleRotationAveraging(&ROpt, &inlierIndices, RVec, kappa,
                                          cbar);
     DCORA::checkRotationMatrix(ROpt);
     double distChordal = (ROpt - RTrue).norm();
@@ -80,7 +80,7 @@ TEST(testDCORA, testRobustSinglePoseAveragingTrivial) {
     DCORA::Matrix ROpt;
     DCORA::Vector tOpt;
     std::vector<size_t> inlierIndices;
-    DCORA::robustSinglePoseAveraging(ROpt, tOpt, inlierIndices, RVec, tVec,
+    DCORA::robustSinglePoseAveraging(&ROpt, &tOpt, &inlierIndices, RVec, tVec,
                                      kappa, tau, gnc_barc);
     DCORA::checkRotationMatrix(ROpt);
     ASSERT_LE((ROpt - RTrue).norm(), 1e-8);
@@ -127,7 +127,7 @@ TEST(testDCORA, testRobustSinglePoseAveraging) {
     DCORA::Matrix ROpt;
     DCORA::Vector tOpt;
     std::vector<size_t> inlierIndices;
-    DCORA::robustSinglePoseAveraging(ROpt, tOpt, inlierIndices, RVec, tVec,
+    DCORA::robustSinglePoseAveraging(&ROpt, &tOpt, &inlierIndices, RVec, tVec,
                                      kappa_vec, tau_vec, gnc_barc);
     DCORA::checkRotationMatrix(ROpt);
     ASSERT_LE((ROpt - RTrue).norm(), RMaxError);
@@ -276,7 +276,7 @@ TEST(testDCORA, testRobustPGO) {
       DCORA::odometryInitialization(pose_graph->odometry());
   auto mutable_measurements = measurements;
   DCORA::PoseArray T =
-      DCORA::solveRobustPGO(mutable_measurements, params, &TOdom);
+      DCORA::solveRobustPGO(&mutable_measurements, params, &TOdom);
   // Check classification of inlier vs outlier
   for (const auto &m : mutable_measurements) {
     if (!m.fixedWeight) {

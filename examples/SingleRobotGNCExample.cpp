@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
       << std::endl;
   size_t num_poses;
   std::vector<DCORA::RelativeSEMeasurement> measurements =
-      DCORA::read_g2o_file(argv[1], num_poses);
+      DCORA::read_g2o_file(argv[1], &num_poses);
   CHECK(!measurements.empty());
   unsigned int dimension = measurements[0].t.size();
   auto pose_graph = std::make_shared<DCORA::PoseGraph>(0, dimension, dimension);
@@ -44,6 +44,6 @@ int main(int argc, char **argv) {
   params.verbose = true;
   DCORA::PoseArray TOdom =
       DCORA::odometryInitialization(pose_graph->odometry());
-  DCORA::PoseArray T = DCORA::solveRobustPGO(measurements, params, &TOdom);
+  DCORA::PoseArray T = DCORA::solveRobustPGO(&measurements, params, &TOdom);
   exit(0);
 }

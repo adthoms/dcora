@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 
   size_t num_poses;
   std::vector<DCORA::RelativeSEMeasurement> dataset =
-      DCORA::read_g2o_file(argv[1], num_poses);
+      DCORA::read_g2o_file(argv[1], &num_poses);
 
   /**
   ###########################################

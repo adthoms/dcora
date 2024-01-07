@@ -58,7 +58,7 @@ TEST(testDCORA, TriangleGraph) {
   ASSERT_LE((Ttrue - TLocal).norm(), 1e-4);
 
   DCORA::Matrix T;
-  agent.getTrajectoryInLocalFrame(T);
+  agent.getTrajectoryInLocalFrame(&T);
   ASSERT_LE((Ttrue - T).norm(), 1e-4);
 
   agent.iterate();
@@ -68,6 +68,6 @@ TEST(testDCORA, TriangleGraph) {
   ASSERT_EQ(agent.dimension(), d);
   ASSERT_EQ(agent.relaxation_rank(), r);
 
-  agent.getTrajectoryInLocalFrame(T);
+  agent.getTrajectoryInLocalFrame(&T);
   ASSERT_LE((Ttrue - T).norm(), 1e-4);
 }
