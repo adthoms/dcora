@@ -74,11 +74,8 @@ set(EXTERNAL_INCLUDES
 add_library(DCORA SHARED
 	src/manifold/Elements.cpp
 	src/manifold/LiftedManifold.cpp
-	src/manifold/LiftedRAManifold.cpp
 	src/manifold/LiftedVariable.cpp
-	src/manifold/LiftedRAVariable.cpp
 	src/manifold/LiftedVector.cpp
-	src/manifold/LiftedRAVector.cpp
 	src/PoseGraph.cpp
 	src/CORAAgent.cpp
 	src/QuadraticProblem.cpp

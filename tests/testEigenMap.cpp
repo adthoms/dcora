@@ -1,8 +1,6 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_utils.h>
 #include <DCORA/manifold/LiftedManifold.h>
-#include <DCORA/manifold/LiftedRAManifold.h>
-#include <DCORA/manifold/LiftedRAVariable.h>
 #include <DCORA/manifold/LiftedVariable.h>
 
 #include <iostream>
