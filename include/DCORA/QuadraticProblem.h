@@ -8,7 +8,7 @@
 #pragma once
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/PoseGraph.h>
+#include <DCORA/Graphs.h>
 #include <DCORA/manifold/LiftedManifold.h>
 #include <DCORA/manifold/LiftedVariable.h>
 #include <DCORA/manifold/LiftedVector.h>

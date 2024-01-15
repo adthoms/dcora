@@ -7,7 +7,7 @@
 
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_solver.h>
-#include <DCORA/PoseGraph.h>
+#include <DCORA/Graphs.h>
 #include <DCORA/QuadraticOptimizer.h>
 
 #include <Eigen/Geometry>

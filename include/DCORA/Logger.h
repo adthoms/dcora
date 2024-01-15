@@ -8,7 +8,7 @@
 #pragma once
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/RelativeSEMeasurement.h>
+#include <DCORA/RelativeMeasurement.h>
 
 #include <fstream>
 #include <iostream>

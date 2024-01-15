@@ -1,4 +1,4 @@
-#include <DCORA/CORAAgent.h>
+#include <DCORA/Agent.h>
 
 #include "gtest/gtest.h"
 

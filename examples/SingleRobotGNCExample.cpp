@@ -1,5 +1,5 @@
 #include <DCORA/DCORA_solver.h>
-#include <DCORA/PoseGraph.h>
+#include <DCORA/Graphs.h>
 
 #include <glog/logging.h>
 

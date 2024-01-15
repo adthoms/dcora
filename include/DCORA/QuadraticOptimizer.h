@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <DCORA/CORAAgent.h>
+#include <DCORA/Agent.h>
 #include <DCORA/DCORA_types.h>
 #include <DCORA/QuadraticProblem.h>
 #include <DCORA/manifold/LiftedManifold.h>

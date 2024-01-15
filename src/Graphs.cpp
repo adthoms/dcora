@@ -5,7 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/PoseGraph.h>
+#include <DCORA/Graphs.h>
 #include <glog/logging.h>
 
 namespace DCORA {

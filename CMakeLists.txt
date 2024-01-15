@@ -71,14 +71,14 @@ add_library(DCORA SHARED
   src/manifold/LiftedManifold.cpp
   src/manifold/LiftedVariable.cpp
   src/manifold/LiftedVector.cpp
-  src/PoseGraph.cpp
-  src/CORAAgent.cpp
   src/QuadraticProblem.cpp
   src/QuadraticOptimizer.cpp
   src/DCORA_utils.cpp
   src/DCORA_solver.cpp
   src/DCORA_robust.cpp
-  src/CORALogger.cpp
+  src/Agent.cpp
+  src/Graphs.cpp
+  src/Logger.cpp
 )
 target_include_directories(DCORA PUBLIC
   ${EXTERNAL_INCLUDES}

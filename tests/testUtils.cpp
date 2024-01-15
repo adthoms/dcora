@@ -1,7 +1,7 @@
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_solver.h>
 #include <DCORA/DCORA_types.h>
-#include <DCORA/PoseGraph.h>
+#include <DCORA/Graphs.h>
 #include <DCORA/manifold/LiftedManifold.h>
 
 #include <iostream>
