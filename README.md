@@ -19,7 +19,7 @@ make
 ## Usage
 
 The built executables are located in directory build/bin. For a minimal demo of distributed RA-SLAM on one of the benchmark datasets, inside the build directory run:
-```
+```bash
 ./bin/multi-robot-example 5 ../data/smallGrid3D.g2o
 ```
 
