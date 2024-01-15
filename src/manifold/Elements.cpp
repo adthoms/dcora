@@ -5,7 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include "DCORA/manifold/Poses.h"
+#include "DCORA/manifold/Elements.h"
 
 #include <glog/logging.h>
 

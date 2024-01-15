@@ -72,12 +72,12 @@ set(EXTERNAL_INCLUDES
 	CACHE INTERNAL "")
 
 add_library(DCORA SHARED
-	src/manifold/Poses.cpp
-	src/manifold/LiftedSEManifold.cpp
+	src/manifold/Elements.cpp
+	src/manifold/LiftedManifold.cpp
 	src/manifold/LiftedRAManifold.cpp
-	src/manifold/LiftedSEVariable.cpp
+	src/manifold/LiftedVariable.cpp
 	src/manifold/LiftedRAVariable.cpp
-	src/manifold/LiftedSEVector.cpp
+	src/manifold/LiftedVector.cpp
 	src/manifold/LiftedRAVector.cpp
 	src/PoseGraph.cpp
 	src/CORAAgent.cpp
@@ -166,7 +166,7 @@ if(BUILD_DCORA_TESTS)
 			testDCORA
 			tests/testUtils.cpp
 			tests/testCORA.cpp
-      tests/testPoses.cpp
+      tests/testElements.cpp
 			tests/testEigenMap.cpp
 			tests/testConstruction.cpp
 			tests/testLineGraph.cpp

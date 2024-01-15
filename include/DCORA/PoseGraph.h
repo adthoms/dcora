@@ -10,7 +10,7 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_utils.h>
 #include <DCORA/RelativeSEMeasurement.h>
-#include <DCORA/manifold/Poses.h>
+#include <DCORA/manifold/Elements.h>
 
 #include <map>
 #include <memory>

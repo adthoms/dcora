@@ -3,7 +3,7 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/PoseGraph.h>
 #include <DCORA/QuadraticOptimizer.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/manifold/LiftedManifold.h>
 
 #include <iostream>
 #include <random>

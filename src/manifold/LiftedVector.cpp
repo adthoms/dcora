@@ -5,7 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/manifold/LiftedSEVector.h>
+#include <DCORA/manifold/LiftedVector.h>
 #include <glog/logging.h>
 
 namespace DCORA {

@@ -8,7 +8,7 @@
 #pragma once
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/manifold/Poses.h>
+#include <DCORA/manifold/Elements.h>
 
 #include <memory>
 

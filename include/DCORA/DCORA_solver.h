@@ -9,7 +9,7 @@
 
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_utils.h>
-#include <DCORA/manifold/Poses.h>
+#include <DCORA/manifold/Elements.h>
 
 #include <vector>
 

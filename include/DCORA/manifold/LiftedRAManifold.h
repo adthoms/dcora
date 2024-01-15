@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/manifold/LiftedManifold.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 

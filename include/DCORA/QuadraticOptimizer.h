@@ -10,9 +10,9 @@
 #include <DCORA/CORAAgent.h>
 #include <DCORA/DCORA_types.h>
 #include <DCORA/QuadraticProblem.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
-#include <DCORA/manifold/LiftedSEVariable.h>
-#include <DCORA/manifold/LiftedSEVector.h>
+#include <DCORA/manifold/LiftedManifold.h>
+#include <DCORA/manifold/LiftedVariable.h>
+#include <DCORA/manifold/LiftedVector.h>
 
 namespace DCORA {
 

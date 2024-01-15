@@ -12,10 +12,10 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/QuadraticProblem.h>
 #include <DCORA/RelativeSEMeasurement.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
-#include <DCORA/manifold/LiftedSEVariable.h>
-#include <DCORA/manifold/LiftedSEVector.h>
-#include <DCORA/manifold/Poses.h>
+#include <DCORA/manifold/Elements.h>
+#include <DCORA/manifold/LiftedManifold.h>
+#include <DCORA/manifold/LiftedVariable.h>
+#include <DCORA/manifold/LiftedVector.h>
 
 #include <Eigen/Dense>
 #include <glog/logging.h>
