@@ -10,8 +10,8 @@
 
 #include "DCORA_types.h"
 #include "DCORA_utils.h"
-#include "manifold/Poses.h"
-#include "RelativeSEMeasurement.h"
+#include "manifold/Elements.h"
+#include "RelativeMeasurement.h"
 #include <glog/logging.h>
 #include <set>
 #include <map>

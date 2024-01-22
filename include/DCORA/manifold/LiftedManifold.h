@@ -9,7 +9,7 @@
 #define LIFTEDSEMANIFOLD_H
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/manifold/Poses.h>
+#include <DCORA/manifold/Elements.h>
 
 #include "Manifolds/Euclidean/Euclidean.h"
 #include "Manifolds/ProductManifold.h"

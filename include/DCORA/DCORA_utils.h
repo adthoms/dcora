@@ -9,7 +9,7 @@
 #define DCORAUTILS_H
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/RelativeSEMeasurement.h>
+#include <DCORA/RelativeMeasurement.h>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>

@@ -8,7 +8,7 @@
 #ifndef LIFTEDRAVARIABLE_H
 #define LIFTEDRAVARIABLE_H
 
-#include <DCORA/manifold/LiftedSEVariable.h>
+#include <DCORA/manifold/LiftedVariable.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 

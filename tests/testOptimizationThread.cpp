@@ -1,6 +1,6 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_utils.h>
-#include <DCORA/CORAAgent.h>
+#include <DCORA/Agent.h>
 #include <DCORA/QuadraticProblem.h>
 
 #include "gtest/gtest.h"

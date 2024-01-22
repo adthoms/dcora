@@ -8,7 +8,7 @@
 #ifndef LIFTEDRAVECTOR_H
 #define LIFTEDRAVECTOR_H
 
-#include <DCORA/manifold/LiftedSEVector.h>
+#include <DCORA/manifold/LiftedVector.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 

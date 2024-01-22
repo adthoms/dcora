@@ -8,7 +8,7 @@
 #ifndef LIFTEDRAMANIFOLD_H
 #define LIFTEDRAMANIFOLD_H
 
-#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/manifold/LiftedManifold.h>
 
 #include "Manifolds/Oblique/Oblique.h"
 
@@ -16,10 +16,11 @@
 namespace DCORA {
 
 /**
- * @brief This class represents a manifold for the RA SLAM synchronization problem
+ * @brief This class represents a manifold for the RA SLAM synchronization
+ * problem
  */
 class LiftedRAManifold : public LiftedSEManifold {
- public:
+public:
   /**
    * @brief Constructor
    * @param r
@@ -28,7 +29,8 @@ class LiftedRAManifold : public LiftedSEManifold {
    * @param l
    * @param b
    */
-  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n,
+                   unsigned int l, unsigned int b);
   /**
    * @brief Destructor
    */
@@ -45,12 +47,12 @@ class LiftedRAManifold : public LiftedSEManifold {
    */
   Matrix project(const Matrix &M) const override;
 
- private:
+private:
   unsigned int l_, b_;
   ROPTLIB::Oblique *ObliqueManifold;
   ROPTLIB::Euclidean *EuclideanLandmarkManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };
-}  // namespace DCORA
+} // namespace DCORA
 
 #endif

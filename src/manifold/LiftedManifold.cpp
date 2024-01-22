@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------------- */
 
 #include <DCORA/DCORA_utils.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/manifold/LiftedManifold.h>
 #include <glog/logging.h>
 
 namespace DCORA {

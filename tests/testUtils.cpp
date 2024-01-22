@@ -1,8 +1,8 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_solver.h>
 #include <DCORA/DCORA_robust.h>
-#include <DCORA/PoseGraph.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
+#include <DCORA/Graph.h>
+#include <DCORA/manifold/LiftedManifold.h>
 #include <iostream>
 #include <random>
 

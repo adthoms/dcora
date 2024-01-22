@@ -13,7 +13,7 @@
 #include <iostream>
 #include <fstream>
 #include <DCORA/DCORA_types.h>
-#include <DCORA/RelativeSEMeasurement.h>
+#include <DCORA/RelativeMeasurement.h>
 
 namespace DCORA {
 

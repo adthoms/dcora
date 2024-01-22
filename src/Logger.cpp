@@ -4,7 +4,7 @@
  * Authors: Yulun Tian, et al. (see README for the full author list)
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
-#include <DCORA/CORALogger.h>
+#include <DCORA/Logger.h>
 #include <Eigen/Geometry>
 #include <utility>
 #include <glog/logging.h>

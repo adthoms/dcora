@@ -5,7 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/CORAAgent.h>
+#include <DCORA/Agent.h>
 #include <DCORA/DCORA_solver.h>
 #include <DCORA/QuadraticOptimizer.h>
 #include <glog/logging.h>

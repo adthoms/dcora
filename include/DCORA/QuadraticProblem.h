@@ -9,10 +9,10 @@
 #define QUADRATICPROBLEM_H
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
-#include <DCORA/manifold/LiftedSEVariable.h>
-#include <DCORA/manifold/LiftedSEVector.h>
-#include <DCORA/PoseGraph.h>
+#include <DCORA/manifold/LiftedManifold.h>
+#include <DCORA/manifold/LiftedVariable.h>
+#include <DCORA/manifold/LiftedVector.h>
+#include <DCORA/Graph.h>
 
 #include <Eigen/CholmodSupport>
 #include <Eigen/Dense>

@@ -1,7 +1,7 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_utils.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
-#include <DCORA/manifold/LiftedSEVariable.h>
+#include <DCORA/manifold/LiftedManifold.h>
+#include <DCORA/manifold/LiftedVariable.h>
 #include <DCORA/manifold/LiftedRAManifold.h>
 #include <DCORA/manifold/LiftedRAVariable.h>
 #include <iostream>
@@ -18,22 +18,24 @@ TEST(testDCORA, EigenMapSE) {
   x.var()->RandInManifold();
 
   // View the internal memory of x as a read-only eigen matrix
-  Eigen::Map<const Matrix> xMatConst((double *) x.var()->ObtainReadData(), d, (d + 1) * n);
+  Eigen::Map<const Matrix> xMatConst((double *)x.var()->ObtainReadData(), d,
+                                     (d + 1) * n);
   ASSERT_LE((xMatConst - x.getData()).norm(), 1e-4);
 
   // View the internal memory of x as a writable eigen matrix
-  Eigen::Map<Matrix> xMat((double *) x.var()->ObtainWriteEntireData(), d, (d + 1) * n);
+  Eigen::Map<Matrix> xMat((double *)x.var()->ObtainWriteEntireData(), d,
+                          (d + 1) * n);
 
   // Modify x through eigen map
   for (size_t i = 0; i < n; ++i) {
-    xMat.block(0, i * (d+1), d, d) = randomStiefelVariable(d, d);
-    xMat.col(i * (d+1) + d) = randomEuclideanVariable(d);
+    xMat.block(0, i * (d + 1), d, d) = randomStiefelVariable(d, d);
+    xMat.col(i * (d + 1) + d) = randomEuclideanVariable(d);
   }
 
   // Check that the internal value of x is modified accordingly
   ASSERT_LE((xMat - x.getData()).norm(), 1e-4);
 
-  xMat = Matrix::Random(d, (d + 1) *n);
+  xMat = Matrix::Random(d, (d + 1) * n);
   ASSERT_LE((xMat - x.getData()).norm(), 1e-4);
 }
 
@@ -46,11 +48,13 @@ TEST(testDCORA, EigenMapRA) {
   x.var()->RandInManifold();
 
   // View the internal memory of x as a read-only eigen matrix
-  Eigen::Map<const Matrix> xMatConst((double *) x.var()->ObtainReadData(), d, (d + 1) * n + l + b);
+  Eigen::Map<const Matrix> xMatConst((double *)x.var()->ObtainReadData(), d,
+                                     (d + 1) * n + l + b);
   ASSERT_LE((xMatConst - x.getData()).norm(), 1e-4);
 
   // View the internal memory of x as a writable eigen matrix
-  Eigen::Map<Matrix> xMat((double *) x.var()->ObtainWriteEntireData(), d, (d + 1) * n + l + b);
+  Eigen::Map<Matrix> xMat((double *)x.var()->ObtainWriteEntireData(), d,
+                          (d + 1) * n + l + b);
 
   // Modify x through eigen map
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(xMat, d, d, n, l, b);
@@ -69,6 +73,6 @@ TEST(testDCORA, EigenMapRA) {
   // Check that the internal value of x is modified accordingly
   ASSERT_LE((xMat - x.getData()).norm(), 1e-4);
 
-  xMat = Matrix::Random(d, (d + 1) *n);
+  xMat = Matrix::Random(d, (d + 1) * n);
   ASSERT_LE((xMat - x.getData()).norm(), 1e-4);
 }
