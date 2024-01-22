@@ -5,12 +5,13 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DCORAROBUST_H
-#define DCORAROBUST_H
+#pragma once
 
 #include <DCORA/DCORA_utils.h>
-#include <iostream>
 #include <glog/logging.h>
+
+#include <iostream>
+#include <string>
 
 namespace DCORA {
 
@@ -18,15 +19,14 @@ namespace DCORA {
  * @brief Parameters for robust cost functions
  */
 class RobustCostParameters {
- public:
-
+public:
   // Type of robust costs supported
   enum class Type {
-    L2, // L2 (least squares)
-    L1, // L1
-    TLS, // truncated least squares
-    Huber, // Huber loss
-    GM, // Geman-McClure
+    L2,      // L2 (least squares)
+    L1,      // L1
+    TLS,     // truncated least squares
+    Huber,   // Huber loss
+    GM,      // Geman-McClure
     GNC_TLS, // Graduated Non-Convexity (GNC) with truncated least squares (TLS)
   };
 
@@ -46,18 +46,20 @@ class RobustCostParameters {
   double TLSThreshold;
 
   // Default constructor
-  explicit RobustCostParameters(Type type = Type::L2,
-                                unsigned gncMaxIters = 20,
-                                double gncBarc = 5.0,
-                                double gncMuStep = 1.4,
-                                double gncInitMu = 1e-4,
-                                double huberThresh = 3,
+  explicit RobustCostParameters(Type type = Type::L2, unsigned gncMaxIters = 20,
+                                double gncBarc = 5.0, double gncMuStep = 1.4,
+                                double gncInitMu = 1e-4, double huberThresh = 3,
                                 double TLSThresh = 10)
-      : costType(type), GNCMaxNumIters(gncMaxIters), GNCBarc(gncBarc), GNCMuStep(gncMuStep), GNCInitMu(gncInitMu),
-        HuberThreshold(huberThresh), TLSThreshold(TLSThresh) {}
+      : costType(type),
+        GNCMaxNumIters(gncMaxIters),
+        GNCBarc(gncBarc),
+        GNCMuStep(gncMuStep),
+        GNCInitMu(gncInitMu),
+        HuberThreshold(huberThresh),
+        TLSThreshold(TLSThresh) {}
 
-  inline friend std::ostream &operator<<(
-      std::ostream &os, const RobustCostParameters &params) {
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const RobustCostParameters &params) {
     os << "Robust cost parameters: " << std::endl;
     os << "Cost function: " << robustCostName(params.costType) << std::endl;
     os << "GNC maximum iterations: " << params.GNCMaxNumIters << std::endl;
@@ -68,6 +70,7 @@ class RobustCostParameters {
     os << "TLS threshold: " << params.TLSThreshold << std::endl;
     return os;
   }
+
   /**
    * @brief String names for the supported robust cost functions
    * @param type
@@ -81,13 +84,19 @@ class RobustCostParameters {
  *
  * Main references:
  * M-estimation:
- * Zhang, "Parameter Estimation Techniques: A Tutorial with Application to Conic Fitting"
+ * Zhang, "Parameter Estimation Techniques: A Tutorial with Application to Conic
+ * Fitting"
  *
  * Graduated Non-Convexity (GNC):
- * Yang et al. "Graduated Non-Convexity for Robust Spatial Perception: From Non-Minimal Solvers to Global Outlier Rejection"
+ * Yang et al. "Graduated Non-Convexity for Robust Spatial Perception: From
+ * Non-Minimal Solvers to Global Outlier Rejection"
  */
 class RobustCost {
- public:
+public:
+  /**
+   * @brief Constructor
+   * @param params
+   */
   explicit RobustCost(const RobustCostParameters &params);
 
   /**
@@ -103,35 +112,27 @@ class RobustCost {
   void reset();
 
   /**
-   * @brief perform some auxiliary operations (e.g., update the mu parameter when GNC is used)
+   * @brief Perform some auxiliary operations (e.g., update the mu parameter
+   * when GNC is used)
    */
   void update();
 
   /**
-   * @brief Set error threshold based on the quantile of chi-squared distribution. This function only works for 3D measurements.
+   * @brief Set error threshold based on the quantile of chi-squared
+   * distribution. This function only works for 3D measurements.
    * @param quantile
    * @param dimension
    * @return threshold
    */
-  static double computeErrorThresholdAtQuantile(double quantile, size_t dimension) {
-    CHECK_EQ((int) dimension, 3) << "quantile function currently only supports 3D problem.";
-    CHECK_GT(quantile, 0);
-    if (quantile < 1)
-      return std::sqrt(chi2inv(quantile, 6));
-    else
-      return 1e5;
-  }
+  static double computeErrorThresholdAtQuantile(double quantile,
+                                                size_t dimension);
 
- private:
+private:
   // Parameter settings
   const RobustCostParameters mParams;
-
   // GNC internal states
   size_t mGNCIteration = 0; // Iteration number
   double mu;                // Mu parameter
-
 };
 
-}  // namespace DCORA
-
-#endif
+} // namespace DCORA

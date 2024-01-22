@@ -5,29 +5,28 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef LIFTEDSEMANIFOLD_H
-#define LIFTEDSEMANIFOLD_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/manifold/Elements.h>
 
 #include "Manifolds/Euclidean/Euclidean.h"
+#include "Manifolds/Oblique/Oblique.h"
 #include "Manifolds/ProductManifold.h"
 #include "Manifolds/Stiefel/Stiefel.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
 /**
  * @brief This class represents a manifold for the SE(n) synchronization problem
  */
 class LiftedSEManifold {
- public:
+public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
    */
   LiftedSEManifold(unsigned int r, unsigned int d, unsigned int n);
   /**
@@ -46,13 +45,51 @@ class LiftedSEManifold {
    */
   virtual Matrix project(const Matrix &M) const;
 
- protected:
+protected:
   unsigned int r_, d_, n_;
   ROPTLIB::Stiefel *StiefelManifold;
   ROPTLIB::Euclidean *EuclideanManifold;
   ROPTLIB::ProductManifold *CartanManifold;
   ROPTLIB::ProductManifold *MySEManifold;
 };
-}  // namespace DCORA
 
-#endif
+/**
+ * @brief This class represents a manifold for the RA-SLAM synchronization
+ * problem
+ */
+class LiftedRAManifold : public LiftedSEManifold {
+public:
+  /**
+   * @brief Constructor
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
+   * @param l number of ranges
+   * @param b number of landmarks
+   */
+  LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n,
+                   unsigned int l, unsigned int b);
+  /**
+   * @brief Destructor
+   */
+  ~LiftedRAManifold() override;
+  /**
+   * @brief Get the underlying ROPTLIB product manifold
+   * @return
+   */
+  ROPTLIB::ProductManifold *getManifold() override { return MyRAManifold; }
+  /**
+   * @brief Utility function to project a given matrix onto this manifold
+   * @param M
+   * @return orthogonal projection of M onto this manifold
+   */
+  Matrix project(const Matrix &M) const override;
+
+private:
+  unsigned int l_, b_;
+  ROPTLIB::Oblique *ObliqueManifold;
+  ROPTLIB::Euclidean *EuclideanLandmarkManifold;
+  ROPTLIB::ProductManifold *MyRAManifold;
+};
+
+} // namespace DCORA

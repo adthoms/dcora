@@ -5,48 +5,59 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef QUADRATICPROBLEM_H
-#define QUADRATICPROBLEM_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
+#include <DCORA/Graph.h>
 #include <DCORA/manifold/LiftedManifold.h>
 #include <DCORA/manifold/LiftedVariable.h>
 #include <DCORA/manifold/LiftedVector.h>
-#include <DCORA/Graph.h>
 
 #include <Eigen/CholmodSupport>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "Problems/Problem.h"
 
-/*Define the namespace*/
 namespace DCORA {
 
-/** This class implements a ROPTLIB problem with the following cost function:
-    f(X) = 0.5*<Q, XtX> + <X,G>
-    Q is the quadratic part with dimension (d+1)n-by-(d+1)n
-    G is the linear part with dimension r-by-(d+1)n
-*/
+/**
+ * @brief This class implements a ROPTLIB problem with the following cost
+ * function: f(X) = 0.5*<Q, XtX> + <X,G>; Q is the quadratic part with dimension
+ * (d+1)n-by-(d+1)n; G is the linear part with dimension r-by-(d+1)n
+ */
 class QuadraticProblem : public ROPTLIB::Problem {
- public:
+public:
   /**
    * @brief Construct a quadratic optimization problem from a pose graph
-   * @param pose_graph input pose graph must be initialized (or can be initialized) otherwise throw an runtime error
+   * @param pose_graph input pose graph must be initialized (or can be
+   * initialized) otherwise throw a runtime error
    */
-  explicit QuadraticProblem(const std::shared_ptr<PoseGraph>& pose_graph);
+  explicit QuadraticProblem(const std::shared_ptr<PoseGraph> &pose_graph);
 
+  /**
+   * @brief Deconstructor
+   */
   ~QuadraticProblem() override;
 
-  /** Number of pose variables */
+  /**
+   * @brief Number of pose variables
+   * @return
+   */
   unsigned int num_poses() const { return pose_graph_->n(); }
 
-  /** Dimension (2 or 3) of estimation problem */
+  /**
+   * @brief Dimension (2 or 3) of estimation problem
+   * @return
+   */
   unsigned int dimension() const { return pose_graph_->d(); }
 
-  /** Relaxation rank in Riemannian optimization problem */
+  /**
+   * @brief Relaxation rank in Riemannian optimization problem
+   * @return
+   */
   unsigned int relaxation_rank() const { return pose_graph_->r(); }
 
   /**
@@ -102,7 +113,7 @@ class QuadraticProblem : public ROPTLIB::Problem {
    */
   double RieGradNorm(const Matrix &Y) const;
 
- private:
+private:
   // The pose graph that represents the optimization problem
   std::shared_ptr<PoseGraph> pose_graph_;
 
@@ -114,6 +125,4 @@ class QuadraticProblem : public ROPTLIB::Problem {
   void setElement(ROPTLIB::Element *element, const Matrix *matrix) const;
 };
 
-}  // namespace DCORA
-
-#endif
+} // namespace DCORA

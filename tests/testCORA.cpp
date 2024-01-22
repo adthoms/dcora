@@ -1,27 +1,28 @@
-#include <DCORA/DCORA_types.h>
-#include <DCORA/DCORA_solver.h>
 #include <DCORA/DCORA_robust.h>
+#include <DCORA/DCORA_solver.h>
+#include <DCORA/DCORA_types.h>
 #include <DCORA/Graph.h>
-#include <DCORA/manifold/LiftedManifold.h>
 #include <DCORA/QuadraticOptimizer.h>
+#include <DCORA/manifold/LiftedManifold.h>
+
 #include <iostream>
 #include <random>
 
 #include "gtest/gtest.h"
 
-using namespace DCORA;
-
 TEST(testDCORA, testRobustSingleRotationAveragingTrivial) {
   for (int trial = 0; trial < 50; ++trial) {
-    const Matrix RTrue = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
-    const double cbar = angular2ChordalSO3(0.5);  // approximately 30 deg
-    std::vector<Matrix> RVec;
+    const DCORA::Matrix RTrue =
+        Eigen::Quaterniond::UnitRandom().toRotationMatrix();
+    const double cbar = DCORA::angular2ChordalSO3(0.5); // approximately 30 deg
+    std::vector<DCORA::Matrix> RVec;
     RVec.push_back(RTrue);
-    Matrix ROpt;
+    DCORA::Matrix ROpt;
     std::vector<size_t> inlierIndices;
-    const auto kappa = Vector::Ones(1);
-    robustSingleRotationAveraging(ROpt, inlierIndices, RVec, kappa, cbar);
-    checkRotationMatrix(ROpt);
+    const auto kappa = DCORA::Vector::Ones(1);
+    DCORA::robustSingleRotationAveraging(&ROpt, &inlierIndices, RVec, kappa,
+                                         cbar);
+    DCORA::checkRotationMatrix(ROpt);
     double distChordal = (ROpt - RTrue).norm();
     ASSERT_LE(distChordal, 1e-8);
     ASSERT_EQ(inlierIndices.size(), 1);
@@ -31,25 +32,28 @@ TEST(testDCORA, testRobustSingleRotationAveragingTrivial) {
 
 TEST(testDCORA, testRobustSingleRotationAveraging) {
   for (int trial = 0; trial < 50; ++trial) {
-    const double tol = angular2ChordalSO3(0.02);
-    const double cbar = angular2ChordalSO3(0.3);
-    const Matrix RTrue = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
-    std::vector<Matrix> RVec;
+    const double tol = DCORA::angular2ChordalSO3(0.02);
+    const double cbar = DCORA::angular2ChordalSO3(0.3);
+    const DCORA::Matrix RTrue =
+        Eigen::Quaterniond::UnitRandom().toRotationMatrix();
+    std::vector<DCORA::Matrix> RVec;
     // Push inliers
     for (int i = 0; i < 10; ++i) {
       RVec.emplace_back(RTrue);
     }
     // Push outliers
     while (RVec.size() < 50) {
-      Matrix RRand = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
-      if ((RRand - RTrue).norm() > 1.2 * cbar)  // Make sure that outlier is separated from the true rotation
+      DCORA::Matrix RRand = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
+      // Make sure that outlier is separated from the true rotation
+      if ((RRand - RTrue).norm() > 1.2 * cbar)
         RVec.emplace_back(RRand);
     }
-    Matrix ROpt;
+    DCORA::Matrix ROpt;
     std::vector<size_t> inlierIndices;
-    const auto kappa = Vector::Ones(50);
-    robustSingleRotationAveraging(ROpt, inlierIndices, RVec, kappa, cbar);
-    checkRotationMatrix(ROpt);
+    const auto kappa = DCORA::Vector::Ones(50);
+    DCORA::robustSingleRotationAveraging(&ROpt, &inlierIndices, RVec, kappa,
+                                         cbar);
+    DCORA::checkRotationMatrix(ROpt);
     double distChordal = (ROpt - RTrue).norm();
     ASSERT_LE(distChordal, tol);
     ASSERT_EQ(inlierIndices.size(), 10);
@@ -61,21 +65,24 @@ TEST(testDCORA, testRobustSingleRotationAveraging) {
 
 TEST(testDCORA, testRobustSinglePoseAveragingTrivial) {
   for (int trial = 0; trial < 50; ++trial) {
-    const Matrix RTrue = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
-    const Vector tTrue = Eigen::Vector3d::Zero();
-    std::vector<Matrix> RVec;
+    const DCORA::Matrix RTrue =
+        Eigen::Quaterniond::UnitRandom().toRotationMatrix();
+    const DCORA::Vector tTrue = Eigen::Vector3d::Zero();
+    std::vector<DCORA::Matrix> RVec;
     RVec.push_back(RTrue);
-    std::vector<Vector> tVec;
+    std::vector<DCORA::Vector> tVec;
     tVec.push_back(tTrue);
-    const auto kappa = 10000 * Vector::Ones(1);
-    const auto tau = 100 * Vector::Ones(1);
+    const auto kappa = 10000 * DCORA::Vector::Ones(1);
+    const auto tau = 100 * DCORA::Vector::Ones(1);
     const double gnc_quantile = 0.9;
-    const double gnc_barc = RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
-    Matrix ROpt;
-    Vector tOpt;
+    const double gnc_barc =
+        DCORA::RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
+    DCORA::Matrix ROpt;
+    DCORA::Vector tOpt;
     std::vector<size_t> inlierIndices;
-    robustSinglePoseAveraging(ROpt, tOpt, inlierIndices, RVec, tVec, kappa, tau, gnc_barc);
-    checkRotationMatrix(ROpt);
+    DCORA::robustSinglePoseAveraging(&ROpt, &tOpt, &inlierIndices, RVec, tVec,
+                                     kappa, tau, gnc_barc);
+    DCORA::checkRotationMatrix(ROpt);
     ASSERT_LE((ROpt - RTrue).norm(), 1e-8);
     ASSERT_LE((tOpt - tTrue).norm(), 1e-8);
     ASSERT_EQ(inlierIndices.size(), 1);
@@ -85,19 +92,21 @@ TEST(testDCORA, testRobustSinglePoseAveragingTrivial) {
 
 TEST(testDCORA, testRobustSinglePoseAveraging) {
   for (int trial = 0; trial < 50; ++trial) {
-    const double RMaxError = angular2ChordalSO3(0.02);
+    const double RMaxError = DCORA::angular2ChordalSO3(0.02);
     const double tMaxError = 1e-2;
     const double gnc_quantile = 0.9;
-    const double gnc_barc = RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
+    const double gnc_barc =
+        DCORA::RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
     const double kappa = 10000;
     const double tau = 100;
-    const auto kappa_vec = kappa * Vector::Ones(50);
-    const auto tau_vec = tau * Vector::Ones(50);
+    const auto kappa_vec = kappa * DCORA::Vector::Ones(50);
+    const auto tau_vec = tau * DCORA::Vector::Ones(50);
 
-    const Matrix RTrue = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
-    const Vector tTrue = Eigen::Vector3d::Zero();
-    std::vector<Matrix> RVec;
-    std::vector<Vector> tVec;
+    const DCORA::Matrix RTrue =
+        Eigen::Quaterniond::UnitRandom().toRotationMatrix();
+    const DCORA::Vector tTrue = Eigen::Vector3d::Zero();
+    std::vector<DCORA::Matrix> RVec;
+    std::vector<DCORA::Vector> tVec;
     // Push inliers
     for (int i = 0; i < 10; ++i) {
       RVec.emplace_back(RTrue);
@@ -105,19 +114,22 @@ TEST(testDCORA, testRobustSinglePoseAveraging) {
     }
     // Push outliers
     while (RVec.size() < 50) {
-      Matrix RRand = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
-      Matrix tRand = Eigen::Vector3d::Random();
-      double rSq = kappa * (RTrue - RRand).squaredNorm() + tau * (tTrue - tRand).squaredNorm();
-      if (std::sqrt(rSq) > 1.2 * gnc_barc) { // Make sure that outliers are sufficiently far away from ground truth
+      DCORA::Matrix RRand = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
+      DCORA::Matrix tRand = Eigen::Vector3d::Random();
+      double rSq = kappa * (RTrue - RRand).squaredNorm() +
+                   tau * (tTrue - tRand).squaredNorm();
+      // Make sure that outliers are sufficiently far away from ground truth
+      if (std::sqrt(rSq) > 1.2 * gnc_barc) {
         RVec.emplace_back(RRand);
         tVec.emplace_back(tRand);
       }
     }
-    Matrix ROpt;
-    Vector tOpt;
+    DCORA::Matrix ROpt;
+    DCORA::Vector tOpt;
     std::vector<size_t> inlierIndices;
-    robustSinglePoseAveraging(ROpt, tOpt, inlierIndices, RVec, tVec, kappa_vec, tau_vec, gnc_barc);
-    checkRotationMatrix(ROpt);
+    DCORA::robustSinglePoseAveraging(&ROpt, &tOpt, &inlierIndices, RVec, tVec,
+                                     kappa_vec, tau_vec, gnc_barc);
+    DCORA::checkRotationMatrix(ROpt);
     ASSERT_LE((ROpt - RTrue).norm(), RMaxError);
     ASSERT_LE((tOpt - tTrue).norm(), tMaxError);
     ASSERT_EQ(inlierIndices.size(), 10);
@@ -127,14 +139,13 @@ TEST(testDCORA, testRobustSinglePoseAveraging) {
   }
 }
 
-
 TEST(testDCORA, testPrior) {
   size_t dimension = 3;
   size_t num_poses = 2;
   size_t robot_id = 0;
-  
+
   // Odometry measurement
-  RelativeSEMeasurement m;
+  DCORA::RelativeSEMeasurement m;
   m.r1 = 0;
   m.p1 = 0;
   m.r2 = 0;
@@ -145,24 +156,29 @@ TEST(testDCORA, testPrior) {
   m.tau = 100;
   m.weight = 1;
   m.fixedWeight = true;
-  std::vector<RelativeSEMeasurement> measurements;
+  std::vector<DCORA::RelativeSEMeasurement> measurements;
   measurements.push_back(m);
 
-  PoseArray T(dimension, num_poses);
-  T = odometryInitialization(measurements);
+  DCORA::PoseArray T(dimension, num_poses);
+  T = DCORA::odometryInitialization(measurements);
 
   // Form pose graph and add a prior
-  auto pose_graph = std::make_shared<PoseGraph>(robot_id, dimension, dimension);
+  auto pose_graph =
+      std::make_shared<DCORA::PoseGraph>(robot_id, dimension, dimension);
   pose_graph->setMeasurements(measurements);
-  Matrix prior_rotation(dimension, dimension);
-  prior_rotation << 0.7236,    0.1817,    0.6658,
-              -0.6100,    0.6198,    0.4938,
-              -0.3230,   -0.7634,    0.5594;
-  prior_rotation = projectToRotationGroup(prior_rotation);
-  Pose prior(dimension);
+  DCORA::Matrix prior_rotation(dimension, dimension);
+
+  // clang-format off
+  prior_rotation << 0.7236,  0.1817, 0.6658,
+                   -0.6100,  0.6198, 0.4938,
+                   -0.3230, -0.7634, 0.5594;
+  // clang-format on
+
+  prior_rotation = DCORA::projectToRotationGroup(prior_rotation);
+  DCORA::Pose prior(dimension);
   prior.rotation() = prior_rotation;
   pose_graph->setPrior(1, prior);
-  QuadraticProblem problem(pose_graph);
+  DCORA::QuadraticProblem problem(pose_graph);
 
   // The odometry initial guess does not respect the prior
   double error0 = (T.pose(0) - prior.pose()).norm();
@@ -171,17 +187,17 @@ TEST(testDCORA, testPrior) {
   ASSERT_GT(error1, 1e-6);
 
   // Initialize optimizer object
-  ROptParameters params;
+  DCORA::ROptParameters params;
   params.verbose = false;
   params.RTR_iterations = 50;
   params.RTR_tCG_iterations = 500;
   params.gradnorm_tol = 1e-5;
-  QuadraticOptimizer optimizer(&problem, params);
+  DCORA::QuadraticOptimizer optimizer(&problem, params);
 
   // Optimize!
   auto Topt_mat = optimizer.optimize(T.getData());
   T.setData(Topt_mat);
-  
+
   // After optimization, the solution should be fixed on the prior
   error0 = (T.pose(0) - prior.pose()).norm();
   error1 = (T.pose(1) - prior.pose()).norm();
@@ -189,27 +205,26 @@ TEST(testDCORA, testPrior) {
   ASSERT_LT(error1, 1e-6);
 }
 
-
 TEST(testDCORA, testRobustPGO) {
   int d = 3;
   int n = 4;
   double kappa = 10000;
   double tau = 100;
-  std::vector<Pose> poses_gt;
+  std::vector<DCORA::Pose> poses_gt;
   for (int i = 0; i < n; ++i) {
-    Pose Ti(d);
+    DCORA::Pose Ti(d);
     Ti.rotation() = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
     Ti.translation() = i * Eigen::Vector3d::Ones();
     poses_gt.push_back(Ti);
   }
-  std::vector<RelativeSEMeasurement> measurements;
+  std::vector<DCORA::RelativeSEMeasurement> measurements;
   // generate odometry
-  for (int i = 0; i < n-1; ++i) {
+  for (int i = 0; i < n - 1; ++i) {
     int j = i + 1;
-    Pose Ti = poses_gt[i];
-    Pose Tj = poses_gt[j];
-    Pose Tij = Ti.inverse() * Tj;
-    RelativeSEMeasurement m;
+    DCORA::Pose Ti = poses_gt[i];
+    DCORA::Pose Tj = poses_gt[j];
+    DCORA::Pose Tij = Ti.inverse() * Tj;
+    DCORA::RelativeSEMeasurement m;
     m.r1 = 0;
     m.r2 = 0;
     m.p1 = i;
@@ -222,10 +237,10 @@ TEST(testDCORA, testRobustPGO) {
     measurements.push_back(m);
   }
   // generate a single inlier loop closure
-  Pose Ti = poses_gt[0];
-  Pose Tj = poses_gt[3];
-  Pose Tij = Ti.inverse() * Tj;
-  RelativeSEMeasurement m_inlier;
+  DCORA::Pose Ti = poses_gt[0];
+  DCORA::Pose Tj = poses_gt[3];
+  DCORA::Pose Tij = Ti.inverse() * Tj;
+  DCORA::RelativeSEMeasurement m_inlier;
   m_inlier.r1 = 0;
   m_inlier.r2 = 0;
   m_inlier.p1 = 0;
@@ -237,7 +252,7 @@ TEST(testDCORA, testRobustPGO) {
   m_inlier.t = Tij.translation();
   measurements.push_back(m_inlier);
   // generate a single outlier loop closure
-  RelativeSEMeasurement m_outlier;
+  DCORA::RelativeSEMeasurement m_outlier;
   m_outlier.r1 = 0;
   m_outlier.r2 = 0;
   m_outlier.p1 = 1;
@@ -249,19 +264,21 @@ TEST(testDCORA, testRobustPGO) {
   m_outlier.t = Eigen::Vector3d::Zero();
   measurements.push_back(m_outlier);
   // Solve!
-  auto pose_graph = std::make_shared<PoseGraph>(0, d, d);
+  auto pose_graph = std::make_shared<DCORA::PoseGraph>(0, d, d);
   pose_graph->setMeasurements(measurements);
-  solveRobustPGOParams params;
+  DCORA::solveRobustPGOParams params;
   params.verbose = false;
   params.opt_params.verbose = false;
   params.opt_params.gradnorm_tol = 1e-1;
   params.opt_params.RTR_iterations = 50;
   params.robust_params.GNCBarc = 7.0;
-  PoseArray TOdom = odometryInitialization(pose_graph->odometry());
+  DCORA::PoseArray TOdom =
+      DCORA::odometryInitialization(pose_graph->odometry());
   auto mutable_measurements = measurements;
-  PoseArray T = solveRobustPGO(mutable_measurements, params, &TOdom);
+  DCORA::PoseArray T =
+      DCORA::solveRobustPGO(&mutable_measurements, params, &TOdom);
   // Check classification of inlier vs outlier
-  for (const auto& m: mutable_measurements) {
+  for (const auto &m : mutable_measurements) {
     if (!m.fixedWeight) {
       if (m.p1 == 0 && m.p2 == 3)
         CHECK_NEAR(m.weight, 1, 1e-6);

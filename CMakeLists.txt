@@ -68,9 +68,6 @@ set(EXTERNAL_INCLUDES
 )
 add_library(DCORA SHARED
   src/manifold/Elements.cpp
-  src/manifold/LiftedRAManifold.cpp
-  src/manifold/LiftedRAVariable.cpp
-  src/manifold/LiftedRAVector.cpp
   src/manifold/LiftedManifold.cpp
   src/manifold/LiftedVariable.cpp
   src/manifold/LiftedVector.cpp

@@ -5,8 +5,7 @@
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef RELATIVESEMEASUREMENT_H
-#define RELATIVESEMEASUREMENT_H
+#pragma once
 
 #include <DCORA/DCORA_types.h>
 
@@ -15,44 +14,45 @@
 
 namespace DCORA {
 
-/** A simple struct that contains the elements of a relative SE measurement
-    from pose (r1, p1) to (r2, p2)
+/**
+ * @brief A simple struct that contains the elements of a relative SE
+ * measurement from pose (r1, p1) to (r2, p2)
  */
 struct RelativeSEMeasurement {
-  /** 0-based index of first robot */
+  // 0-based index of first robot
   size_t r1;
 
-  /** 0-based index of second robot */
+  // 0-based index of second robot
   size_t r2;
 
-  /** 0-based index of first pose */
+  // 0-based index of first pose
   size_t p1;
 
-  /** 0-based index of second pose */
+  // 0-based index of second pose
   size_t p2;
 
-  /** Rotational measurement */
+  // Rotational measurement
   Matrix R;
 
-  /** Translational measurement */
+  // Translational measurement
   Matrix t;
 
-  /** Rotational measurement precision */
+  // Rotational measurement precision
   double kappa;
 
-  /** Translational measurement precision */
+  // Translational measurement precision
   double tau;
 
-  /** If measurement weight is fixed */
+  // If measurement weight is fixed
   bool fixedWeight;
 
-  /** Weight between (0,1) used in Graduated Non-Convexity */
+  // Weight between (0,1) used in Graduated Non-Convexity
   double weight;
 
-  /** Simple default constructor; does nothing */
+  // Simple default constructor; does nothing
   RelativeSEMeasurement() = default;
 
-  /** Basic constructor */
+  // Basic constructor
   RelativeSEMeasurement(size_t first_robot, size_t second_robot,
                         size_t first_pose, size_t second_pose,
                         const Eigen::MatrixXd &relative_rotation,
@@ -70,9 +70,9 @@ struct RelativeSEMeasurement {
         fixedWeight(false),
         weight(1.0) {}
 
-  /** A utility function for streaming this struct to cout */
-  inline friend std::ostream &operator<<(
-      std::ostream &os, const RelativeSEMeasurement &measurement) {
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &
+  operator<<(std::ostream &os, const RelativeSEMeasurement &measurement) {
     os << "r1: " << measurement.r1 << std::endl;
     os << "p1: " << measurement.p1 << std::endl;
     os << "r2: " << measurement.r2 << std::endl;
@@ -87,5 +87,5 @@ struct RelativeSEMeasurement {
     return os;
   }
 };
-};  // namespace DCORA
-#endif
+
+} // namespace DCORA
