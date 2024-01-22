@@ -1,3 +1,14 @@
+/* -----------------------------------------------------------------------------
+ * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
+ * All Rights Reserved
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
+ * See LICENSE for the license information
+ * -------------------------------------------------------------------------- */
+
 #include <DCORA/DCORA_utils.h>
 #include <DCORA/manifold/Elements.h>
 
