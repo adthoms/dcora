@@ -1,36 +1,41 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DCORA_INCLUDE_DCORA_POSEGRAPH_H_
-#define DCORA_INCLUDE_DCORA_POSEGRAPH_H_
+#pragma once
 
-#include "DCORA_types.h"
-#include "DCORA_utils.h"
-#include "manifold/Poses.h"
-#include "RelativeSEMeasurement.h"
-#include <glog/logging.h>
-#include <set>
+#include <DCORA/DCORA_types.h>
+#include <DCORA/DCORA_utils.h>
+#include <DCORA/RelativeMeasurement.h>
+#include <DCORA/manifold/Elements.h>
+
 #include <map>
-#include <unordered_set>
-#include <unordered_map>
 #include <memory>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace DCORA {
 
 /**
- * @brief A pose graph class representing the local optimization problem in distributed PGO.
+ * @brief A pose graph class representing the local optimization problem in
+ * distributed PGO.
  */
 class PoseGraph {
- public:
+public:
   /**
    * @brief Store statistics for the current pose graph
    */
   class Statistics {
-   public:
+  public:
     Statistics()
         : total_loop_closures(0),
           accept_loop_closures(0),
@@ -42,7 +47,7 @@ class PoseGraph {
     double undecided_loop_closures;
   };
   /**
-   * @brief
+   * @brief Constructor
    * @param id
    * @param r
    * @param d
@@ -50,7 +55,7 @@ class PoseGraph {
   PoseGraph(unsigned int id, unsigned int r, unsigned int d);
   /**
    * @brief Destructor
-  */
+   */
   ~PoseGraph();
   /**
    * @brief Get dimension
@@ -84,8 +89,8 @@ class PoseGraph {
   unsigned int numSharedLoopClosures() const { return shared_lcs_.size(); }
   /**
    * @brief Return the number of all measurements
-   * @return 
-  */
+   * @return
+   */
   unsigned int numMeasurements() const;
   /**
    * @brief Clear all contents and reset this pose graph to be empty
@@ -93,10 +98,10 @@ class PoseGraph {
   void empty();
   /**
    * @brief Clear all temporary data and only keep measurements
-  */
+   */
   void reset();
   /**
-   * @brief Clear all cached neighbor poses 
+   * @brief Clear all cached neighbor poses
    */
   void clearNeighborPoses();
   /**
@@ -105,7 +110,8 @@ class PoseGraph {
    */
   void setMeasurements(const std::vector<RelativeSEMeasurement> &measurements);
   /**
-   * @brief Add a single measurement to this pose graph. Ignored if the input measurement already exists.
+   * @brief Add a single measurement to this pose graph. Ignored if the input
+   * measurement already exists.
    * @param m
    */
   void addMeasurement(const RelativeSEMeasurement &m);
@@ -118,37 +124,44 @@ class PoseGraph {
    * @brief Return a copy of the list of private loop closures
    * @return
    */
-  std::vector<RelativeSEMeasurement> privateLoopClosures() const { return private_lcs_; }
+  std::vector<RelativeSEMeasurement> privateLoopClosures() const {
+    return private_lcs_;
+  }
   /**
    * @brief Return a copy of the list of shared loop closures
    * @return
    */
-  std::vector<RelativeSEMeasurement> sharedLoopClosures() const { return shared_lcs_; }
+  std::vector<RelativeSEMeasurement> sharedLoopClosures() const {
+    return shared_lcs_;
+  }
   /**
-   * @brief Return a copy of all inter-robot loop closures with the specified neighbor
+   * @brief Return a copy of all inter-robot loop closures with the specified
+   * neighbor
    * @param neighbor_id
    * @return
    */
-  std::vector<RelativeSEMeasurement> sharedLoopClosuresWithRobot(unsigned neighbor_id) const;
+  std::vector<RelativeSEMeasurement>
+  sharedLoopClosuresWithRobot(unsigned neighbor_id) const;
   /**
    * @brief Return a copy of all measurements
    * @return
    */
   std::vector<RelativeSEMeasurement> measurements() const;
   /**
-   * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot loop closures)
+   * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot
+   * loop closures)
    * @return
    */
   std::vector<RelativeSEMeasurement> localMeasurements() const;
   /**
    * @brief Clear all priors
-  */
+   */
   void clearPriors();
   /**
    * @brief Add a prior term
    * @param index The index of the local variable
    * @param Xi Corresponding prior term
-  */
+   */
   void setPrior(unsigned index, const LiftedPose &Xi);
   /**
    * @brief Set neighbor poses
@@ -174,7 +187,8 @@ class PoseGraph {
    */
   void clearLinearMatrix();
   /**
-   * @brief Construct data matrices that are needed for optimization, if they do not yet exist
+   * @brief Construct data matrices that are needed for optimization, if they do
+   * not yet exist
    * @return true if construction is successful
    */
   bool constructDataMatrices();
@@ -206,10 +220,11 @@ class PoseGraph {
    * @brief Get the set of Pose IDs that active neighbors need to share with me.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
-  */
+   */
   PoseSet activeNeighborPublicPoseIDs() const;
   /**
-   * @brief Get the set of neighbor robot IDs that share inter-robot loop closures with me
+   * @brief Get the set of neighbor robot IDs that share inter-robot loop
+   * closures with me
    * @return
    */
   std::set<unsigned> neighborIDs() const { return nbr_robot_ids_; }
@@ -228,23 +243,24 @@ class PoseGraph {
    * @brief Return the number of active neighbors.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
-  */
+   */
   size_t numActiveNeighbors() const;
   /**
-   * @brief Return true if the input robot is a neighbor (i.e., share inter-robot loop closure)
+   * @brief Return true if the input robot is a neighbor (i.e., share
+   * inter-robot loop closure)
    * @param robot_id
    * @return
    */
   bool hasNeighbor(unsigned int robot_id) const;
   /**
    * @brief Check if the input neighbor is active
-   * @return false if the input robot is not a neighbor or is ignored 
-  */
+   * @return false if the input robot is not a neighbor or is ignored
+   */
   bool isNeighborActive(unsigned int neighbor_id) const;
   /**
    * @brief Set the input neighbor to be active or inactive.
    * Does nothing if the input is not a neighbor.
-  */
+   */
   void setNeighborActive(unsigned int neighbor_id, bool active);
   /**
    * @brief Return true if the given neighbor pose ID is required by me
@@ -260,16 +276,19 @@ class PoseGraph {
   Statistics statistics() const;
   /**
    * @brief Check if a measurement exists in the pose graph
-  */
+   */
   bool hasMeasurement(const PoseID &srcID, const PoseID &dstID) const;
   /**
-   * @brief Find and return a writable pointer to the specified measurement within this pose graph
+   * @brief Find and return a writable pointer to the specified measurement
+   * within this pose graph
    * @param measurements
    * @param srcID
    * @param dstID
-   * @return writable pointer to the desired measurement (nullptr if measurement does not exists)
+   * @return writable pointer to the desired measurement (nullptr if measurement
+   * does not exists)
    */
-  RelativeSEMeasurement *findMeasurement(const PoseID &srcID, const PoseID &dstID);
+  RelativeSEMeasurement *findMeasurement(const PoseID &srcID,
+                                         const PoseID &dstID);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
    * pose graph (contains both private and inter-robot loop closures)
@@ -278,19 +297,18 @@ class PoseGraph {
   std::vector<RelativeSEMeasurement *> allLoopClosures();
   /**
    * @brief Return a vector of pointers to all active loop closures
-  */
+   */
   std::vector<RelativeSEMeasurement *> activeLoopClosures();
   /**
    * @brief Return a vector of pointers to all inactive loop closures
-  */
-  std::vector<RelativeSEMeasurement *> inactiveLoopClosures(); 
+   */
+  std::vector<RelativeSEMeasurement *> inactiveLoopClosures();
   /**
    * @brief Set to true to use measurements with inactive neighbors
-  */
+   */
   void useInactiveNeighbors(bool use = true);
 
- protected:
-
+protected:
   // ID associated with this agent
   const unsigned int id_;
 
@@ -341,12 +359,14 @@ class PoseGraph {
    */
   void addOdometry(const RelativeSEMeasurement &factor);
   /**
-   * @brief Add private loop closure. Ignored if the input measurement already exists.
+   * @brief Add private loop closure. Ignored if the input measurement already
+   * exists.
    * @param factor
    */
   void addPrivateLoopClosure(const RelativeSEMeasurement &factor);
   /**
-   * @brief Add shared loop closure. Ignored if the input measurement already exists.
+   * @brief Add shared loop closure. Ignored if the input measurement already
+   * exists.
    * @param factor
    */
   void addSharedLoopClosure(const RelativeSEMeasurement &factor);
@@ -366,15 +386,15 @@ class PoseGraph {
    */
   bool constructPreconditioner();
   /**
-   * @brief Based on the current list of inter-robot (shared) 
-   * loop closures, update the list of public pose IDs of myself 
+   * @brief Based on the current list of inter-robot (shared)
+   * loop closures, update the list of public pose IDs of myself
    * and my neighbors.
-  */ 
+   */
   void updatePublicPoseIDs();
 
- private:
+private:
   // Mapping Edge ID to the corresponding index in the vector of measurements
-  // (either odometry, private loop closures, or public loop closures)  
+  // (either odometry, private loop closures, or public loop closures)
   std::unordered_map<EdgeID, size_t, HashEdgeID> edge_id_to_index_;
 
   // Use measurements with inactive neighbors when constructing data matrices
@@ -388,6 +408,4 @@ class PoseGraph {
   std::map<unsigned, LiftedPose> priors_;
 };
 
-}
-
-#endif //DCORA_INCLUDE_DCORA_POSEGRAPH_H_
+} // namespace DCORA

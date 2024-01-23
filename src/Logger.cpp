@@ -1,34 +1,43 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
-#include <DCORA/CORALogger.h>
+
+#include <DCORA/Logger.h>
 #include <Eigen/Geometry>
-#include <utility>
 #include <glog/logging.h>
+#include <utility>
 
 namespace DCORA {
 
 PGOLogger::PGOLogger(std::string logDir) : logDirectory(std::move(logDir)) {}
 
-PGOLogger::~PGOLogger() = default;
-
-void PGOLogger::logMeasurements(std::vector<RelativeSEMeasurement> &measurements, const std::string &filename) {
-  if (measurements.empty()) return;
+void PGOLogger::logMeasurements(
+    std::vector<RelativeSEMeasurement> *measurements,
+    const std::string &filename) {
+  if (measurements->empty())
+    return;
 
   std::ofstream file;
   file.open(logDirectory + filename);
-  if (!file.is_open()) return;
+  if (!file.is_open())
+    return;
 
-  size_t d = measurements[0].R.rows();
-  if (d == 2) return;
+  size_t d = measurements->at(0).R.rows();
+  if (d == 2)
+    return;
 
   // Insert header row
-  file << "robot_src,pose_src,robot_dst,pose_dst,qx,qy,qz,qw,tx,ty,tz,kappa,tau,is_known_inlier,weight\n";
+  file << "robot_src,pose_src,robot_dst,pose_dst,qx,qy,qz,qw,tx,ty,tz,kappa,"
+          "tau,is_known_inlier,weight\n";
 
-  for (RelativeSEMeasurement m: measurements) {
+  for (RelativeSEMeasurement m : *measurements) {
     // Convert rotation matrix to quaternion
     Eigen::Matrix3d R = m.R;
     Eigen::Quaternion<double> quat(R);
@@ -52,13 +61,16 @@ void PGOLogger::logMeasurements(std::vector<RelativeSEMeasurement> &measurements
   file.close();
 }
 
-void PGOLogger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T, const std::string &filename) {
-  if (d == 2) return;
+void PGOLogger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
+                              const std::string &filename) {
+  if (d == 2)
+    return;
   CHECK_EQ(T.rows(), d);
   CHECK_EQ(T.cols(), (d + 1) * n);
   std::ofstream file;
   file.open(logDirectory + filename);
-  if (!file.is_open()) return;
+  if (!file.is_open())
+    return;
 
   // Insert header row
   file << "pose_index,qx,qy,qz,qw,tx,ty,tz\n";
@@ -82,7 +94,8 @@ void PGOLogger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T, c
 
 Matrix PGOLogger::loadTrajectory(const std::string &filename) {
   std::ifstream infile(logDirectory + filename);
-  std::cout << "Loading trajectory from " << logDirectory + filename << "..." << std::endl;
+  std::cout << "Loading trajectory from " << logDirectory + filename << "..."
+            << std::endl;
   if (!infile.is_open()) {
     std::cout << "Could not open specified file!" << std::endl;
     return Matrix(0, 0);
@@ -145,7 +158,8 @@ Matrix PGOLogger::loadTrajectory(const std::string &filename) {
   return T;
 }
 
-std::vector<RelativeSEMeasurement> PGOLogger::loadMeasurements(const std::string &filename, bool load_weight) {
+std::vector<RelativeSEMeasurement>
+PGOLogger::loadMeasurements(const std::string &filename, bool load_weight) {
   std::vector<RelativeSEMeasurement> measurements;
   std::cout << "Loading measurements from " << filename << "..." << std::endl;
   std::ifstream infile(filename);
@@ -211,8 +225,7 @@ std::vector<RelativeSEMeasurement> PGOLogger::loadMeasurements(const std::string
     weight = std::stod(token);
 
     RelativeSEMeasurement m(robot_src, robot_dst, pose_src, pose_dst,
-                            quat.toRotationMatrix(), tVec,
-                            kappa, tau);
+                            quat.toRotationMatrix(), tVec, kappa, tau);
     m.fixedWeight = fixed_weight;
     if (load_weight)
       m.weight = weight;
@@ -224,4 +237,4 @@ std::vector<RelativeSEMeasurement> PGOLogger::loadMeasurements(const std::string
   return measurements;
 }
 
-}
+} // namespace DCORA

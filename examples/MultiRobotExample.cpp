@@ -1,22 +1,22 @@
-
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/DCORA_types.h>
+#include <DCORA/Agent.h>
 #include <DCORA/DCORA_solver.h>
-#include <DCORA/CORAAgent.h>
+#include <DCORA/DCORA_types.h>
 #include <DCORA/QuadraticProblem.h>
 
-#include <cstdlib>
 #include <cassert>
+#include <cstdlib>
 #include <iostream>
-
-using namespace std;
-using namespace DCORA;
 
 int main(int argc, char **argv) {
   /**
@@ -26,23 +26,25 @@ int main(int argc, char **argv) {
   */
 
   if (argc < 3) {
-    cout << "Multi-robot pose graph optimization example. " << endl;
-    cout << "Usage: " << argv[0] << " [# robots] [input .g2o file]" << endl;
+    std::cout << "Multi-robot pose graph optimization example. " << std::endl;
+    std::cout << "Usage: " << argv[0] << " [# robots] [input .g2o file]"
+              << std::endl;
     exit(1);
   }
 
-  cout << "Multi-robot pose graph optimization example. " << endl;
+  std::cout << "Multi-robot pose graph optimization example. " << std::endl;
 
   int num_robots = atoi(argv[1]);
   if (num_robots <= 0) {
-    cout << "Number of robots must be positive!" << endl;
+    std::cout << "Number of robots must be positive!" << std::endl;
     exit(1);
   }
-  cout << "Simulating " << num_robots << " robots." << endl;
+  std::cout << "Simulating " << num_robots << " robots." << std::endl;
 
   size_t num_poses;
-  vector<RelativeSEMeasurement> dataset = read_g2o_file(argv[2], num_poses);
-  cout << "Loaded dataset from file " << argv[2] << "." << endl;
+  std::vector<DCORA::RelativeSEMeasurement> dataset =
+      DCORA::read_g2o_file(argv[2], &num_poses);
+  std::cout << "Loaded dataset from file " << argv[2] << "." << std::endl;
 
   /**
   ###########################################
@@ -58,10 +60,10 @@ int main(int argc, char **argv) {
   unsigned numIters = 1000;
 
   // Construct the centralized problem (used for evaluation)
-  std::shared_ptr<PoseGraph> pose_graph = std::make_shared<PoseGraph>(0, r, d);
+  std::shared_ptr<DCORA::PoseGraph> pose_graph =
+      std::make_shared<DCORA::PoseGraph>(0, r, d);
   pose_graph->setMeasurements(dataset);
-  QuadraticProblem problemCentral(pose_graph);
-
+  DCORA::QuadraticProblem problemCentral(pose_graph);
 
   /**
   ###########################################
@@ -70,37 +72,43 @@ int main(int argc, char **argv) {
   */
   unsigned int num_poses_per_robot = num_poses / num_robots;
   if (num_poses_per_robot <= 0) {
-    cout << "More robots than total number of poses! Decrease the number of robots" << endl;
+    std::cout
+        << "More robots than total number of poses! Decrease the number of "
+           "robots"
+        << std::endl;
     exit(1);
   }
 
   // create mapping from global pose index to local pose index
-  map<unsigned, PoseID> PoseMap;
-  for (unsigned robot = 0; robot < (unsigned) num_robots; ++robot) {
+  std::map<unsigned, DCORA::PoseID> PoseMap;
+  for (unsigned robot = 0; robot < (unsigned)num_robots; ++robot) {
     unsigned startIdx = robot * num_poses_per_robot;
-    unsigned endIdx = (robot + 1) * num_poses_per_robot;  // non-inclusive
-    if (robot == (unsigned) num_robots - 1) endIdx = n;
+    unsigned endIdx = (robot + 1) * num_poses_per_robot; // non-inclusive
+    if (robot == (unsigned)num_robots - 1)
+      endIdx = n;
     for (unsigned idx = startIdx; idx < endIdx; ++idx) {
-      unsigned localIdx = idx - startIdx;  // this is the local ID of this pose
-      PoseID pose(robot, localIdx);
+      unsigned localIdx = idx - startIdx; // this is the local ID of this pose
+      DCORA::PoseID pose(robot, localIdx);
       PoseMap[idx] = pose;
     }
   }
 
-  vector<vector<RelativeSEMeasurement>> odometry(num_robots);
-  vector<vector<RelativeSEMeasurement>> private_loop_closures(num_robots);
-  vector<vector<RelativeSEMeasurement>> shared_loop_closure(num_robots);
+  std::vector<std::vector<DCORA::RelativeSEMeasurement>> odometry(num_robots);
+  std::vector<std::vector<DCORA::RelativeSEMeasurement>> private_loop_closures(
+      num_robots);
+  std::vector<std::vector<DCORA::RelativeSEMeasurement>> shared_loop_closure(
+      num_robots);
   for (auto mIn : dataset) {
-    PoseID src = PoseMap[mIn.p1];
-    PoseID dst = PoseMap[mIn.p2];
+    DCORA::PoseID src = PoseMap[mIn.p1];
+    DCORA::PoseID dst = PoseMap[mIn.p2];
 
     unsigned srcRobot = src.robot_id;
     unsigned srcIdx = src.frame_id;
     unsigned dstRobot = dst.robot_id;
     unsigned dstIdx = dst.frame_id;
 
-    RelativeSEMeasurement m(srcRobot, dstRobot, srcIdx, dstIdx, mIn.R, mIn.t,
-                            mIn.kappa, mIn.tau);
+    DCORA::RelativeSEMeasurement m(srcRobot, dstRobot, srcIdx, dstIdx, mIn.R,
+                                   mIn.t, mIn.kappa, mIn.tau);
 
     if (srcRobot == dstRobot) {
       // private measurement
@@ -123,23 +131,24 @@ int main(int argc, char **argv) {
   Initialization
   ###########################################
   */
-  vector<PGOAgent *> agents;
-  for (unsigned robot = 0; robot < (unsigned) num_robots; ++robot) {
-    PGOAgentParameters options(d, r, num_robots);
+  std::vector<DCORA::PGOAgent *> agents;
+  for (unsigned robot = 0; robot < static_cast<unsigned int>(num_robots);
+       ++robot) {
+    DCORA::PGOAgentParameters options(d, r, num_robots);
     options.acceleration = acceleration;
     options.verbose = verbose;
 
-    auto *agent = new PGOAgent(robot, options);
+    auto *agent = new DCORA::PGOAgent(robot, options);
 
-    // All agents share a special, common matrix called the 'lifting matrix' which the first agent will generate
+    // All agents share a special, common matrix called the 'lifting matrix'
+    // which the first agent will generate
     if (robot > 0) {
-      Matrix M;
-      agents[0]->getLiftingMatrix(M);
+      DCORA::Matrix M;
+      agents[0]->getLiftingMatrix(&M);
       agent->setLiftingMatrix(M);
     }
 
-    agent->setMeasurements(odometry[robot],
-                           private_loop_closures[robot],
+    agent->setMeasurements(odometry[robot], private_loop_closures[robot],
                            shared_loop_closure[robot]);
     agent->initialize();
     agents.push_back(agent);
@@ -147,16 +156,21 @@ int main(int argc, char **argv) {
 
   /**
   ##########################################################################################
-  For this demo, we initialize each robot's estimate from the centralized chordal relaxation
+  For this demo, we initialize each robot's estimate from the centralized
+  chordal relaxation
   ##########################################################################################
   */
-  auto TChordal = chordalInitialization(dataset);
-  Matrix XChordal = fixedStiefelVariable(r, d) * TChordal.getData(); // Lift estimate to the correct relaxation rank
-  for (unsigned robot = 0; robot < (unsigned) num_robots; ++robot) {
+  auto TChordal = DCORA::chordalInitialization(dataset);
+  DCORA::Matrix XChordal =
+      DCORA::fixedStiefelVariable(r, d) *
+      TChordal.getData(); // Lift estimate to the correct relaxation rank
+  for (unsigned robot = 0; robot < (unsigned)num_robots; ++robot) {
     unsigned startIdx = robot * num_poses_per_robot;
-    unsigned endIdx = (robot + 1) * num_poses_per_robot;  // non-inclusive
-    if (robot == (unsigned) num_robots - 1) endIdx = n;
-    agents[robot]->setX(XChordal.block(0, startIdx * (d + 1), r, (endIdx - startIdx) * (d + 1)));
+    unsigned endIdx = (robot + 1) * num_poses_per_robot; // non-inclusive
+    if (robot == (unsigned)num_robots - 1)
+      endIdx = n;
+    agents[robot]->setX(XChordal.block(0, startIdx * (d + 1), r,
+                                       (endIdx - startIdx) * (d + 1)));
   }
 
   /**
@@ -164,11 +178,11 @@ int main(int argc, char **argv) {
   Optimization loop
   ###########################################
   */
-  Matrix Xopt(r, n * (d + 1));
+  DCORA::Matrix Xopt(r, n * (d + 1));
   unsigned selectedRobot = 0;
-  cout << "Running " << numIters << " iterations..." << endl;
+  std::cout << "Running " << numIters << " iterations..." << std::endl;
   for (unsigned iter = 0; iter < numIters; ++iter) {
-    PGOAgent *selectedRobotPtr = agents[selectedRobot];
+    DCORA::PGOAgent *selectedRobotPtr = agents[selectedRobot];
 
     // Non-selected robots perform an iteration
     for (auto *robotPtr : agents) {
@@ -181,9 +195,10 @@ int main(int argc, char **argv) {
 
     // Selected robot requests public poses from others
     for (auto *robotPtr : agents) {
-      if (robotPtr->getID() == selectedRobot) continue;
-      PoseDict sharedPoses;
-      if (!robotPtr->getSharedPoseDict(sharedPoses)) {
+      if (robotPtr->getID() == selectedRobot)
+        continue;
+      DCORA::PoseDict sharedPoses;
+      if (!robotPtr->getSharedPoseDict(&sharedPoses)) {
         continue;
       }
       selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
@@ -193,13 +208,15 @@ int main(int argc, char **argv) {
     // When using acceleration, selected robot also requests auxiliary poses
     if (acceleration) {
       for (auto *robotPtr : agents) {
-        if (robotPtr->getID() == selectedRobot) continue;
-        PoseDict auxSharedPoses;
-        if (!robotPtr->getAuxSharedPoseDict(auxSharedPoses)) {
+        if (robotPtr->getID() == selectedRobot)
+          continue;
+        DCORA::PoseDict auxSharedPoses;
+        if (!robotPtr->getAuxSharedPoseDict(&auxSharedPoses)) {
           continue;
         }
         selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
-        selectedRobotPtr->updateAuxNeighborPoses(robotPtr->getID(), auxSharedPoses);
+        selectedRobotPtr->updateAuxNeighborPoses(robotPtr->getID(),
+                                                 auxSharedPoses);
       }
     }
 
@@ -207,20 +224,21 @@ int main(int argc, char **argv) {
     selectedRobotPtr->iterate(true);
 
     // Form centralized solution
-    for (unsigned robot = 0; robot < (unsigned) num_robots; ++robot) {
+    for (unsigned robot = 0; robot < (unsigned)num_robots; ++robot) {
       unsigned startIdx = robot * num_poses_per_robot;
-      unsigned endIdx = (robot + 1) * num_poses_per_robot;  // non-inclusive
-      if (robot == (unsigned) num_robots - 1) endIdx = n;
+      unsigned endIdx = (robot + 1) * num_poses_per_robot; // non-inclusive
+      if (robot == (unsigned)num_robots - 1)
+        endIdx = n;
 
-      Matrix XRobot;
-      if (agents[robot]->getX(XRobot)) {
-        Xopt.block(0, startIdx * (d + 1), r, (endIdx - startIdx) * (d + 1)) = XRobot;
+      DCORA::Matrix XRobot;
+      if (agents[robot]->getX(&XRobot)) {
+        Xopt.block(0, startIdx * (d + 1), r, (endIdx - startIdx) * (d + 1)) =
+            XRobot;
       }
     }
-    Matrix RGrad = problemCentral.RieGrad(Xopt);
+    DCORA::Matrix RGrad = problemCentral.RieGrad(Xopt);
     double RGradNorm = RGrad.norm();
-    std::cout << std::setprecision(5)
-              << "Iter = " << iter << " | "
+    std::cout << std::setprecision(5) << "Iter = " << iter << " | "
               << "robot = " << selectedRobotPtr->getID() << " | "
               << "cost = " << 2 * problemCentral.f(Xopt) << " | "
               << "gradnorm = " << RGradNorm << std::endl;
@@ -236,19 +254,22 @@ int main(int argc, char **argv) {
       selectedRobot = selectedRobotPtr->getID();
     } else {
       std::vector<double> gradNorms;
-      for (size_t robot = 0; robot < (unsigned) num_robots; ++robot) {
+      for (size_t robot = 0; robot < (unsigned)num_robots; ++robot) {
         unsigned startIdx = robot * num_poses_per_robot;
-        unsigned endIdx = (robot + 1) * num_poses_per_robot;  // non-inclusive
-        if (robot == (unsigned) num_robots - 1) endIdx = n;
-        Matrix RGradRobot = RGrad.block(0, startIdx * (d + 1), r, (endIdx - startIdx) * (d + 1));
+        unsigned endIdx = (robot + 1) * num_poses_per_robot; // non-inclusive
+        if (robot == (unsigned)num_robots - 1)
+          endIdx = n;
+        DCORA::Matrix RGradRobot = RGrad.block(0, startIdx * (d + 1), r,
+                                               (endIdx - startIdx) * (d + 1));
         gradNorms.push_back(RGradRobot.norm());
       }
-      selectedRobot = std::max_element(gradNorms.begin(), gradNorms.end()) - gradNorms.begin();
+      selectedRobot = std::max_element(gradNorms.begin(), gradNorms.end()) -
+                      gradNorms.begin();
     }
 
     // Share global anchor for rounding
-    Matrix M;
-    agents[0]->getSharedPose(0, M);
+    DCORA::Matrix M;
+    agents[0]->getSharedPose(0, &M);
     for (auto agentPtr : agents) {
       agentPtr->setGlobalAnchor(M);
     }

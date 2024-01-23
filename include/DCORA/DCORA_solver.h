@@ -1,16 +1,21 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DCORA_INCLUDE_DCORA_PGOSOLVER_H_
-#define DCORA_INCLUDE_DCORA_PGOSOLVER_H_
+#pragma once
 
-#include <DCORA/DCORA_utils.h>
 #include <DCORA/DCORA_robust.h>
-#include <DCORA/manifold/Poses.h>
+#include <DCORA/DCORA_utils.h>
+#include <DCORA/manifold/Elements.h>
+
+#include <vector>
 
 namespace DCORA {
 /**
@@ -19,8 +24,7 @@ namespace DCORA {
  * @param tVec
  * @param tau
  */
-void singleTranslationAveraging(Vector &tOpt,
-                                const std::vector<Vector> &tVec,
+void singleTranslationAveraging(Vector *tOpt, const std::vector<Vector> &tVec,
                                 const Vector &tau = Vector::Ones(0));
 
 /**
@@ -29,8 +33,7 @@ void singleTranslationAveraging(Vector &tOpt,
  * @param RVec
  * @param kappa
  */
-void singleRotationAveraging(Matrix &ROpt,
-                             const std::vector<Matrix> &RVec,
+void singleRotationAveraging(Matrix *ROpt, const std::vector<Matrix> &RVec,
                              const Vector &kappa = Vector::Ones(0));
 
 /**
@@ -42,7 +45,7 @@ void singleRotationAveraging(Matrix &ROpt,
  * @param kappa
  * @param tau
  */
-void singlePoseAveraging(Matrix &ROpt, Vector &tOpt,
+void singlePoseAveraging(Matrix *ROpt, Vector *tOpt,
                          const std::vector<Matrix> &RVec,
                          const std::vector<Vector> &tVec,
                          const Vector &kappa = Vector::Ones(0),
@@ -56,8 +59,8 @@ void singlePoseAveraging(Matrix &ROpt, Vector &tOpt,
  * @param kappaVec weights associated with rotation matrices
  * @param errorThreshold max error threshold under Langevin noise distribution
  */
-void robustSingleRotationAveraging(Matrix &ROpt,
-                                   std::vector<size_t> &inlierIndices,
+void robustSingleRotationAveraging(Matrix *ROpt,
+                                   std::vector<size_t> *inlierIndices,
                                    const std::vector<Matrix> &RVec,
                                    const Vector &kappa = Vector::Ones(0),
                                    double errorThreshold = 0.1);
@@ -73,8 +76,8 @@ void robustSingleRotationAveraging(Matrix &ROpt,
  * @param tau
  * @param errorThreshold max error threshold under Langevin noise distribution
  */
-void robustSinglePoseAveraging(Matrix &ROpt, Vector &tOpt,
-                               std::vector<size_t> &inlierIndices,
+void robustSinglePoseAveraging(Matrix *ROpt, Vector *tOpt,
+                               std::vector<size_t> *inlierIndices,
                                const std::vector<Matrix> &RVec,
                                const std::vector<Vector> &tVec,
                                const Vector &kappa = Vector::Ones(0),
@@ -84,9 +87,11 @@ void robustSinglePoseAveraging(Matrix &ROpt, Vector &tOpt,
 /**
  * @brief Initialize local trajectory estimate from chordal relaxation
  * @param measurements
- * @return trajectory estimate in matrix form T = [R1 t1 ... Rn tn] in an arbitrary frame
+ * @return trajectory estimate in matrix form T = [R1 t1 ... Rn tn] in an
+ * arbitrary frame
  */
-PoseArray chordalInitialization(const std::vector<RelativeSEMeasurement> &measurements);
+PoseArray
+chordalInitialization(const std::vector<RelativeSEMeasurement> &measurements);
 
 /**
  * @brief Initialize local trajectory estimate from odometry,
@@ -96,43 +101,43 @@ PoseArray chordalInitialization(const std::vector<RelativeSEMeasurement> &measur
  * @return trajectory estimate in matrix form T = [R1 t1 ... Rn tn] in an
  * arbitrary frame
  */
-PoseArray odometryInitialization(
-    const std::vector<RelativeSEMeasurement> &odometry,
-    const PoseArray *partial_trajectory = nullptr);
+PoseArray
+odometryInitialization(const std::vector<RelativeSEMeasurement> &odometry,
+                       const PoseArray *partial_trajectory = nullptr);
 
 /**
- * @brief Perform single-robot pose graph optimization using the L2 cost function
+ * @brief Perform single-robot pose graph optimization using the L2 cost
+ * function
  * @param measurements
  * @param params
  * @param T0
  * @return
  */
 PoseArray solvePGO(const std::vector<RelativeSEMeasurement> &measurements,
-                   const ROptParameters &params,
-                   const PoseArray *T0 = nullptr);
+                   const ROptParameters &params, const PoseArray *T0 = nullptr);
 
 struct solveRobustPGOParams {
- public:
+public:
   ROptParameters opt_params;
   RobustCostParameters robust_params;
   bool verbose;
-  solveRobustPGOParams() :
-      opt_params(),
-      robust_params(RobustCostParameters::Type::GNC_TLS),
-      verbose(true) {}
+  solveRobustPGOParams()
+      : opt_params(),
+        robust_params(RobustCostParameters::Type::GNC_TLS),
+        verbose(true) {}
 };
 
 /**
- * @brief Perform single-robot pose graph optimization using graduated non-convexity (GNC)
+ * @brief Perform single-robot pose graph optimization using graduated
+ * non-convexity (GNC)
  * @param mutable_measurements
  * @param params
  * @param T0
  * @return
  */
-PoseArray solveRobustPGO(std::vector<RelativeSEMeasurement> &mutable_measurements,
-                         const solveRobustPGOParams &params,
-                         const PoseArray *T0 = nullptr);
+PoseArray
+solveRobustPGO(std::vector<RelativeSEMeasurement> *mutable_measurements,
+               const solveRobustPGOParams &params,
+               const PoseArray *T0 = nullptr);
 
-}
-
-#endif //DCORA_INCLUDE_DCORA_PGOSOLVER_H_
+} // namespace DCORA

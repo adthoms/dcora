@@ -1,73 +1,90 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef QUADRATICOPTIMIZER_H
-#define QUADRATICOPTIMIZER_H
+#pragma once
 
+#include <DCORA/Agent.h>
 #include <DCORA/DCORA_types.h>
-#include <DCORA/CORAAgent.h>
 #include <DCORA/QuadraticProblem.h>
-#include <DCORA/manifold/LiftedSEManifold.h>
-#include <DCORA/manifold/LiftedSEVariable.h>
-#include <DCORA/manifold/LiftedSEVector.h>
+#include <DCORA/manifold/LiftedManifold.h>
+#include <DCORA/manifold/LiftedVariable.h>
+#include <DCORA/manifold/LiftedVector.h>
 
 namespace DCORA {
 
 class QuadraticOptimizer {
- public:
+public:
   /**
-   * @brief
+   * @brief Constructor
    * @param p
    * @param params
    */
-  QuadraticOptimizer(QuadraticProblem *p, ROptParameters params = ROptParameters());
+  QuadraticOptimizer(QuadraticProblem *p,
+                     ROptParameters params = ROptParameters());
 
+  /**
+   * @brief Destructor
+   */
   ~QuadraticOptimizer();
 
   /**
-  Optimize from the given initial guess
-  */
+   * @brief Optimize from the given initial guess
+   * @param Y
+   * @return
+   */
   Matrix optimize(const Matrix &Y);
 
   /**
-   * Set optimization problem
+   * @brief Set optimization problem
+   * @param p
    */
   void setProblem(QuadraticProblem *p) { problem_ = p; }
 
   /**
-  Turn on/off verbose output
-  */
+   * @brief Turn on/off verbose output
+   * @param v
+   */
   void setVerbose(bool v) { params_.verbose = v; }
 
   /**
-  Set optimization algorithm
-  */
+   * @brief Set optimization algorithm
+   * @param alg
+   */
   void setAlgorithm(ROptParameters::ROptMethod alg) { params_.method = alg; }
 
   /**
-  Set maximum step size
-  */
+   * @brief Set maximum step size
+   * @param s
+   */
   void setRGDStepsize(double s) { params_.RGD_stepsize = s; }
 
   /**
-  Set number of trust region iterations
-  */
+   * @brief Set number of trust region iterations
+   * @param iter
+   */
   void setRTRIterations(int iter) { params_.RTR_iterations = iter; }
 
   /**
-  Set tolerance of trust region
-  */
+   * @brief Set tolerance of trust region
+   * @param tol
+   */
   void setGradientNormTolerance(double tol) { params_.gradnorm_tol = tol; }
 
   /**
    * @brief Set the initial trust region radius (default 1e1)
    * @param radius
    */
-  void setRTRInitialRadius(double radius) { params_.RTR_initial_radius = radius; }
+  void setRTRInitialRadius(double radius) {
+    params_.RTR_initial_radius = radius;
+  }
 
   /**
    * @brief Set the maximum number of inner tCG iterations
@@ -76,11 +93,12 @@ class QuadraticOptimizer {
   void setRTRtCGIterations(int iter) { params_.RTR_tCG_iterations = iter; }
 
   /**
-  Return optimization result
-  */
-  ROPTResult getOptResult() const { return result_; };
+   * @brief Return optimization result
+   * @return
+   */
+  ROPTResult getOptResult() const { return result_; }
 
- private:
+private:
   // Underlying Riemannian Optimization Problem
   QuadraticProblem *problem_;
 
@@ -103,6 +121,4 @@ class QuadraticOptimizer {
   Matrix gradientDescentLS(const Matrix &Yinit);
 };
 
-}  // namespace DCORA
-
-#endif
+} // namespace DCORA

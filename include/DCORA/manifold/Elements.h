@@ -1,28 +1,35 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#ifndef DCORA_INCLUDE_DCORA_MANIFOLD_POSES_H_
-#define DCORA_INCLUDE_DCORA_MANIFOLD_POSES_H_
+#pragma once
 
+#include <map>
+#include <memory>
 #include <set>
+
 #include "DCORA/DCORA_types.h"
 
 namespace DCORA {
 
 /**
- * @brief A class representing an array of n "lifted" elements of dimension r by dim
- * Elements consist of poses Ti = [Yi pi] and translations pj, where:
- * dim = d + 1 for a pose array, dim = 1 for a translation array
- * Each rotation Yi is a r-by-d matrix representing an element of the Stiefel manifold
- * Each translation pi is a r-dimensional vector representing an element of the Euclidean space
- * Note that translations can also represent unit-sphere auxiliary variables.
+ * @brief A class representing an array of n "lifted" elements of dimension r by
+ * dim. Elements consist of poses Ti = [Yi pi] and translations pj, where:
+ * dim = d + 1 for a pose array, dim = 1 for a translation array. Each rotation
+ * Yi is a r-by-d matrix representing an element of the Stiefel manifold while
+ * each translation pi/pj is a r-dimensional vector representing an element of
+ * the Euclidean space. Note that translations can also represent unit-sphere
+ * auxiliary variables for ranges, which are r-dimensional vectors
  */
 class LiftedArray {
- public:
+public:
   /**
    * @brief Constructor
    * @param r relaxation rank
@@ -56,34 +63,41 @@ class LiftedArray {
    */
   void setData(const Matrix &X);
   /**
-   * @brief Obtain the writable translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the writable translation at the specified index, expressed as
+   * an r dimensional vector
    * @param index
    * @return
    */
   Eigen::Ref<Vector> translation(unsigned int index);
   /**
-   * @brief Obtain the read-only translation at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the read-only translation at the specified index, expressed
+   * as an r dimensional vector
    * @param index
    * @return
    */
   Vector translation(unsigned int index) const;
   /**
-   * @brief Compute the average translation distance between two lifted arrays
-   * Internally check that both arrays should have same dimension and number of elements
+   * @brief Compute the average translation distance between two lifted arrays.
+   * Internally check that both arrays should have same dimension and number of
+   * elements
    * @param array1
    * @param array2
    * @return
    */
-  static double averageTranslationDistance(const LiftedArray &array1, const LiftedArray &array2);
+  static double averageTranslationDistance(const LiftedArray &array1,
+                                           const LiftedArray &array2);
   /**
-   * @brief Compute the max translation distance between two lifted arrays
-   * Internally check that both arrays should have same dimension and number of elements
+   * @brief Compute the max translation distance between two lifted arrays.
+   * Internally check that both arrays should have same dimension and number of
+   * elements
    * @param array1
    * @param array2
    * @return
    */
-  static double maxTranslationDistance(const LiftedArray &array1, const LiftedArray &array2);
- protected:
+  static double maxTranslationDistance(const LiftedArray &array1,
+                                       const LiftedArray &array2);
+
+protected:
   // Dimension constants
   unsigned int r_, d_, n_, dim_;
   // Eigen matrix that stores the array
@@ -91,16 +105,16 @@ class LiftedArray {
 };
 
 /**
- * @brief A class representing an array of "lifted" poses
- * Internally store as r by (d+1)n matrix X = [X1, ... Xn], where each Xi = [Yi pi]
+ * @brief A class representing an array of "lifted" poses. Internally store as
+ * r-by-(d+1)n matrix: X = [X1 ... Xn], where each Xi = [Yi pi]
  */
 class LiftedPoseArray : public LiftedArray {
- public:
+public:
   /**
    * @brief Constructor. The value of the pose array is guaranteed to be valid.
-   * @param r
-   * @param d
-   * @param n
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of poses
    */
   LiftedPoseArray(unsigned int r, unsigned int d, unsigned int n);
   /**
@@ -108,25 +122,29 @@ class LiftedPoseArray : public LiftedArray {
    */
   void checkData() const;
   /**
-   * @brief Obtain the writable pose at the specified index, expressed as an r-by-(d+1) matrix
+   * @brief Obtain the writable pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
    * @param index
    * @return
    */
   Eigen::Ref<Matrix> pose(unsigned int index);
   /**
-   * @brief Obtain the read-only pose at the specified index, expressed as an r-by-(d+1) matrix
+   * @brief Obtain the read-only pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
    * @param index
    * @return
    */
   Matrix pose(unsigned int index) const;
   /**
-   * @brief Obtain the writable rotation at the specified index, expressed as an r-by-d matrix
+   * @brief Obtain the writable rotation at the specified index, expressed as an
+   * r-by-d matrix
    * @param index
    * @return
    */
   Eigen::Ref<Matrix> rotation(unsigned int index);
   /**
-   * @brief Obtain the read-only rotation at the specified index, expressed as an r-by-d matrix
+   * @brief Obtain the read-only rotation at the specified index, expressed as
+   * an r-by-d matrix
    * @param index
    * @return
    */
@@ -135,37 +153,39 @@ class LiftedPoseArray : public LiftedArray {
 
 /**
  * @brief A class representing an array of "lifted" translations
- * Internally store as r by n matrix X = [pi, ... pn]
+ * Internally store as r-by-n matrix: X = [pi ... pn]
  */
 class LiftedTranslationArray : public LiftedArray {
- public:
+public:
   /**
    * @brief Constructor
-   * @param r
-   * @param d
-   * @param n
+   * @param r relaxation rank
+   * @param d dimension (2/3)
+   * @param n number of translations
    */
   LiftedTranslationArray(unsigned int r, unsigned int d, unsigned int n);
 };
 
-typedef LiftedTranslationArray LiftedUnitSphereAuxiliaryArray;
+typedef LiftedTranslationArray LiftedRangeArray;
 typedef LiftedTranslationArray LiftedLandmarkArray;
 
 /**
- * @brief A class representing an array of "lifted" poses, unit-sphere auxiliary variables, and translations in RA ordering
- * Internally store as r by (d+1)n+l+b matrix X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
+ * @brief A class representing an array of "lifted" poses, unit-sphere auxiliary
+ * variables, and translations in RA ordering. Internally store as
+ * r-by-(d+1)n+l+b matrix: X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
  */
 class LiftedRangeAidedArray {
- public:
+public:
   /**
    * @brief Constructor
    * @param r relaxation rank
-   * @param d dimension of pose element
-   * @param n number of pose elements
-   * @param l number of range elements
-   * @param b number of landmark elements
+   * @param d dimension (2/3)
+   * @param n number of poses
+   * @param l number of ranges
+   * @param b number of landmarks
    */
-  LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b);
+  LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n,
+                        unsigned int l, unsigned int b);
   /**
    * @brief Copy constructor
    * @param other
@@ -193,7 +213,7 @@ class LiftedRangeAidedArray {
    */
   unsigned int n() const { return n_; }
   /**
-   * @brief Get number of unit-sphere auxiliary variables
+   * @brief Get number of ranges
    * @return
    */
   unsigned int l() const { return l_; }
@@ -203,12 +223,14 @@ class LiftedRangeAidedArray {
    */
   unsigned int b() const { return b_; }
   /**
-   * @brief Return the underlying Eigen matrices of contained arrays in RA ordering
+   * @brief Return the underlying Eigen matrices of encapsulated arrays in RA
+   * ordering
    * @return
    */
   Matrix getData() const;
   /**
-   * @brief Set the underlying Eigen matrices of contained arrays in RA ordering
+   * @brief Set the underlying Eigen matrices of encapsulated arrays in RA
+   * ordering
    * @param X
    */
   void setData(const Matrix &X);
@@ -216,74 +238,82 @@ class LiftedRangeAidedArray {
    * @brief Get "lifted" pose array
    * @return
    */
-  LiftedPoseArray* GetLiftedPoseArray() const { return poses_.get(); };
+  LiftedPoseArray *GetLiftedPoseArray() const { return poses_.get(); }
   /**
-   * @brief Get "lifted" unit-sphere auxiliary array
+   * @brief Get "lifted" range array
    * @return
    */
-  LiftedUnitSphereAuxiliaryArray* GetLiftedUnitSphereAuxiliaryArray() const { return ranges_.get(); };
+  LiftedRangeArray *GetLiftedRangeArray() const { return ranges_.get(); }
   /**
    * @brief Get "lifted" landmark array
    * @return
    */
-  LiftedLandmarkArray* GetLiftedLandmarkArray() const { return landmarks_.get(); };
- private:
+  LiftedLandmarkArray *GetLiftedLandmarkArray() const {
+    return landmarks_.get();
+  }
+
+private:
   // Dimension constants
   unsigned int r_, d_, n_, l_, b_;
   // "Lifted" arrays
   std::unique_ptr<LiftedPoseArray> poses_;
-  std::unique_ptr<LiftedUnitSphereAuxiliaryArray> ranges_;
+  std::unique_ptr<LiftedRangeArray> ranges_;
   std::unique_ptr<LiftedLandmarkArray> landmarks_;
 };
 
 /**
  * @brief A class representing an array of standard poses in SE(d)
- * Internally store as d by (d+1)n matrix X = [X1, ... Xn], where each Xi = [Ri ti]
- * Each rotation Ri is a d-by-d matrix
- * Each translation pi is a d-dimensional vector
+ * Internally store as d-by-(d+1)n matrix:
+ * X = [X1, ... Xn], where each Xi = [Ri ti]
+ * Each rotation Ri is a d-by-d matrix while each translation pi is a
+ * d-dimensional vector
  */
 class PoseArray : public LiftedPoseArray {
- public:
+public:
   PoseArray(unsigned int d, unsigned int n) : LiftedPoseArray(d, d, n) {}
 };
 
 /**
- * @brief A class representing an array of standard translations in E(d)
- * Internally store as d by n matrix X = [p1, ... pn]
+ * @brief A class representing an array of standard translations in E(d).
+ * Internally store as d-by-n matrix: X = [p1 ... pn]
  * Each translation pi is a d-dimensional vector
  */
 class TranslationArray : public LiftedTranslationArray {
- public:
-  TranslationArray(unsigned int d, unsigned int n) : LiftedTranslationArray(d, d, n) {}
+public:
+  TranslationArray(unsigned int d, unsigned int n)
+      : LiftedTranslationArray(d, d, n) {}
 };
 
-typedef TranslationArray UnitSphereAuxiliaryArray;
+typedef TranslationArray RangeArray;
 typedef TranslationArray LandmarkArray;
 
 /**
- * @brief A class representing an array of poses, unit-sphere auxiliary variables, and translations in RA ordering
- * Internally store as d by (d+1)n+l+b matrix X = [X1, ... Xn | r1 ... rn | p1 ... pn | l1 ... ln]
- * See PoseArray, UnitSphereAuxiliaryArray, and TranslationArray for details on variables
+ * @brief A class representing an array of poses, unit-sphere auxiliary
+ * variables, and translations in RA ordering. Internally store as
+ * d-by-(d+1)n+l+b matrix: X = [X1, ... Xn | r1 ... rn | p1 ... pn | l1 ... ln]
+ * See PoseArray, RangeArray, and TranslationArray for details
  */
-
 class RangeAidedArray : public LiftedRangeAidedArray {
- public:
-  RangeAidedArray(unsigned int d, unsigned int n, unsigned int l, unsigned int b) : LiftedRangeAidedArray(d, d, n, l, b) {}
+public:
+  RangeAidedArray(unsigned int d, unsigned int n, unsigned int l,
+                  unsigned int b)
+      : LiftedRangeAidedArray(d, d, n, l, b) {}
 };
 
 /**
  * @brief A class representing a single "lifted" pose Xi = [Yi pi]
  */
 class LiftedPose : public LiftedPoseArray {
- public:
+public:
   LiftedPose() : LiftedPose(3, 3) {}
   LiftedPose(unsigned int r, unsigned int d) : LiftedPoseArray(r, d, 1) {}
   /**
    * @brief Constructor from Eigen matrix
-   * @param X r by d+1 matrix X = [Y p]
+   * @param X r-by-(d+1) matrix X = [Y p]
    */
-  explicit LiftedPose(const Matrix &X) :
-      LiftedPose(X.rows(), X.cols() - 1) { setData(X); }
+  explicit LiftedPose(const Matrix &X) : LiftedPose(X.rows(), X.cols() - 1) {
+    setData(X);
+  }
   /**
    * @brief Return the writable pose
    * @return
@@ -320,20 +350,25 @@ class LiftedPose : public LiftedPoseArray {
  * @brief A class representing a single "lifted" translation pi
  */
 class LiftedTranslation : public LiftedTranslationArray {
- public:
+public:
   LiftedTranslation() : LiftedTranslation(3, 3) {}
-  LiftedTranslation(unsigned int r, unsigned int d) : LiftedTranslationArray(r, d, 1) {}
+  LiftedTranslation(unsigned int r, unsigned int d)
+      : LiftedTranslationArray(r, d, 1) {}
   /**
    * @brief Constructor from Eigen vector
    * @param P r-dimensional vector
    */
-  explicit LiftedTranslation(const Vector &P) :
-      LiftedTranslation(P.rows(), P.rows()) { setData(P); }
+  explicit LiftedTranslation(const Vector &P)
+      : LiftedTranslation(P.rows(), P.rows()) {
+    setData(P);
+  }
   /**
    * @brief Return the writable translation
    * @return
    */
-  Eigen::Ref<Vector> translation() { return LiftedTranslationArray::translation(0); }
+  Eigen::Ref<Vector> translation() {
+    return LiftedTranslationArray::translation(0);
+  }
   /**
    * @brief Return the read-only translation
    * @return
@@ -345,7 +380,7 @@ class LiftedTranslation : public LiftedTranslationArray {
  * @brief Representing a single standard pose in SE(d)
  */
 class Pose : public LiftedPose {
- public:
+public:
   // Constructor
   Pose() : Pose(3) {}
   explicit Pose(unsigned int d) : LiftedPose(d, d) {}
@@ -384,7 +419,7 @@ class Pose : public LiftedPose {
 };
 
 class Translation : public LiftedTranslation {
- public:
+public:
   // Constructor
   Translation() : Translation(3) {}
   explicit Translation(unsigned int d) : LiftedTranslation(d, d) {}
@@ -416,5 +451,4 @@ typedef std::map<PoseID, LiftedPose, ComparePoseID> PoseDict;
 // Ordered set of PoseID
 typedef std::set<PoseID, ComparePoseID> PoseSet;
 
-}
-#endif //DCORA_INCLUDE_DCORA_MANIFOLD_POSES_H_
+} // namespace DCORA

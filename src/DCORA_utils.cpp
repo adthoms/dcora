@@ -1,53 +1,59 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/DCORA_utils.h>
 #include <DCORA/DCORA_robust.h>
+#include <DCORA/DCORA_utils.h>
+
 #include <Eigen/Geometry>
 #include <Eigen/SPQRSupport>
+#include <glog/logging.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <random>
+
 #include <boost/math/distributions/chi_squared.hpp>
-#include <glog/logging.h>
 
 namespace DCORA {
 
-std::string ROptParameters::ROptMethodToString(ROptParameters::ROptMethod method) {
+std::string
+ROptParameters::ROptMethodToString(ROptParameters::ROptMethod method) {
   switch (method) {
-    case ROptParameters::ROptMethod::RTR: {
-      return "RTR";
-    }
-    case ROptParameters::ROptMethod::RGD: {
-      return "RGD";
-    }
+  case ROptParameters::ROptMethod::RTR: {
+    return "RTR";
+  }
+  case ROptParameters::ROptMethod::RGD: {
+    return "RGD";
+  }
   }
   return "";
 }
 
 std::string InitializationMethodToString(InitializationMethod method) {
   switch (method) {
-    case InitializationMethod::Odometry: {
-      return "Odometry";
-    }
-    case InitializationMethod::Chordal: {
-      return "Chordal";
-    }
-    case InitializationMethod::GNC_TLS: {
-      return "GNC_TLS";
-    }
+  case InitializationMethod::Odometry: {
+    return "Odometry";
+  }
+  case InitializationMethod::Chordal: {
+    return "Chordal";
+  }
+  case InitializationMethod::GNC_TLS: {
+    return "GNC_TLS";
+  }
   }
   return "";
 }
 
-void SimpleTimer::tic() {
-  t_start = std::chrono::high_resolution_clock::now();
-}
+void SimpleTimer::tic() { t_start = std::chrono::high_resolution_clock::now(); }
 
 double SimpleTimer::toc() {
   t_end = std::chrono::high_resolution_clock::now();
@@ -56,11 +62,11 @@ double SimpleTimer::toc() {
   return t_elapsed.count();
 }
 
-std::chrono::time_point<std::chrono::high_resolution_clock> SimpleTimer::Tic() {
+HighResClock SimpleTimer::Tic() {
   return std::chrono::high_resolution_clock::now();
 }
 
-double SimpleTimer::Toc(const std::chrono::time_point<std::chrono::high_resolution_clock> &start_time) {
+double SimpleTimer::Toc(const HighResClock &start_time) {
   auto end_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> t_elapsed(0);
   t_elapsed = end_time - start_time;
@@ -74,12 +80,14 @@ void writeMatrixToFile(const Matrix &M, const std::string &filename) {
     printf("Cannot write to specified file: %s\n", filename.c_str());
     return;
   }
-  const static Eigen::IOFormat CSVFormat(Eigen::FullPrecision, Eigen::DontAlignCols, ", ", "\n");
+  static const Eigen::IOFormat CSVFormat(Eigen::FullPrecision,
+                                         Eigen::DontAlignCols, ", ", "\n");
   file << M.format(CSVFormat);
   file.close();
 }
 
-void writeSparseMatrixToFile(const SparseMatrix &M, const std::string &filename) {
+void writeSparseMatrixToFile(const SparseMatrix &M,
+                             const std::string &filename) {
   std::ofstream file;
   file.open(filename);
   if (!file.is_open()) {
@@ -111,7 +119,7 @@ Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
 */
 
 std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
-                                                 size_t &num_poses) {
+                                                 size_t *num_poses) {
   // Preallocate output vector
   std::vector<DCORA::RelativeSEMeasurement> measurements;
 
@@ -134,7 +142,7 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
   // Open the file for reading
   std::ifstream infile(filename);
 
-  num_poses = 0;
+  *num_poses = 0;
 
   while (std::getline(infile, line)) {
     // Construct a stream from the string
@@ -155,7 +163,7 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
 
       // Extract formatted output
       strstrm >> i >> j >> dx >> dy >> dtheta >> I11 >> I12 >> I13 >> I22 >>
-              I23 >> I33;
+          I23 >> I33;
 
       // Fill in elements of this measurement
 
@@ -175,7 +183,7 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
 
       measurement.kappa = I33;
 
-      if (i+1 == j) {
+      if (i + 1 == j) {
         measurement.fixedWeight = true;
       } else {
         measurement.fixedWeight = false;
@@ -199,8 +207,8 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
 
       // Extract formatted output
       strstrm >> i >> j >> dx >> dy >> dz >> dqx >> dqy >> dqz >> dqw >> I11 >>
-              I12 >> I13 >> I14 >> I15 >> I16 >> I22 >> I23 >> I24 >> I25 >> I26 >>
-              I33 >> I34 >> I35 >> I36 >> I44 >> I45 >> I46 >> I55 >> I56 >> I66;
+          I12 >> I13 >> I14 >> I15 >> I16 >> I22 >> I23 >> I24 >> I25 >> I26 >>
+          I33 >> I34 >> I35 >> I36 >> I44 >> I45 >> I46 >> I55 >> I56 >> I66;
 
       // Fill in elements of the measurement
 
@@ -229,7 +237,7 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
       RotCov << I44, I45, I46, I45, I55, I56, I46, I56, I66;
       measurement.kappa = 3 / (2 * RotCov.inverse().trace());
 
-      if (i+1 == j) {
+      if (i + 1 == j) {
         measurement.fixedWeight = true;
       } else {
         measurement.fixedWeight = false;
@@ -245,45 +253,47 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
     // Update maximum value of poses found so far
     size_t max_pair = std::max<double>(measurement.p1, measurement.p2);
 
-    num_poses = ((max_pair > num_poses) ? max_pair : num_poses);
+    *num_poses = ((max_pair > *num_poses) ? max_pair : *num_poses);
     measurements.push_back(measurement);
-  }  // while
+  } // while
 
   infile.close();
 
-  num_poses++;  // Account for the use of zero-based indexing
+  (*num_poses)++; // Account for the use of zero-based indexing
 
   return measurements;
 }
 
-void get_dimension_and_num_poses(const std::vector<RelativeSEMeasurement> &measurements,
-                                 size_t &dimension,
-                                 size_t &num_poses) {
+void get_dimension_and_num_poses(
+    const std::vector<RelativeSEMeasurement> &measurements, size_t *dimension,
+    size_t *num_poses) {
   CHECK(!measurements.empty());
-  dimension = measurements[0].t.size();
-  CHECK(dimension == 2 || dimension == 3);
-  num_poses = 0;
-  for (const auto& meas: measurements) {
-    num_poses = std::max(num_poses, meas.p1 + 1);
-    num_poses = std::max(num_poses, meas.p2 + 1);
+  *dimension = measurements[0].t.size();
+  CHECK(*dimension == 2 || *dimension == 3);
+  *num_poses = 0;
+  for (const auto &meas : measurements) {
+    *num_poses = std::max(*num_poses, meas.p1 + 1);
+    *num_poses = std::max(*num_poses, meas.p2 + 1);
   }
 }
 
 void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix &AT,
-    DiagonalMatrix &OmegaT) {
+    const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix *AT,
+    DiagonalMatrix *OmegaT) {
   // Deduce graph dimensions from measurements
-  size_t d;  // Dimension of Euclidean space
+  size_t d; // Dimension of Euclidean space
   d = (!measurements.empty() ? measurements[0].t.size() : 0);
-  size_t dh = d + 1;  // Homogenized dimension of Euclidean space
-  size_t m;           // Number of measurements
+  size_t dh = d + 1; // Homogenized dimension of Euclidean space
+  size_t m;          // Number of measurements
   m = measurements.size();
-  size_t n = 0;  // Number of poses
-  for (const RelativeSEMeasurement &meas: measurements) {
-    if (n < meas.p1) n = meas.p1;
-    if (n < meas.p2) n = meas.p2;
+  size_t n = 0; // Number of poses
+  for (const RelativeSEMeasurement &meas : measurements) {
+    if (n < meas.p1)
+      n = meas.p1;
+    if (n < meas.p2)
+      n = meas.p2;
   }
-  n++;  // Account for 0-based indexing: node indexes go from 0 to max({i,j})
+  n++; // Account for 0-based indexing: node indexes go from 0 to max({i,j})
 
   // Define connection incidence matrix dimensions
   // This is a [n x m] (dh x dh)-block matrix
@@ -294,7 +304,7 @@ void constructOrientedConnectionIncidenceMatrixSE(
   // https://eigen.tuxfamily.org/dox/group__TutorialSparse.html#TutorialSparseFilling
   Eigen::SparseMatrix<double, Eigen::ColMajor> A(rows, cols);
   A.reserve(Eigen::VectorXi::Constant(cols, 8));
-  DiagonalMatrix Omega(cols);  // One block per measurement: (d+1)*m
+  DiagonalMatrix Omega(cols); // One block per measurement: (d+1)*m
   DiagonalMatrix::DiagonalVectorType &diagonal = Omega.diagonal();
 
   // Insert actual measurement values
@@ -321,34 +331,36 @@ void constructOrientedConnectionIncidenceMatrixSE(
 
     /// Assign (d+1)-identity matrix to block leaving node j
     /// AT(j,k) = +I (NOTE: POSITIVE)
-    for (size_t r = 0; r < d + 1; r++) A.insert(j * dh + r, k * dh + r) = +1;
+    for (size_t r = 0; r < d + 1; r++)
+      A.insert(j * dh + r, k * dh + r) = +1;
 
     /// Assign isotropic weights in diagonal matrix
-    for (size_t r = 0; r < d; r++) diagonal[k * dh + r] = meas.weight * meas.kappa;
+    for (size_t r = 0; r < d; r++)
+      diagonal[k * dh + r] = meas.weight * meas.kappa;
 
     diagonal[k * dh + d] = meas.weight * meas.tau;
   }
 
   A.makeCompressed();
 
-  AT = A;
-  OmegaT = Omega;
+  *AT = A;
+  *OmegaT = Omega;
 }
 
 SparseMatrix constructConnectionLaplacianSE(
     const std::vector<RelativeSEMeasurement> &measurements) {
   SparseMatrix AT;
   DiagonalMatrix OmegaT;
-  constructOrientedConnectionIncidenceMatrixSE(measurements, AT, OmegaT);
+  constructOrientedConnectionIncidenceMatrixSE(measurements, &AT, &OmegaT);
   return AT * OmegaT * AT.transpose();
 }
 
-void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix &B1,
-                        SparseMatrix &B2, SparseMatrix &B3) {
+void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements,
+                        SparseMatrix *B1, SparseMatrix *B2, SparseMatrix *B3) {
   // Clear input matrices
-  B1.setZero();
-  B2.setZero();
-  B3.setZero();
+  B1->setZero();
+  B2->setZero();
+  B3->setZero();
 
   size_t num_poses = 0;
   size_t d = (!measurements.empty() ? measurements[0].t.size() : 0);
@@ -386,8 +398,8 @@ void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements, 
   }
   num_poses++; // Account for zero-based indexing
 
-  B1.resize(d * measurements.size(), d * num_poses);
-  B1.setFromTriplets(triplets.begin(), triplets.end());
+  B1->resize(d * measurements.size(), d * num_poses);
+  B1->setFromTriplets(triplets.begin(), triplets.end());
 
   /// Construct matrix B2 from equation (69b) in the tech report
   triplets.clear();
@@ -402,8 +414,8 @@ void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements, 
                               -sqrttau * measurements[e].t(k));
   }
 
-  B2.resize(d * measurements.size(), d2 * num_poses);
-  B2.setFromTriplets(triplets.begin(), triplets.end());
+  B2->resize(d * measurements.size(), d2 * num_poses);
+  B2->setFromTriplets(triplets.begin(), triplets.end());
 
   /// Construct matrix B3 from equation (69c) in the tech report
   triplets.clear();
@@ -428,8 +440,8 @@ void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements, 
       triplets.emplace_back(e * d2 + l, j * d2 + l, sqrtkappa);
   }
 
-  B3.resize(d2 * measurements.size(), d2 * num_poses);
-  B3.setFromTriplets(triplets.begin(), triplets.end());
+  B3->resize(d2 * measurements.size(), d2 * num_poses);
+  B3->setFromTriplets(triplets.begin(), triplets.end());
 }
 
 Matrix recoverTranslations(const SparseMatrix &B1, const SparseMatrix &B2,
@@ -438,7 +450,7 @@ Matrix recoverTranslations(const SparseMatrix &B1, const SparseMatrix &B2,
   unsigned int n = R.cols() / d;
 
   // Vectorization of R matrix
-  Eigen::Map<Eigen::VectorXd> rvec((double *) R.data(), d * d * n);
+  Eigen::Map<Eigen::VectorXd> rvec(const_cast<double *>(R.data()), d * d * n);
 
   // Form the matrix comprised of the right (n-1) block columns of B1
   SparseMatrix B1red = B1.rightCols(d * (n - 1));
@@ -490,7 +502,7 @@ Matrix projectToObliqueManifold(const Matrix &M) {
   Matrix X = M;
 #pragma omp parallel for
   for (size_t i = 0; i < l; ++i) {
-    X.col(i) =  X.col(i).normalized();
+    X.col(i) = X.col(i).normalized();
   }
   return X;
 }
@@ -513,24 +525,24 @@ Matrix fixedObliqueVariable(unsigned r, unsigned l) {
 Matrix randomStiefelVariable(unsigned r, unsigned d) {
   ROPTLIB::StieVariable var(r, d);
   var.RandInManifold();
-  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, d);
+  return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, d);
 }
 
 Matrix randomEuclideanVariable(unsigned r, unsigned b) {
   ROPTLIB::EucVariable var(r, b);
   var.RandInManifold();
-  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, b);
+  return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, b);
 }
 
 Matrix randomObliqueVariable(unsigned r, unsigned l) {
   ROPTLIB::ObliqueVariable var(r, l);
   var.RandInManifold();
-  return Eigen::Map<Matrix>((double *) var.ObtainReadData(), r, l);
+  return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, l);
 }
 
-double computeMeasurementError(const RelativeSEMeasurement &m,
-                               const Matrix &R1, const Matrix &t1,
-                               const Matrix &R2, const Matrix &t2) {
+double computeMeasurementError(const RelativeSEMeasurement &m, const Matrix &R1,
+                               const Matrix &t1, const Matrix &R2,
+                               const Matrix &t2) {
   double rotationErrorSq = (R1 * m.R - R2).squaredNorm();
   double translationErrorSq = (t2 - t1 - R1 * m.t).squaredNorm();
   return m.kappa * rotationErrorSq + m.tau * translationErrorSq;
@@ -541,9 +553,7 @@ double chi2inv(double quantile, size_t dof) {
   return boost::math::quantile(chi2, quantile);
 }
 
-double angular2ChordalSO3(double rad) {
-  return 2 * sqrt(2) * sin(rad / 2);
-}
+double angular2ChordalSO3(double rad) { return 2 * sqrt(2) * sin(rad / 2); }
 
 void checkRotationMatrix(const Matrix &R) {
   const auto d = R.rows();
@@ -551,9 +561,8 @@ void checkRotationMatrix(const Matrix &R) {
   double err_det = abs(R.determinant() - 1.0);
   double err_norm = (R.transpose() * R - Matrix::Identity(d, d)).norm();
   if (err_det > 1e-5 || err_norm > 1e-5) {
-    LOG(WARNING)
-        << "[checkRotationMatrix] Invalid rotation: err_det="
-        << err_det << ", err_norm=" << err_norm;
+    LOG(WARNING) << "[checkRotationMatrix] Invalid rotation: err_det="
+                 << err_det << ", err_norm=" << err_norm;
   }
 }
 
@@ -561,23 +570,25 @@ void checkStiefelMatrix(const Matrix &Y) {
   const auto d = Y.cols();
   double err_norm = (Y.transpose() * Y - Matrix::Identity(d, d)).norm();
   if (err_norm > 1e-5) {
-    LOG(WARNING)
-        << "[checkStiefelMatrix] Invalid Stiefel: err_norm="
-        << err_norm;
+    LOG(WARNING) << "[checkStiefelMatrix] Invalid Stiefel: err_norm="
+                 << err_norm;
   }
 }
 
-void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n) {
-  CHECK_EQ(X.rows(), (int) r);
-  CHECK_EQ(X.cols(), (int) (d + 1) * n);
+void checkSEMatrixSize(const Matrix &X, unsigned int r, unsigned int d,
+                       unsigned int n) {
+  CHECK_EQ(X.rows(), (int)r);
+  CHECK_EQ(X.cols(), (int)(d + 1) * n);
 }
 
-void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
-  CHECK_EQ(X.rows(), (int) r);
-  CHECK_EQ(X.cols(), (int) (d + 1) * n + l + b);
+void checkRAMatrixSize(const Matrix &X, unsigned int r, unsigned int d,
+                       unsigned int n, unsigned int l, unsigned int b) {
+  CHECK_EQ(X.rows(), (int)r);
+  CHECK_EQ(X.cols(), (int)(d + 1) * n + l + b);
 }
 
-std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n) {
+std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r,
+                                             unsigned int d, unsigned int n) {
   checkSEMatrixSize(X, r, d, n);
   Matrix X_SE_R = Matrix::Zero(r, d * n);
   Matrix X_SE_t = Matrix::Zero(r, n);
@@ -590,7 +601,9 @@ std::tuple<Matrix, Matrix> partitionSEMatrix(const Matrix &X, unsigned int r, un
   return std::make_tuple(X_SE_R, X_SE_t);
 }
 
-std::tuple<Matrix, Matrix, Matrix, Matrix> partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d, unsigned int n, unsigned int l, unsigned int b) {
+std::tuple<Matrix, Matrix, Matrix, Matrix>
+partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d,
+                  unsigned int n, unsigned int l, unsigned int b) {
   checkRAMatrixSize(X, r, d, n, l, b);
   Matrix X_SE_R = X.block(0, 0, r, d * n);
   Matrix X_OB = X.block(0, d * n, r, l);
@@ -614,16 +627,19 @@ Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
   return X;
 }
 
-Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB, const Matrix &X_SE_t, const Matrix &X_E) {
-  Matrix X(X_SE_R.rows(), X_SE_R.cols() + X_OB.cols() + X_SE_t.cols() + X_E.cols());
+Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB,
+                      const Matrix &X_SE_t, const Matrix &X_E) {
+  Matrix X(X_SE_R.rows(),
+           X_SE_R.cols() + X_OB.cols() + X_SE_t.cols() + X_E.cols());
   X << X_SE_R, X_OB, X_SE_t, X_E;
   return X;
 }
 
-void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable* var, double memSize) {
+void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
+                                      double memSize) {
   const double *matrix_data = Y.data();
   double *prodvar_data = var->ObtainWriteEntireData();
   memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
 }
 
-}  // namespace DCORA
+} // namespace DCORA

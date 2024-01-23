@@ -1,34 +1,36 @@
-/* ----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
  * Copyright 2020, Massachusetts Institute of Technology, * Cambridge, MA 02139
+ * Copyright 2024, University of California Los Angeles, * Los Angeles, CA 90095
  * All Rights Reserved
- * Authors: Yulun Tian, et al. (see README for the full author list)
+ * Authors: Yulun Tian, Alexander Thoms, Alan Papalia, et al.
+ *  - For dpgo's full author list, see:
+ *  https://github.com/mit-acl/dpgo/blob/main/README.md
+ *  - For dcora's full author list, see dcora/README.md
  * See LICENSE for the license information
  * -------------------------------------------------------------------------- */
 
-#include <DCORA/CORAAgent.h>
+#include <DCORA/Agent.h>
 #include <DCORA/DCORA_solver.h>
 #include <DCORA/QuadraticOptimizer.h>
 #include <glog/logging.h>
 
 #include <Eigen/CholmodSupport>
 #include <algorithm>
-#include <chrono>
+#include <chrono> // NOLINT(build/c++11)
 #include <cmath>
 #include <iostream>
 #include <memory>
 #include <random>
 
-using std::lock_guard;
-using std::unique_lock;
-using std::set;
-using std::thread;
-using std::vector;
-
 namespace DCORA {
 
 PGOAgent::PGOAgent(unsigned ID, const PGOAgentParameters &params)
-    : mID(ID), d(params.d), r(params.r), X(r, d, 1),
-      mParams(params), mState(PGOAgentState::WAIT_FOR_DATA),
+    : mID(ID),
+      d(params.d),
+      r(params.r),
+      X(r, d, 1),
+      mParams(params),
+      mState(PGOAgentState::WAIT_FOR_DATA),
       mStatus(ID, mState, 0, 0, false, 0),
       mRobustCost(params.robustCostParams),
       mPoseGraph(std::make_shared<PoseGraph>(mID, r, d)),
@@ -39,8 +41,13 @@ PGOAgent::PGOAgent(unsigned ID, const PGOAgentParameters &params)
       mWeightUpdateCount(0),
       mTrajectoryResetCount(0),
       mLogger(params.logDirectory),
-      gamma(0), alpha(0), Y(X), V(X), XPrev(X) {
-  if (mID == 0) setLiftingMatrix(fixedStiefelVariable(r, d));
+      gamma(0),
+      alpha(0),
+      Y(X),
+      V(X),
+      XPrev(X) {
+  if (mID == 0)
+    setLiftingMatrix(fixedStiefelVariable(r, d));
   mTeamRobotActive.assign(mParams.numRobots, true);
 }
 
@@ -50,7 +57,7 @@ PGOAgent::~PGOAgent() {
 }
 
 void PGOAgent::setX(const Matrix &Xin) {
-  lock_guard<mutex> lock(mPosesMutex);
+  std::lock_guard<std::mutex> lock(mPosesMutex);
   CHECK_NE(mState, PGOAgentState::WAIT_FOR_DATA);
   CHECK_EQ(Xin.rows(), relaxation_rank());
   CHECK_EQ(Xin.cols(), (dimension() + 1) * num_poses());
@@ -59,107 +66,115 @@ void PGOAgent::setX(const Matrix &Xin) {
   if (mParams.acceleration) {
     initializeAcceleration();
   }
-  LOG_IF(INFO, mParams.verbose) << "Robot " << getID() << " resets trajectory with length " << num_poses();
+  LOG_IF(INFO, mParams.verbose)
+      << "Robot " << getID() << " resets trajectory with length "
+      << num_poses();
 }
 
 void PGOAgent::setXToInitialGuess() {
   CHECK_NE(mState, PGOAgentState::WAIT_FOR_DATA);
   CHECK(XInit.has_value());
-  lock_guard<mutex> lock(mPosesMutex);
+  std::lock_guard<std::mutex> lock(mPosesMutex);
   X = XInit.value();
 }
 
-bool PGOAgent::getX(Matrix &Mout) {
-  lock_guard<mutex> lock(mPosesMutex);
-  Mout = X.getData();
+bool PGOAgent::getX(Matrix *Mout) {
+  std::lock_guard<std::mutex> lock(mPosesMutex);
+  *Mout = X.getData();
   return true;
 }
 
-bool PGOAgent::getSharedPose(unsigned int index, Matrix &Mout) {
+bool PGOAgent::getSharedPose(unsigned int index, Matrix *Mout) {
   if (mState != PGOAgentState::INITIALIZED)
     return false;
-  lock_guard<mutex> lock(mPosesMutex);
-  if (index >= num_poses()) return false;
-  Mout = X.pose(index);
+  std::lock_guard<std::mutex> lock(mPosesMutex);
+  if (index >= num_poses())
+    return false;
+  *Mout = X.pose(index);
   return true;
 }
 
-bool PGOAgent::getAuxSharedPose(unsigned int index, Matrix &Mout) {
+bool PGOAgent::getAuxSharedPose(unsigned int index, Matrix *Mout) {
   CHECK(mParams.acceleration);
   if (mState != PGOAgentState::INITIALIZED)
     return false;
-  lock_guard<mutex> lock(mPosesMutex);
-  if (index >= num_poses()) return false;
-  Mout = Y.pose(index);
+  std::lock_guard<std::mutex> lock(mPosesMutex);
+  if (index >= num_poses())
+    return false;
+  *Mout = Y.pose(index);
   return true;
 }
 
-bool PGOAgent::getSharedPoseDict(PoseDict &map) {
+bool PGOAgent::getSharedPoseDict(PoseDict *map) {
   if (mState != PGOAgentState::INITIALIZED)
     return false;
-  map.clear();
-  lock_guard<mutex> lock(mPosesMutex);
+  map->clear();
+  std::lock_guard<std::mutex> lock(mPosesMutex);
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
     CHECK_EQ(robot_id, getID());
     LiftedPose Xi(X.pose(frame_id));
-    map.emplace(pose_id, Xi);
+    map->emplace(pose_id, Xi);
   }
   return true;
 }
 
-bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict &map, unsigned neighborID) {
+bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
+                                             unsigned neighborID) {
   if (mState != PGOAgentState::INITIALIZED)
     return false;
-  map.clear();
-  lock_guard<mutex> lock(mPosesMutex);
-  std::vector<RelativeSEMeasurement> measurements = mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
+  map->clear();
+  std::lock_guard<std::mutex> lock(mPosesMutex);
+  std::vector<RelativeSEMeasurement> measurements =
+      mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements) {
     if (m.r1 == getID()) {
       PoseID pose_id(m.r1, m.p1);
       LiftedPose Xi(X.pose(m.p1));
-      map.emplace(pose_id, Xi);
+      map->emplace(pose_id, Xi);
     } else if (m.r2 == getID()) {
       PoseID pose_id(m.r2, m.p2);
       LiftedPose Xi(X.pose(m.p2));
-      map.emplace(pose_id, Xi);
+      map->emplace(pose_id, Xi);
     }
   }
   return true;
 }
 
-bool PGOAgent::getAuxSharedPoseDict(PoseDict &map) {
+bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
   CHECK(mParams.acceleration);
   if (mState != PGOAgentState::INITIALIZED)
     return false;
-  map.clear();
-  lock_guard<mutex> lock(mPosesMutex);
+  map->clear();
+  std::lock_guard<std::mutex> lock(mPosesMutex);
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
     CHECK_EQ(robot_id, getID());
     LiftedPose Yi(Y.pose(frame_id));
-    map.emplace(pose_id, Yi);
+    map->emplace(pose_id, Yi);
   }
   return true;
 }
 
-bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict &map, unsigned neighborID) {
+bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
+                                                unsigned neighborID) {
   if (mState != PGOAgentState::INITIALIZED)
     return false;
-  map.clear();
-  lock_guard<mutex> lock(mPosesMutex);
-  std::vector<RelativeSEMeasurement> measurements = mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
+  map->clear();
+  std::lock_guard<std::mutex> lock(mPosesMutex);
+  std::vector<RelativeSEMeasurement> measurements =
+      mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements) {
     if (m.r1 == getID()) {
       PoseID pose_id(m.r1, m.p1);
       LiftedPose Yi(Y.pose(m.p1));
-      map.emplace(pose_id, Yi);
+      map->emplace(pose_id, Yi);
     } else if (m.r2 == getID()) {
       PoseID pose_id(m.r2, m.p2);
       LiftedPose Yi(Y.pose(m.p2));
-      map.emplace(pose_id, Yi);
+      map->emplace(pose_id, Yi);
     }
   }
   return true;
@@ -177,7 +192,7 @@ void PGOAgent::addMeasurement(const RelativeSEMeasurement &factor) {
         << "Robot state is not WAIT_FOR_DATA. Ignore new measurements!";
     return;
   }
-  lock_guard<mutex> mLock(mMeasurementsMutex);
+  std::lock_guard<std::mutex> mLock(mMeasurementsMutex);
   mPoseGraph->addMeasurement(factor);
 }
 
@@ -187,12 +202,15 @@ void PGOAgent::setMeasurements(
     const std::vector<RelativeSEMeasurement> &inputSharedLoopClosures) {
   CHECK(!isOptimizationRunning());
   CHECK_EQ(mState, PGOAgentState::WAIT_FOR_DATA);
-  if (inputOdometry.empty()) return;
+  if (inputOdometry.empty())
+    return;
   // Set pose graph measurements
   mPoseGraph = std::make_shared<PoseGraph>(mID, r, d);
   std::vector<RelativeSEMeasurement> measurements = inputOdometry;
-  measurements.insert(measurements.end(), inputPrivateLoopClosures.begin(), inputPrivateLoopClosures.end());
-  measurements.insert(measurements.end(), inputSharedLoopClosures.begin(), inputSharedLoopClosures.end());
+  measurements.insert(measurements.end(), inputPrivateLoopClosures.begin(),
+                      inputPrivateLoopClosures.end());
+  measurements.insert(measurements.end(), inputSharedLoopClosures.begin(),
+                      inputSharedLoopClosures.end());
   mPoseGraph->setMeasurements(measurements);
 }
 
@@ -204,13 +222,15 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
 
   // Do nothing if local pose graph is empty
   if (mPoseGraph->n() == 0) {
-    LOG_IF(INFO, mParams.verbose) << "Local pose graph is empty. Skip initialization.";
+    LOG_IF(INFO, mParams.verbose)
+        << "Local pose graph is empty. Skip initialization.";
     return;
   }
 
   // Check validity of initial trajectory estimate, if provided
   bool initialization_successful = false;
-  if (TInitPtr && TInitPtr->d() == dimension() && TInitPtr->n() == num_poses()) {
+  if (TInitPtr && TInitPtr->d() == dimension() &&
+      TInitPtr->n() == num_poses()) {
     LOG(INFO) << "Using provided trajectory initialization.";
     TLocalInit.emplace(*TInitPtr);
     initialization_successful = true;
@@ -220,47 +240,47 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
   if (!initialization_successful) {
     PoseArray T(dimension(), num_poses());
     switch (mParams.localInitializationMethod) {
-      case (InitializationMethod::Odometry): {
-        LOG(INFO) << "Computing local odometry initialization.";
-        T = odometryInitialization(mPoseGraph->odometry());
-        break;
-      }
-      case (InitializationMethod::Chordal): {
-        LOG(INFO) << "Computing local chordal initialization.";
-        T = chordalInitialization(mPoseGraph->localMeasurements());
-        break;
-      }
-      case (InitializationMethod::GNC_TLS): {
-        LOG(INFO) << "Computing local GNC_TLS initialization.";
-        solveRobustPGOParams params;
-        params.verbose = mParams.verbose;
-        // Standard L2 PGO params (GNC inner iters)
-        params.opt_params.verbose = false;
-        params.opt_params.gradnorm_tol = 1;
-        params.opt_params.RTR_iterations = 20;
-        // Robust optimization params (GNC outer iters)
-        params.robust_params.costType = RobustCostParameters::Type::GNC_TLS;
-        params.robust_params.GNCMaxNumIters = 10;
-        params.robust_params.GNCBarc = 5.0;
-        params.robust_params.GNCMuStep = 1.4;
-        PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
-        std::vector<RelativeSEMeasurement> mutable_local_measurements =
-            mPoseGraph->localMeasurements();
-        // Solve for trajectory
-        T = solveRobustPGO(mutable_local_measurements, params, &TOdom);
-        // Reject outlier local loop closures
-        int reject_count = 0;
-        for (const auto &m : mutable_local_measurements) {
-          if (m.weight < 1e-8) {
-            PoseID srcID(m.r1, m.p1);
-            PoseID dstID(m.r2, m.p2);
-            setMeasurementWeight(srcID, dstID, 0);
-            reject_count++;
-          }
+    case (InitializationMethod::Odometry): {
+      LOG(INFO) << "Computing local odometry initialization.";
+      T = odometryInitialization(mPoseGraph->odometry());
+      break;
+    }
+    case (InitializationMethod::Chordal): {
+      LOG(INFO) << "Computing local chordal initialization.";
+      T = chordalInitialization(mPoseGraph->localMeasurements());
+      break;
+    }
+    case (InitializationMethod::GNC_TLS): {
+      LOG(INFO) << "Computing local GNC_TLS initialization.";
+      solveRobustPGOParams params;
+      params.verbose = mParams.verbose;
+      // Standard L2 PGO params (GNC inner iters)
+      params.opt_params.verbose = false;
+      params.opt_params.gradnorm_tol = 1;
+      params.opt_params.RTR_iterations = 20;
+      // Robust optimization params (GNC outer iters)
+      params.robust_params.costType = RobustCostParameters::Type::GNC_TLS;
+      params.robust_params.GNCMaxNumIters = 10;
+      params.robust_params.GNCBarc = 5.0;
+      params.robust_params.GNCMuStep = 1.4;
+      PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
+      std::vector<RelativeSEMeasurement> mutable_local_measurements =
+          mPoseGraph->localMeasurements();
+      // Solve for trajectory
+      T = solveRobustPGO(&mutable_local_measurements, params, &TOdom);
+      // Reject outlier local loop closures
+      int reject_count = 0;
+      for (const auto &m : mutable_local_measurements) {
+        if (m.weight < 1e-8) {
+          PoseID srcID(m.r1, m.p1);
+          PoseID dstID(m.r2, m.p2);
+          setMeasurementWeight(srcID, dstID, 0);
+          reject_count++;
         }
-        LOG(INFO) << "Reject " << reject_count << " local loop closures.";
-        break;
       }
+      LOG(INFO) << "Reject " << reject_count << " local loop closures.";
+      break;
+    }
     }
     CHECK_EQ(T.d(), dimension());
     if (T.n() != num_poses()) {
@@ -274,7 +294,8 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
   }
 
   if (!initialization_successful) {
-    LOG(WARNING) << "Robot " << getID() << " fails to initialize local trajectory!";
+    LOG(WARNING) << "Robot " << getID()
+                 << " fails to initialize local trajectory!";
     return;
   }
 
@@ -320,7 +341,7 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
   }
 
   // Halt insertion of new poses
-  lock_guard<mutex> tLock(mPosesMutex);
+  std::lock_guard<std::mutex> tLock(mPosesMutex);
 
   // Clear cache
   clearNeighborPoses();
@@ -370,7 +391,8 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
                           "trajectory_initial.csv");
   }
 
-  if (optimizationHalted) startOptimizationLoop();
+  if (optimizationHalted)
+    startOptimizationLoop();
 }
 
 bool PGOAgent::iterate(bool doOptimization) {
@@ -406,18 +428,23 @@ bool PGOAgent::iterate(bool doOptimization) {
       mStatus.relativeChange = LiftedArray::maxTranslationDistance(X, XPrev);
       // Check local termination condition
       bool readyToTerminate = true;
-      if (!success) readyToTerminate = false;
+      if (!success)
+        readyToTerminate = false;
       double relative_change_tol = mParams.relChangeTol;
       // Use loose threshold during initial inner iters of robust opt
-      if (mParams.robustCostParams.costType != RobustCostParameters::Type::L2 && 
+      if (mParams.robustCostParams.costType != RobustCostParameters::Type::L2 &&
           mWeightUpdateCount == 0) {
         relative_change_tol = 5;
       }
-      if (mStatus.relativeChange > relative_change_tol) readyToTerminate = false;
-      // Compute percentage of converged loop closures (i.e., either accepted or rejected)
+      if (mStatus.relativeChange > relative_change_tol)
+        readyToTerminate = false;
+      // Compute percentage of converged loop closures (i.e., either accepted or
+      // rejected)
       const auto stat = mPoseGraph->statistics();
-      double ratio = (stat.accept_loop_closures + stat.reject_loop_closures) / stat.total_loop_closures;
-      if (ratio < mParams.robustOptMinConvergenceRatio) readyToTerminate = false;
+      double ratio = (stat.accept_loop_closures + stat.reject_loop_closures) /
+                     stat.total_loop_closures;
+      if (ratio < mParams.robustOptMinConvergenceRatio)
+        readyToTerminate = false;
       mStatus.readyToTerminate = readyToTerminate;
     }
 
@@ -437,14 +464,17 @@ void PGOAgent::reset() {
 
   if (mParams.logData) {
     // Save measurements (including final weights)
-    std::vector<RelativeSEMeasurement> measurements = mPoseGraph->measurements();
-    mLogger.logMeasurements(measurements, "measurements.csv");
+    std::vector<RelativeSEMeasurement> measurements =
+        mPoseGraph->measurements();
+    mLogger.logMeasurements(&measurements, "measurements.csv");
 
     // Save trajectory estimates after rounding
     Matrix T;
-    if (getTrajectoryInGlobalFrame(T)) {
-      mLogger.logTrajectory(dimension(), num_poses(), T, "trajectory_optimized.csv");
-      std::cout << "Saved optimized trajectory to " << mParams.logDirectory << std::endl;
+    if (getTrajectoryInGlobalFrame(&T)) {
+      mLogger.logTrajectory(dimension(), num_poses(), T,
+                            "trajectory_optimized.csv");
+      std::cout << "Saved optimized trajectory to " << mParams.logDirectory
+                << std::endl;
     }
 
     // Save solution before rounding
@@ -458,7 +488,8 @@ void PGOAgent::reset() {
   mWeightUpdateCount = 0;
   mTrajectoryResetCount = 0;
   mState = PGOAgentState::WAIT_FOR_DATA;
-  mStatus = PGOAgentStatus(getID(), mState, mInstanceNumber, mIterationNumber, false, 0);
+  mStatus = PGOAgentStatus(getID(), mState, mInstanceNumber, mIterationNumber,
+                           false, 0);
   mTeamStatus.clear();
   mTeamRobotActive.assign(mParams.numRobots, false);
   globalAnchor.reset();
@@ -466,7 +497,7 @@ void PGOAgent::reset() {
   XInit.reset();
   mPublishPublicPosesRequested = false;
   mPublishAsynchronousRequested = false;
-  
+
   // This function will activate all robots in pose graph again
   mPoseGraph->reset();
   clearNeighborPoses();
@@ -474,20 +505,25 @@ void PGOAgent::reset() {
 
 void PGOAgent::startOptimizationLoop() {
   // Asynchronous updates currently restricted to non-accelerated updates
-  CHECK(!mParams.acceleration) << "Asynchronous mode does not support acceleration!";
+  CHECK(!mParams.acceleration)
+      << "Asynchronous mode does not support acceleration!";
   if (isOptimizationRunning()) {
     return;
   }
-  LOG_IF(INFO, mParams.verbose) << "Robot " << getID()
-                                << " spins optimization thread at " << mParams.asynchronousOptimizationRate << " Hz.";
-  mOptimizationThread = std::make_unique<thread>(&PGOAgent::runOptimizationLoop, this);
+  LOG_IF(INFO, mParams.verbose)
+      << "Robot " << getID() << " spins optimization thread at "
+      << mParams.asynchronousOptimizationRate << " Hz.";
+  mOptimizationThread =
+      std::make_unique<std::thread>(&PGOAgent::runOptimizationLoop, this);
 }
 
 void PGOAgent::runOptimizationLoop() {
   // Create exponential distribution with the desired rate
-  std::random_device rd;  // Will be used to obtain a seed for the random number engine
-  std::mt19937 rng(rd());  // Standard mersenne_twister_engine seeded with rd()
-  std::exponential_distribution<double> ExponentialDistribution(mParams.asynchronousOptimizationRate);
+  std::random_device
+      rd; // Will be used to obtain a seed for the random number engine
+  std::mt19937 rng(rd()); // Standard mersenne_twister_engine seeded with rd()
+  std::exponential_distribution<double> ExponentialDistribution(
+      mParams.asynchronousOptimizationRate);
   while (true) {
     iterate(true);
     usleep(1e6 * ExponentialDistribution(rng));
@@ -499,20 +535,23 @@ void PGOAgent::runOptimizationLoop() {
 }
 
 void PGOAgent::endOptimizationLoop() {
-  if (!isOptimizationRunning()) return;
+  if (!isOptimizationRunning())
+    return;
   mEndLoopRequested = true;
   // wait for thread to finish
   mOptimizationThread->join();
   mOptimizationThread.reset(nullptr);
-  mEndLoopRequested = false;  // reset request flag
-  LOG_IF(INFO, mParams.verbose) << "Robot " << getID() << " optimization thread exits.";
+  mEndLoopRequested = false; // reset request flag
+  LOG_IF(INFO, mParams.verbose)
+      << "Robot " << getID() << " optimization thread exits.";
 }
 
 bool PGOAgent::isOptimizationRunning() {
   return mOptimizationThread != nullptr;
 }
 
-Pose PGOAgent::computeNeighborTransform(const RelativeSEMeasurement &measurement, const LiftedPose &neighbor_pose) {
+Pose PGOAgent::computeNeighborTransform(
+    const RelativeSEMeasurement &measurement, const LiftedPose &neighbor_pose) {
   CHECK(YLift);
   CHECK_EQ(neighbor_pose.r(), r);
   CHECK_EQ(neighbor_pose.d(), d);
@@ -568,8 +607,9 @@ bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
       tVec.emplace_back(T.translation());
     }
   }
-  if (RVec.empty()) return false;
-  int m = (int) RVec.size();
+  if (RVec.empty())
+    return false;
+  int m = static_cast<int>(RVec.size());
   const Vector kappa = Vector::Ones(m);
   const Vector tau = Vector::Ones(m);
   Matrix ROpt;
@@ -577,21 +617,24 @@ bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
   std::vector<size_t> inlierIndices;
 
   // Perform robust single rotation averaging
-  double maxRotationError = angular2ChordalSO3(0.5);  // approximately 30 deg
-  robustSingleRotationAveraging(ROpt, inlierIndices, RVec, kappa, maxRotationError);
-  int inlierSize = (int) inlierIndices.size();
-  printf("Robot %u attempts initialization from neighbor %u: finds %i/%i inliers.\n",
+  double maxRotationError = angular2ChordalSO3(0.5); // approximately 30 deg
+  robustSingleRotationAveraging(&ROpt, &inlierIndices, RVec, kappa,
+                                maxRotationError);
+  int inlierSize = static_cast<int>(inlierIndices.size());
+  printf("Robot %u attempts initialization from neighbor %u: finds %i/%i "
+         "inliers.\n",
          getID(), neighborID, inlierSize, m);
 
   // Return if robust rotation averaging fails to find any inlier
-  if (inlierIndices.size() < mParams.robustInitMinInliers) return false;
+  if (inlierIndices.size() < mParams.robustInitMinInliers)
+    return false;
 
   // Perform single translation averaging on the inlier set
   std::vector<Vector> tVecInliers;
   for (const auto index : inlierIndices) {
     tVecInliers.emplace_back(tVec[index]);
   }
-  singleTranslationAveraging(tOpt, tVecInliers);
+  singleTranslationAveraging(&tOpt, tVecInliers);
 
   // Return transformation as matrix
   CHECK_NOTNULL(T_world_robot);
@@ -622,22 +665,27 @@ bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
       tVec.emplace_back(T.translation());
     }
   }
-  if (RVec.empty()) return false;
+  if (RVec.empty())
+    return false;
   // Perform robust single pose averaging
-  int m = (int) RVec.size();
-  const Vector kappa = 1.82 * Vector::Ones(m);  // rotation stddev approximately 30 degree
-  const Vector tau = 0.01 * Vector::Ones(m);  // translation stddev 10 m
+  int m = static_cast<int>(RVec.size());
+  const Vector kappa =
+      1.82 * Vector::Ones(m); // rotation stddev approximately 30 degree
+  const Vector tau = 0.01 * Vector::Ones(m); // translation stddev 10 m
   const double cbar = RobustCost::computeErrorThresholdAtQuantile(0.9, 3);
   Matrix ROpt;
   Vector tOpt;
   std::vector<size_t> inlierIndices;
-  robustSinglePoseAveraging(ROpt, tOpt, inlierIndices, RVec, tVec, kappa, tau, cbar);
-  int inlierSize = (int) inlierIndices.size();
-  printf("Robot %u attempts initialization from neighbor %u: finds %i/%i inliers.\n",
+  robustSinglePoseAveraging(&ROpt, &tOpt, &inlierIndices, RVec, tVec, kappa,
+                            tau, cbar);
+  int inlierSize = static_cast<int>(inlierIndices.size());
+  printf("Robot %u attempts initialization from neighbor %u: finds %i/%i "
+         "inliers.\n",
          getID(), neighborID, inlierSize, m);
 
   // Return if fails to identify any inlier
-  if (inlierIndices.size() < mParams.robustInitMinInliers) return false;
+  if (inlierIndices.size() < mParams.robustInitMinInliers)
+    return false;
 
   // Return transformation as matrix
   CHECK_NOTNULL(T_world_robot);
@@ -647,7 +695,8 @@ bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
   return true;
 }
 
-void PGOAgent::updateNeighborPoses(unsigned neighborID, const PoseDict &poseDict) {
+void PGOAgent::updateNeighborPoses(unsigned neighborID,
+                                   const PoseDict &poseDict) {
   CHECK(neighborID != mID);
   if (!YLift)
     return;
@@ -657,14 +706,15 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID, const PoseDict &poseDict
     return;
   if (mState == PGOAgentState::WAIT_FOR_INITIALIZATION) {
     Pose T_world_robot(dimension());
-    if (computeRobustNeighborTransformTwoStage(neighborID, poseDict, &T_world_robot)) {
+    if (computeRobustNeighborTransformTwoStage(neighborID, poseDict,
+                                               &T_world_robot)) {
       initializeInGlobalFrame(T_world_robot);
     }
   }
   if (mState != PGOAgentState::INITIALIZED)
     return;
   // Save neighbor public poses in local cache
-  lock_guard<mutex> lock(mNeighborPosesMutex);
+  std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   for (const auto &it : poseDict) {
     const auto nID = it.first;
     const auto var = it.second;
@@ -677,7 +727,8 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID, const PoseDict &poseDict
   }
 }
 
-void PGOAgent::updateAuxNeighborPoses(unsigned neighborID, const PoseDict &poseDict) {
+void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
+                                      const PoseDict &poseDict) {
   CHECK(mParams.acceleration);
   CHECK(neighborID != mID);
   if (!YLift)
@@ -688,7 +739,7 @@ void PGOAgent::updateAuxNeighborPoses(unsigned neighborID, const PoseDict &poseD
     return;
   if (mState != PGOAgentState::INITIALIZED)
     return;
-  lock_guard<mutex> lock(mNeighborPosesMutex);
+  std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   for (const auto &it : poseDict) {
     const auto nID = it.first;
     const auto var = it.second;
@@ -702,78 +753,85 @@ void PGOAgent::updateAuxNeighborPoses(unsigned neighborID, const PoseDict &poseD
 }
 
 void PGOAgent::clearNeighborPoses() {
-  lock_guard<mutex> lock(mNeighborPosesMutex);
+  std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   neighborPoseDict.clear();
   neighborAuxPoseDict.clear();
 }
 
 void PGOAgent::clearActiveNeighborPoses() {
-  lock_guard<mutex> lock(mNeighborPosesMutex);
+  std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   for (const auto &pose_id : mPoseGraph->activeNeighborPublicPoseIDs()) {
     neighborPoseDict.erase(pose_id);
     neighborAuxPoseDict.erase(pose_id);
   }
 }
 
-bool PGOAgent::getTrajectoryInLocalFrame(Matrix &Trajectory) {
+bool PGOAgent::getTrajectoryInLocalFrame(Matrix *Trajectory) {
   if (mState != PGOAgentState::INITIALIZED) {
     return false;
   }
-  lock_guard<mutex> lock(mPosesMutex);
+  std::lock_guard<std::mutex> lock(mPosesMutex);
 
   PoseArray T(d, num_poses());
   T.setData(X.rotation(0).transpose() * X.getData());
   auto t0 = T.translation(0);
 
-  // Project each rotation block to the rotation group, and make the first translation zero
+  // Project each rotation block to the rotation group, and make the first
+  // translation zero
   for (unsigned i = 0; i < num_poses(); ++i) {
     T.rotation(i) = projectToRotationGroup(T.rotation(i));
     T.translation(i) = T.translation(i) - t0;
   }
 
-  Trajectory = T.getData();
+  *Trajectory = T.getData();
   return true;
 }
 
-bool PGOAgent::getTrajectoryInGlobalFrame(Matrix &Trajectory) {
+bool PGOAgent::getTrajectoryInGlobalFrame(Matrix *Trajectory) {
   PoseArray T(d, num_poses());
-  if (!getTrajectoryInGlobalFrame(T)) {
+  if (!getTrajectoryInGlobalFrame(&T)) {
     return false;
   }
-  Trajectory = T.getData();
+  *Trajectory = T.getData();
   return true;
 }
 
-bool PGOAgent::getTrajectoryInGlobalFrame(PoseArray &Trajectory) {
-  if (!globalAnchor) return false;
+bool PGOAgent::getTrajectoryInGlobalFrame(PoseArray *Trajectory) {
+  if (!globalAnchor)
+    return false;
   auto Xa = globalAnchor.value();
   CHECK(Xa.r() == relaxation_rank());
   CHECK(Xa.d() == dimension());
-  if (mState != PGOAgentState::INITIALIZED) return false;
-  lock_guard<mutex> lock(mPosesMutex);
+  if (mState != PGOAgentState::INITIALIZED)
+    return false;
+  std::lock_guard<std::mutex> lock(mPosesMutex);
 
   PoseArray T(d, num_poses());
   T.setData(Xa.rotation().transpose() * X.getData());
   Vector t0 = Xa.rotation().transpose() * Xa.translation();
 
-  // Project each rotation block to the rotation group, and make the first translation zero
+  // Project each rotation block to the rotation group, and make the first
+  // translation zero
   for (unsigned i = 0; i < num_poses(); ++i) {
     T.rotation(i) = projectToRotationGroup(T.rotation(i));
     T.translation(i) = T.translation(i) - t0;
   }
 
-  Trajectory = T;
+  *Trajectory = T;
   return true;
 }
 
-bool PGOAgent::getPoseInGlobalFrame(unsigned int poseID, Matrix &T) {
-  if (!globalAnchor) return false;
+bool PGOAgent::getPoseInGlobalFrame(unsigned int poseID, Matrix *T) {
+  if (!globalAnchor)
+    return false;
   auto Xa = globalAnchor.value();
   CHECK(Xa.r() == relaxation_rank());
   CHECK(Xa.d() == dimension());
-  if (mState != PGOAgentState::INITIALIZED) return false;
-  lock_guard<mutex> lock(mPosesMutex);
-  if (poseID < 0 || poseID >= num_poses()) return false;
+  if (mState != PGOAgentState::INITIALIZED)
+    return false;
+  std::lock_guard<std::mutex> lock(mPosesMutex);
+  if (poseID < 0 || poseID >= num_poses())
+    return false;
   Matrix Ya = Xa.rotation();
   Matrix pa = Xa.translation();
   Matrix t0 = Ya.transpose() * pa;
@@ -782,17 +840,20 @@ bool PGOAgent::getPoseInGlobalFrame(unsigned int poseID, Matrix &T) {
   Ti.col(d) -= t0;
   CHECK(Ti.rows() == d);
   CHECK(Ti.cols() == d + 1);
-  T = Ti;
+  *T = Ti;
   return true;
 }
 
-bool PGOAgent::getNeighborPoseInGlobalFrame(unsigned int neighborID, unsigned int poseID, Matrix &T) {
-  if (!globalAnchor) return false;
+bool PGOAgent::getNeighborPoseInGlobalFrame(unsigned int neighborID,
+                                            unsigned int poseID, Matrix *T) {
+  if (!globalAnchor)
+    return false;
   auto Xa = globalAnchor.value();
   CHECK(Xa.r() == relaxation_rank());
   CHECK(Xa.d() == dimension());
-  if (mState != PGOAgentState::INITIALIZED) return false;
-  lock_guard<mutex> lock(mNeighborPosesMutex);
+  if (mState != PGOAgentState::INITIALIZED)
+    return false;
+  std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   PoseID nID(neighborID, poseID);
   if (neighborPoseDict.find(nID) != neighborPoseDict.end()) {
     Matrix Ya = Xa.rotation();
@@ -803,7 +864,7 @@ bool PGOAgent::getNeighborPoseInGlobalFrame(unsigned int neighborID, unsigned in
     CHECK(Xi.d() == d);
     Pose Ti(Ya.transpose() * Xi.pose());
     Ti.translation() -= t0;
-    T = Ti.pose();
+    *T = Ti.pose();
     return true;
   }
   return false;
@@ -827,9 +888,9 @@ Matrix PGOAgent::localPoseGraphOptimization() {
   return T.getData();
 }
 
-bool PGOAgent::getLiftingMatrix(Matrix &M) const {
+bool PGOAgent::getLiftingMatrix(Matrix *M) const {
   if (YLift.has_value()) {
-    M = YLift.value();
+    *M = YLift.value();
     return true;
   }
   return false;
@@ -850,7 +911,8 @@ bool PGOAgent::shouldTerminate() {
     return true;
   }
 
-  // Do not terminate if not update measurement weights for sufficiently many times
+  // Do not terminate if not update measurement weights for sufficiently many
+  // times
   if (mParams.robustCostParams.costType != RobustCostParameters::Type::L2) {
     if (mWeightUpdateCount < mParams.robustOptNumWeightUpdates)
       return false;
@@ -886,7 +948,8 @@ bool PGOAgent::shouldRestart() const {
 
 void PGOAgent::restartNesterovAcceleration(bool doOptimization) {
   if (mParams.acceleration && mState == PGOAgentState::INITIALIZED) {
-    LOG_IF(INFO, mParams.verbose) << "Robot " << getID() << " restarts acceleration.";
+    LOG_IF(INFO, mParams.verbose)
+        << "Robot " << getID() << " restarts acceleration.";
     X = XPrev;
     updateX(doOptimization, false);
     V = X;
@@ -910,7 +973,8 @@ void PGOAgent::initializeAcceleration() {
 void PGOAgent::updateGamma() {
   CHECK(mParams.acceleration);
   CHECK(mState == PGOAgentState::INITIALIZED);
-  gamma = (1 + sqrt(1 + 4 * pow(mParams.numRobots, 2) * pow(gamma, 2))) / (2 * mParams.numRobots);
+  gamma = (1 + sqrt(1 + 4 * pow(mParams.numRobots, 2) * pow(gamma, 2))) /
+          (2 * mParams.numRobots);
 }
 
 void PGOAgent::updateAlpha() {
@@ -937,17 +1001,20 @@ void PGOAgent::updateV() {
 
 bool PGOAgent::updateX(bool doOptimization, bool acceleration) {
   // Lock during local optimization
-  unique_lock<mutex> tLock(mPosesMutex);
-  unique_lock<mutex> mLock(mMeasurementsMutex);
-  unique_lock<mutex> nLock(mNeighborPosesMutex);
+  std::unique_lock<std::mutex> tLock(mPosesMutex);
+  std::unique_lock<std::mutex> mLock(mMeasurementsMutex);
+  std::unique_lock<std::mutex> nLock(mNeighborPosesMutex);
   if (!doOptimization) {
     if (acceleration) {
       X = Y;
     }
     return true;
   }
-  LOG_IF(INFO, mParams.verbose) << "Robot " << getID() << " optimizes at iteration " << iteration_number();
-  if (acceleration) CHECK(mParams.acceleration);
+  LOG_IF(INFO, mParams.verbose)
+      << "Robot " << getID() << " optimizes at iteration "
+      << iteration_number();
+  if (acceleration)
+    CHECK(mParams.acceleration);
   CHECK(mState == PGOAgentState::INITIALIZED);
 
   // Initialize pose graph for optimization
@@ -959,7 +1026,8 @@ bool PGOAgent::updateX(bool doOptimization, bool acceleration) {
 
   // Skip optimization if cannot construct data matrices for some reason
   if (!mPoseGraph->constructDataMatrices()) {
-    LOG(WARNING) << "Robot " << getID() << " cannot construct data matrices... Skip optimization.";
+    LOG(WARNING) << "Robot " << getID()
+                 << " cannot construct data matrices... Skip optimization.";
     mLocalOptResult = ROPTResult(false);
     return false;
   }
@@ -987,8 +1055,7 @@ bool PGOAgent::updateX(bool doOptimization, bool acceleration) {
   if (mParams.verbose) {
     printf("df: %f, init_gradnorm: %f, opt_gradnorm: %f. \n",
            mLocalOptResult.fInit - mLocalOptResult.fOpt,
-           mLocalOptResult.gradNormInit,
-           mLocalOptResult.gradNormOpt);
+           mLocalOptResult.gradNormInit, mLocalOptResult.gradNormOpt);
   }
 
   return true;
@@ -1006,7 +1073,8 @@ bool PGOAgent::shouldUpdateMeasurementWeights() const {
 
   // Return true if number of inner iterations exceeds threshold
   if (mRobustOptInnerIter >= mParams.robustOptInnerIters) {
-    LOG_IF(INFO, mParams.verbose) << "Exceeds max inner iterations. Update weights.";
+    LOG_IF(INFO, mParams.verbose)
+        << "Exceeds max inner iterations. Update weights.";
     return true;
   }
 
@@ -1051,7 +1119,7 @@ void PGOAgent::initializeRobustOptimization() {
                     "need to initialize measurement weights!";
   }
   mRobustCost.reset();
-  unique_lock<mutex> lock(mMeasurementsMutex);
+  std::unique_lock<std::mutex> lock(mMeasurementsMutex);
   for (RelativeSEMeasurement *m : mPoseGraph->activeLoopClosures()) {
     if (!m->fixedWeight) {
       m->weight = 1.0;
@@ -1072,9 +1140,8 @@ bool PGOAgent::computeMeasurementResidual(
     p1 = X.translation(measurement.p1);
     Y2 = X.rotation(measurement.p2);
     p2 = X.translation(measurement.p2);
-  }
-  // Evaluate shared (inter-robot) loop closure
-  else {
+  } else {
+    // Evaluate shared (inter-robot) loop closure
     if (measurement.r1 == getID()) {
       Y1 = X.rotation(measurement.p1);
       p1 = X.translation(measurement.p1);
@@ -1103,13 +1170,15 @@ bool PGOAgent::computeMeasurementResidual(
 
 void PGOAgent::updateMeasurementWeights() {
   if (mState != PGOAgentState::INITIALIZED) {
-    LOG(WARNING) << "Robot " << getID() << " attempts to update weights but is not initialized.";
+    LOG(WARNING) << "Robot " << getID()
+                 << " attempts to update weights but is not initialized.";
     return;
   }
-  unique_lock<mutex> lock(mMeasurementsMutex);
+  std::unique_lock<std::mutex> lock(mMeasurementsMutex);
   double residual = 0;
   for (auto &m : mPoseGraph->activeLoopClosures()) {
-    if (m->fixedWeight) continue;
+    if (m->fixedWeight)
+      continue;
     if (computeMeasurementResidual(*m, &residual)) {
       m->weight = mRobustCost.weight(residual);
     } else {
@@ -1130,9 +1199,10 @@ void PGOAgent::updateMeasurementWeights() {
   // or if warm start is disabled
   if (mTrajectoryResetCount < mParams.robustOptNumResets) {
     mTrajectoryResetCount++;
-    LOG(INFO) << "Robot " << getID() << " resets trajectory estimates after weight updates.";
+    LOG(INFO) << "Robot " << getID()
+              << " resets trajectory estimates after weight updates.";
     setXToInitialGuess();
-    clearNeighborPoses(); 
+    clearNeighborPoses();
   }
 
   // Reset acceleration
@@ -1145,7 +1215,7 @@ bool PGOAgent::setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
                                     double weight, bool fixed_weight) {
   RelativeSEMeasurement *m = mPoseGraph->findMeasurement(src_ID, dst_ID);
   if (m) {
-    unique_lock<mutex> lock(mMeasurementsMutex);
+    std::unique_lock<std::mutex> lock(mMeasurementsMutex);
     m->weight = weight;
     m->fixedWeight = fixed_weight;
     return true;
@@ -1172,12 +1242,13 @@ bool PGOAgent::isRobotActive(unsigned robot_id) const {
 
 void PGOAgent::setRobotActive(unsigned robot_id, bool active) {
   if (robot_id >= mParams.numRobots) {
-    LOG(ERROR) << "Input robot ID " << robot_id << " bigger than number of robots!";
+    LOG(ERROR) << "Input robot ID " << robot_id
+               << " bigger than number of robots!";
     return;
   }
   mTeamRobotActive[robot_id] = active;
-  // If this robot is a neighbor, 
-  // activate or deactivate corresponding measurements 
+  // If this robot is a neighbor,
+  // activate or deactivate corresponding measurements
   if (mPoseGraph->hasNeighbor(robot_id)) {
     mPoseGraph->setNeighborActive(robot_id, active);
   }
@@ -1211,4 +1282,4 @@ bool PGOAgent::anchorFirstPose(const LiftedPose &prior) {
   return true;
 }
 
-}  // namespace DCORA
+} // namespace DCORA
