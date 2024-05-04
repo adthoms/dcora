@@ -35,9 +35,10 @@ LiftedSEVariable::LiftedSEVariable(unsigned int r, unsigned int d,
   }
 }
 
-LiftedSEVariable::LiftedSEVariable(const LiftedPoseArray &poses)
-    : LiftedSEVariable(poses.r(), poses.d(), poses.n()) {
-  setData(poses.getData());
+LiftedSEVariable::LiftedSEVariable(const LiftedPoseArray &liftedPoseArray)
+    : LiftedSEVariable(liftedPoseArray.r(), liftedPoseArray.d(),
+                       liftedPoseArray.n()) {
+  setData(liftedPoseArray.getData());
 }
 
 LiftedSEVariable::LiftedSEVariable(const LiftedSEVariable &other)
@@ -129,15 +130,12 @@ LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d,
   X_RA_ = createRAMatrix(X_SE_R, X_OB_, X_SE_t, X_E_);
 }
 
-LiftedRAVariable::LiftedRAVariable(const LiftedRangeAidedArray &rangeAidedArray)
-    : LiftedRAVariable(rangeAidedArray.r(), rangeAidedArray.d(),
-                       rangeAidedArray.n(), rangeAidedArray.l(),
-                       rangeAidedArray.b()) {
-  auto [X_SE_R, X_SE_t] = partitionSEMatrix(
-      rangeAidedArray.GetLiftedPoseArray()->getData(), r_, d_, n_);
-  Matrix X_OB = rangeAidedArray.GetLiftedRangeArray()->getData();
-  Matrix X_E = rangeAidedArray.GetLiftedLandmarkArray()->getData();
-  setData(createRAMatrix(X_SE_R, X_OB, X_SE_t, X_E));
+LiftedRAVariable::LiftedRAVariable(
+    const LiftedRangeAidedArray &liftedRangeAidedArray)
+    : LiftedRAVariable(liftedRangeAidedArray.r(), liftedRangeAidedArray.d(),
+                       liftedRangeAidedArray.n(), liftedRangeAidedArray.l(),
+                       liftedRangeAidedArray.b()) {
+  setData(liftedRangeAidedArray.getData());
 }
 
 LiftedRAVariable::LiftedRAVariable(const LiftedRAVariable &other)
