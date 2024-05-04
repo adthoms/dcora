@@ -53,6 +53,42 @@ std::string InitializationMethodToString(InitializationMethod method) {
   return "";
 }
 
+std::string StateTypeToString(const StateType &type) {
+  switch (type) {
+  case StateType::None: {
+    return "None";
+  }
+  case StateType::Pose: {
+    return "Pose";
+  }
+  case StateType::Point: {
+    return "Point";
+  }
+  }
+  return "";
+}
+
+std::string MeasurementTypeToString(const MeasurementType &type) {
+  switch (type) {
+  case MeasurementType::PosePrior: {
+    return "PosePrior";
+  }
+  case MeasurementType::PointPrior: {
+    return "PointPrior";
+  }
+  case MeasurementType::PosePose: {
+    return "PosePose";
+  }
+  case MeasurementType::PosePoint: {
+    return "PosePoint";
+  }
+  case MeasurementType::Range: {
+    return "Range";
+  }
+  }
+  return "";
+}
+
 void SimpleTimer::tic() { t_start = std::chrono::high_resolution_clock::now(); }
 
 double SimpleTimer::toc() {
