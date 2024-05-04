@@ -90,8 +90,8 @@ void robustSinglePoseAveraging(Matrix *ROpt, Vector *tOpt,
  * @return trajectory estimate in matrix form T = [R1 t1 ... Rn tn] in an
  * arbitrary frame
  */
-PoseArray
-chordalInitialization(const std::vector<RelativeSEMeasurement> &measurements);
+PoseArray chordalInitialization(
+    const std::vector<RelativePosePoseMeasurement> &measurements);
 
 /**
  * @brief Initialize local trajectory estimate from odometry,
@@ -102,7 +102,7 @@ chordalInitialization(const std::vector<RelativeSEMeasurement> &measurements);
  * arbitrary frame
  */
 PoseArray
-odometryInitialization(const std::vector<RelativeSEMeasurement> &odometry,
+odometryInitialization(const std::vector<RelativePosePoseMeasurement> &odometry,
                        const PoseArray *partial_trajectory = nullptr);
 
 /**
@@ -113,7 +113,7 @@ odometryInitialization(const std::vector<RelativeSEMeasurement> &odometry,
  * @param T0
  * @return
  */
-PoseArray solvePGO(const std::vector<RelativeSEMeasurement> &measurements,
+PoseArray solvePGO(const std::vector<RelativePosePoseMeasurement> &measurements,
                    const ROptParameters &params, const PoseArray *T0 = nullptr);
 
 struct solveRobustPGOParams {
@@ -136,7 +136,7 @@ public:
  * @return
  */
 PoseArray
-solveRobustPGO(std::vector<RelativeSEMeasurement> *mutable_measurements,
+solveRobustPGO(std::vector<RelativePosePoseMeasurement> *mutable_measurements,
                const solveRobustPGOParams &params,
                const PoseArray *T0 = nullptr);
 

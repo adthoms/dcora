@@ -215,8 +215,8 @@ void robustSinglePoseAveraging(Matrix *ROpt, Vector *tOpt,
   }
 }
 
-PoseArray
-chordalInitialization(const std::vector<RelativeSEMeasurement> &measurements) {
+PoseArray chordalInitialization(
+    const std::vector<RelativePosePoseMeasurement> &measurements) {
   size_t dimension, num_poses;
   get_dimension_and_num_poses(measurements, &dimension, &num_poses);
   SparseMatrix B1, B2, B3;
@@ -268,7 +268,7 @@ chordalInitialization(const std::vector<RelativeSEMeasurement> &measurements) {
 }
 
 PoseArray
-odometryInitialization(const std::vector<RelativeSEMeasurement> &odometry,
+odometryInitialization(const std::vector<RelativePosePoseMeasurement> &odometry,
                        const PoseArray *partial_trajectory) {
   size_t dimension, num_poses;
   get_dimension_and_num_poses(odometry, &dimension, &num_poses);
@@ -289,7 +289,7 @@ odometryInitialization(const std::vector<RelativeSEMeasurement> &odometry,
   // Initialize the remaining poses using odometry
   for (size_t dst = next_index; dst < num_poses; ++dst) {
     size_t src = dst - 1;
-    const RelativeSEMeasurement &m = odometry[src];
+    const RelativePosePoseMeasurement &m = odometry[src];
     CHECK(m.p1 == src);
     CHECK(m.p2 == dst);
     const Matrix Rsrc = T.rotation(src);
@@ -301,7 +301,7 @@ odometryInitialization(const std::vector<RelativeSEMeasurement> &odometry,
   return T;
 }
 
-PoseArray solvePGO(const std::vector<RelativeSEMeasurement> &measurements,
+PoseArray solvePGO(const std::vector<RelativePosePoseMeasurement> &measurements,
                    const ROptParameters &params, const PoseArray *T0) {
   size_t dimension, num_poses, robot_id;
   get_dimension_and_num_poses(measurements, &dimension, &num_poses);
@@ -330,7 +330,7 @@ PoseArray solvePGO(const std::vector<RelativeSEMeasurement> &measurements,
 }
 
 PoseArray
-solveRobustPGO(std::vector<RelativeSEMeasurement> *mutable_measurements,
+solveRobustPGO(std::vector<RelativePosePoseMeasurement> *mutable_measurements,
                const solveRobustPGOParams &params, const PoseArray *T0) {
   size_t dimension, num_poses;
   get_dimension_and_num_poses(*mutable_measurements, &dimension, &num_poses);
@@ -340,7 +340,7 @@ solveRobustPGO(std::vector<RelativeSEMeasurement> *mutable_measurements,
   PoseArray T = solvePGO(*mutable_measurements, params.opt_params, T0);
   Vector rSqVec = Vector::Zero(m);
   for (int i = 0; i < m; ++i) {
-    RelativeSEMeasurement &meas = mutable_measurements->at(i);
+    RelativePosePoseMeasurement &meas = mutable_measurements->at(i);
     meas.weight = 1.0;
     rSqVec(i) = computeMeasurementError(
         meas, T.rotation(meas.p1), T.translation(meas.p1), T.rotation(meas.p2),
@@ -368,7 +368,7 @@ solveRobustPGO(std::vector<RelativeSEMeasurement> *mutable_measurements,
       T = solvePGO(*mutable_measurements, params.opt_params, T0);
       // Update weight
       for (int i = 0; i < m; ++i) {
-        RelativeSEMeasurement &meas = mutable_measurements->at(i);
+        RelativePosePoseMeasurement &meas = mutable_measurements->at(i);
         if (meas.fixedWeight)
           continue;
         double rSq = computeMeasurementError(

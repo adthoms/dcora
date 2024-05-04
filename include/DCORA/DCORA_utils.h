@@ -78,8 +78,8 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
  * @param num_poses
  * @return
  */
-std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
-                                                 size_t *num_poses);
+std::vector<RelativePosePoseMeasurement>
+read_g2o_file(const std::string &filename, size_t *num_poses);
 
 /**
  * @brief Get the dimension and number of poses from a vector of relative pose
@@ -89,8 +89,8 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
  * @param num_poses
  */
 void get_dimension_and_num_poses(
-    const std::vector<RelativeSEMeasurement> &measurements, size_t *dimension,
-    size_t *num_poses);
+    const std::vector<RelativePosePoseMeasurement> &measurements,
+    size_t *dimension, size_t *num_poses);
 
 /**
  * @brief Helper function to construct connection laplacian matrix in SE(d)
@@ -99,8 +99,8 @@ void get_dimension_and_num_poses(
  * @param OmegaT
  */
 void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix *AT,
-    DiagonalMatrix *OmegaT);
+    const std::vector<RelativePosePoseMeasurement> &measurements,
+    SparseMatrix *AT, DiagonalMatrix *OmegaT);
 
 /**
  * @brief Helper function to construct connection laplacian matrix in SE(d)
@@ -108,7 +108,7 @@ void constructOrientedConnectionIncidenceMatrixSE(
  * @return
  */
 SparseMatrix constructConnectionLaplacianSE(
-    const std::vector<RelativeSEMeasurement> &measurements);
+    const std::vector<RelativePosePoseMeasurement> &measurements);
 
 /**
  * @brief Given a vector of relative pose measurements, this function computes
@@ -118,8 +118,9 @@ SparseMatrix constructConnectionLaplacianSE(
  * @param B2
  * @param B3
  */
-void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements,
-                        SparseMatrix *B1, SparseMatrix *B2, SparseMatrix *B3);
+void constructBMatrices(
+    const std::vector<RelativePosePoseMeasurement> &measurements,
+    SparseMatrix *B1, SparseMatrix *B2, SparseMatrix *B3);
 
 /**
  * @brief Given the measurement matrices B1 and B2 and a matrix R of rotational
@@ -214,9 +215,9 @@ Matrix randomObliqueVariable(unsigned r, unsigned l = 1);
  * @param t2 translation of second pose
  * @return
  */
-double computeMeasurementError(const RelativeSEMeasurement &m, const Matrix &R1,
-                               const Matrix &t1, const Matrix &R2,
-                               const Matrix &t2);
+double computeMeasurementError(const RelativePosePoseMeasurement &m,
+                               const Matrix &R1, const Matrix &t1,
+                               const Matrix &R2, const Matrix &t2);
 
 /**
  * @brief Quantile of chi-squared distribution with given degrees of freedom at

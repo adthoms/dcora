@@ -108,30 +108,33 @@ public:
    * @brief Set measurements for this pose graph
    * @param measurements
    */
-  void setMeasurements(const std::vector<RelativeSEMeasurement> &measurements);
+  void
+  setMeasurements(const std::vector<RelativePosePoseMeasurement> &measurements);
   /**
    * @brief Add a single measurement to this pose graph. Ignored if the input
    * measurement already exists.
    * @param m
    */
-  void addMeasurement(const RelativeSEMeasurement &m);
+  void addMeasurement(const RelativePosePoseMeasurement &m);
   /**
    * @brief Return a copy of the list of odometry edges
    * @return
    */
-  std::vector<RelativeSEMeasurement> odometry() const { return odometry_; }
+  std::vector<RelativePosePoseMeasurement> odometry() const {
+    return odometry_;
+  }
   /**
    * @brief Return a copy of the list of private loop closures
    * @return
    */
-  std::vector<RelativeSEMeasurement> privateLoopClosures() const {
+  std::vector<RelativePosePoseMeasurement> privateLoopClosures() const {
     return private_lcs_;
   }
   /**
    * @brief Return a copy of the list of shared loop closures
    * @return
    */
-  std::vector<RelativeSEMeasurement> sharedLoopClosures() const {
+  std::vector<RelativePosePoseMeasurement> sharedLoopClosures() const {
     return shared_lcs_;
   }
   /**
@@ -140,19 +143,19 @@ public:
    * @param neighbor_id
    * @return
    */
-  std::vector<RelativeSEMeasurement>
+  std::vector<RelativePosePoseMeasurement>
   sharedLoopClosuresWithRobot(unsigned neighbor_id) const;
   /**
    * @brief Return a copy of all measurements
    * @return
    */
-  std::vector<RelativeSEMeasurement> measurements() const;
+  std::vector<RelativePosePoseMeasurement> measurements() const;
   /**
    * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot
    * loop closures)
    * @return
    */
-  std::vector<RelativeSEMeasurement> localMeasurements() const;
+  std::vector<RelativePosePoseMeasurement> localMeasurements() const;
   /**
    * @brief Clear all priors
    */
@@ -287,22 +290,22 @@ public:
    * @return writable pointer to the desired measurement (nullptr if measurement
    * does not exists)
    */
-  RelativeSEMeasurement *findMeasurement(const PoseID &srcID,
-                                         const PoseID &dstID);
+  RelativePosePoseMeasurement *findMeasurement(const PoseID &srcID,
+                                               const PoseID &dstID);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
    * pose graph (contains both private and inter-robot loop closures)
    * @return Vector of pointers to all loop closures
    */
-  std::vector<RelativeSEMeasurement *> allLoopClosures();
+  std::vector<RelativePosePoseMeasurement *> allLoopClosures();
   /**
    * @brief Return a vector of pointers to all active loop closures
    */
-  std::vector<RelativeSEMeasurement *> activeLoopClosures();
+  std::vector<RelativePosePoseMeasurement *> activeLoopClosures();
   /**
    * @brief Return a vector of pointers to all inactive loop closures
    */
-  std::vector<RelativeSEMeasurement *> inactiveLoopClosures();
+  std::vector<RelativePosePoseMeasurement *> inactiveLoopClosures();
   /**
    * @brief Set to true to use measurements with inactive neighbors
    */
@@ -316,13 +319,13 @@ protected:
   unsigned int r_, d_, n_;
 
   // Store odometry measurement of this robot
-  std::vector<RelativeSEMeasurement> odometry_;
+  std::vector<RelativePosePoseMeasurement> odometry_;
 
   // Store private loop closures of this robot
-  std::vector<RelativeSEMeasurement> private_lcs_;
+  std::vector<RelativePosePoseMeasurement> private_lcs_;
 
   // Store shared loop closure measurements
-  std::vector<RelativeSEMeasurement> shared_lcs_;
+  std::vector<RelativePosePoseMeasurement> shared_lcs_;
 
   // Store the set of public poses that need to be sent to other robots
   PoseSet local_shared_pose_ids_;
@@ -357,19 +360,19 @@ protected:
    * @brief Add odometry edge. Ignored if the input measurement already exists.
    * @param factor
    */
-  void addOdometry(const RelativeSEMeasurement &factor);
+  void addOdometry(const RelativePosePoseMeasurement &factor);
   /**
    * @brief Add private loop closure. Ignored if the input measurement already
    * exists.
    * @param factor
    */
-  void addPrivateLoopClosure(const RelativeSEMeasurement &factor);
+  void addPrivateLoopClosure(const RelativePosePoseMeasurement &factor);
   /**
    * @brief Add shared loop closure. Ignored if the input measurement already
    * exists.
    * @param factor
    */
-  void addSharedLoopClosure(const RelativeSEMeasurement &factor);
+  void addSharedLoopClosure(const RelativePosePoseMeasurement &factor);
   /**
    * @brief Construct the quadratic cost matrix
    * @return

@@ -64,24 +64,24 @@ TEST(testDCORA, OptimizationThreadTriangleGraph) {
   DCORA::Matrix Ttrue(d, 3 * (d + 1));
   Ttrue << Tw0, Tw1, Tw2;
 
-  std::vector<DCORA::RelativeSEMeasurement> odometry;
-  std::vector<DCORA::RelativeSEMeasurement> private_loop_closures;
-  std::vector<DCORA::RelativeSEMeasurement> shared_loop_closures;
+  std::vector<DCORA::RelativePosePoseMeasurement> odometry;
+  std::vector<DCORA::RelativePosePoseMeasurement> private_loop_closures;
+  std::vector<DCORA::RelativePosePoseMeasurement> shared_loop_closures;
 
   DCORA::Matrix dT;
   dT = Tw0.inverse() * Tw1;
-  DCORA::RelativeSEMeasurement m01(id, id, 0, 1, dT.block(0, 0, d, d),
-                                   dT.block(0, d, d, 1), 1.0, 1.0);
+  DCORA::RelativePosePoseMeasurement m01(id, id, 0, 1, dT.block(0, 0, d, d),
+                                         dT.block(0, d, d, 1), 1.0, 1.0);
   odometry.push_back(m01);
 
   dT = Tw1.inverse() * Tw2;
-  DCORA::RelativeSEMeasurement m12(id, id, 1, 2, dT.block(0, 0, d, d),
-                                   dT.block(0, d, d, 1), 1.0, 1.0);
+  DCORA::RelativePosePoseMeasurement m12(id, id, 1, 2, dT.block(0, 0, d, d),
+                                         dT.block(0, d, d, 1), 1.0, 1.0);
   odometry.push_back(m12);
 
   dT = Tw0.inverse() * Tw2;
-  DCORA::RelativeSEMeasurement m02(id, id, 0, 2, dT.block(0, 0, d, d),
-                                   dT.block(0, d, d, 1), 1.0, 1.0);
+  DCORA::RelativePosePoseMeasurement m02(id, id, 0, 2, dT.block(0, 0, d, d),
+                                         dT.block(0, d, d, 1), 1.0, 1.0);
   private_loop_closures.push_back(m02);
 
   agent.setMeasurements(odometry, private_loop_closures, shared_loop_closures);

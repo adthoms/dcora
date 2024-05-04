@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
   std::cout << "Single robot pose-graph optimization demo. " << std::endl;
 
   size_t num_poses;
-  std::vector<DCORA::RelativeSEMeasurement> dataset =
+  std::vector<DCORA::RelativePosePoseMeasurement> dataset =
       DCORA::read_g2o_file(argv[1], &num_poses);
 
   /**
@@ -54,15 +54,15 @@ int main(int argc, char **argv) {
   DCORA::PGOAgentParameters options(d, r, 1);
   options.verbose = true;
 
-  std::vector<DCORA::RelativeSEMeasurement> odometry;
-  std::vector<DCORA::RelativeSEMeasurement> private_loop_closures;
-  std::vector<DCORA::RelativeSEMeasurement> shared_loop_closure;
+  std::vector<DCORA::RelativePosePoseMeasurement> odometry;
+  std::vector<DCORA::RelativePosePoseMeasurement> private_loop_closures;
+  std::vector<DCORA::RelativePosePoseMeasurement> shared_loop_closure;
   for (const auto &mIn : dataset) {
     unsigned srcIdx = mIn.p1;
     unsigned dstIdx = mIn.p2;
 
-    DCORA::RelativeSEMeasurement m(0, 0, srcIdx, dstIdx, mIn.R, mIn.t,
-                                   mIn.kappa, mIn.tau);
+    DCORA::RelativePosePoseMeasurement m(0, 0, srcIdx, dstIdx, mIn.R, mIn.t,
+                                         mIn.kappa, mIn.tau);
 
     if (srcIdx + 1 == dstIdx) {
       // Odometry

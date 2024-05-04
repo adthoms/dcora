@@ -23,12 +23,12 @@ TEST(testDCORA, LineGraph) {
   DCORA::Matrix R = DCORA::Matrix::Identity(d, d);
   DCORA::Matrix t = DCORA::Matrix::Random(d, 1);
 
-  std::vector<DCORA::RelativeSEMeasurement> odometry;
-  std::vector<DCORA::RelativeSEMeasurement> private_loop_closures;
-  std::vector<DCORA::RelativeSEMeasurement> shared_loop_closures;
+  std::vector<DCORA::RelativePosePoseMeasurement> odometry;
+  std::vector<DCORA::RelativePosePoseMeasurement> private_loop_closures;
+  std::vector<DCORA::RelativePosePoseMeasurement> shared_loop_closures;
   DCORA::PGOAgent agent(id, options);
   for (unsigned int i = 0; i < 4; ++i) {
-    DCORA::RelativeSEMeasurement m(id, id, i, i + 1, R, t, 1.0, 1.0);
+    DCORA::RelativePosePoseMeasurement m(id, id, i, i + 1, R, t, 1.0, 1.0);
     odometry.push_back(m);
   }
   agent.setMeasurements(odometry, private_loop_closures, shared_loop_closures);

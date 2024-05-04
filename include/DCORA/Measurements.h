@@ -22,7 +22,7 @@ namespace DCORA {
  * @brief A simple struct that contains the elements of a relative SE
  * measurement from pose (r1, p1) to (r2, p2)
  */
-struct RelativeSEMeasurement {
+struct RelativePosePoseMeasurement {
   // 0-based index of first robot
   size_t r1;
 
@@ -54,15 +54,15 @@ struct RelativeSEMeasurement {
   double weight;
 
   // Simple default constructor; does nothing
-  RelativeSEMeasurement() = default;
+  RelativePosePoseMeasurement() = default;
 
   // Basic constructor
-  RelativeSEMeasurement(size_t first_robot, size_t second_robot,
-                        size_t first_pose, size_t second_pose,
-                        const Eigen::MatrixXd &relative_rotation,
-                        const Eigen::VectorXd &relative_translation,
-                        double rotational_precision,
-                        double translational_precision)
+  RelativePosePoseMeasurement(size_t first_robot, size_t second_robot,
+                              size_t first_pose, size_t second_pose,
+                              const Eigen::MatrixXd &relative_rotation,
+                              const Eigen::VectorXd &relative_translation,
+                              double rotational_precision,
+                              double translational_precision)
       : r1(first_robot),
         r2(second_robot),
         p1(first_pose),
@@ -76,7 +76,7 @@ struct RelativeSEMeasurement {
 
   // A utility function for streaming this struct to cout
   inline friend std::ostream &
-  operator<<(std::ostream &os, const RelativeSEMeasurement &measurement) {
+  operator<<(std::ostream &os, const RelativePosePoseMeasurement &measurement) {
     os << "r1: " << measurement.r1 << std::endl;
     os << "p1: " << measurement.p1 << std::endl;
     os << "r2: " << measurement.r2 << std::endl;

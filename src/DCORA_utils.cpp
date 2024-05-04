@@ -118,13 +118,13 @@ Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
 ###############################################################
 */
 
-std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
-                                                 size_t *num_poses) {
+std::vector<RelativePosePoseMeasurement>
+read_g2o_file(const std::string &filename, size_t *num_poses) {
   // Preallocate output vector
-  std::vector<DCORA::RelativeSEMeasurement> measurements;
+  std::vector<DCORA::RelativePosePoseMeasurement> measurements;
 
   // A single measurement, whose values we will fill in
-  DCORA::RelativeSEMeasurement measurement;
+  DCORA::RelativePosePoseMeasurement measurement;
   measurement.weight = 1.0;
 
   // A string used to contain the contents of a single line
@@ -265,8 +265,8 @@ std::vector<RelativeSEMeasurement> read_g2o_file(const std::string &filename,
 }
 
 void get_dimension_and_num_poses(
-    const std::vector<RelativeSEMeasurement> &measurements, size_t *dimension,
-    size_t *num_poses) {
+    const std::vector<RelativePosePoseMeasurement> &measurements,
+    size_t *dimension, size_t *num_poses) {
   CHECK(!measurements.empty());
   *dimension = measurements[0].t.size();
   CHECK(*dimension == 2 || *dimension == 3);
@@ -278,8 +278,8 @@ void get_dimension_and_num_poses(
 }
 
 void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativeSEMeasurement> &measurements, SparseMatrix *AT,
-    DiagonalMatrix *OmegaT) {
+    const std::vector<RelativePosePoseMeasurement> &measurements,
+    SparseMatrix *AT, DiagonalMatrix *OmegaT) {
   // Deduce graph dimensions from measurements
   size_t d; // Dimension of Euclidean space
   d = (!measurements.empty() ? measurements[0].t.size() : 0);
@@ -287,7 +287,7 @@ void constructOrientedConnectionIncidenceMatrixSE(
   size_t m;          // Number of measurements
   m = measurements.size();
   size_t n = 0; // Number of poses
-  for (const RelativeSEMeasurement &meas : measurements) {
+  for (const RelativePosePoseMeasurement &meas : measurements) {
     if (n < meas.p1)
       n = meas.p1;
     if (n < meas.p2)
@@ -310,7 +310,7 @@ void constructOrientedConnectionIncidenceMatrixSE(
   // Insert actual measurement values
   size_t i, j;
   for (size_t k = 0; k < m; k++) {
-    const RelativeSEMeasurement &meas = measurements[k];
+    const RelativePosePoseMeasurement &meas = measurements[k];
     i = meas.p1;
     j = meas.p2;
 
@@ -348,15 +348,16 @@ void constructOrientedConnectionIncidenceMatrixSE(
 }
 
 SparseMatrix constructConnectionLaplacianSE(
-    const std::vector<RelativeSEMeasurement> &measurements) {
+    const std::vector<RelativePosePoseMeasurement> &measurements) {
   SparseMatrix AT;
   DiagonalMatrix OmegaT;
   constructOrientedConnectionIncidenceMatrixSE(measurements, &AT, &OmegaT);
   return AT * OmegaT * AT.transpose();
 }
 
-void constructBMatrices(const std::vector<RelativeSEMeasurement> &measurements,
-                        SparseMatrix *B1, SparseMatrix *B2, SparseMatrix *B3) {
+void constructBMatrices(
+    const std::vector<RelativePosePoseMeasurement> &measurements,
+    SparseMatrix *B1, SparseMatrix *B2, SparseMatrix *B3) {
   // Clear input matrices
   B1->setZero();
   B2->setZero();
@@ -540,9 +541,9 @@ Matrix randomObliqueVariable(unsigned r, unsigned l) {
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, l);
 }
 
-double computeMeasurementError(const RelativeSEMeasurement &m, const Matrix &R1,
-                               const Matrix &t1, const Matrix &R2,
-                               const Matrix &t2) {
+double computeMeasurementError(const RelativePosePoseMeasurement &m,
+                               const Matrix &R1, const Matrix &t1,
+                               const Matrix &R2, const Matrix &t2) {
   double rotationErrorSq = (R1 * m.R - R2).squaredNorm();
   double translationErrorSq = (t2 - t1 - R1 * m.t).squaredNorm();
   return m.kappa * rotationErrorSq + m.tau * translationErrorSq;

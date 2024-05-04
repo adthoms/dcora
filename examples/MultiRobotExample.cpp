@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   std::cout << "Simulating " << num_robots << " robots." << std::endl;
 
   size_t num_poses;
-  std::vector<DCORA::RelativeSEMeasurement> dataset =
+  std::vector<DCORA::RelativePosePoseMeasurement> dataset =
       DCORA::read_g2o_file(argv[2], &num_poses);
   std::cout << "Loaded dataset from file " << argv[2] << "." << std::endl;
 
@@ -93,11 +93,12 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::vector<std::vector<DCORA::RelativeSEMeasurement>> odometry(num_robots);
-  std::vector<std::vector<DCORA::RelativeSEMeasurement>> private_loop_closures(
+  std::vector<std::vector<DCORA::RelativePosePoseMeasurement>> odometry(
       num_robots);
-  std::vector<std::vector<DCORA::RelativeSEMeasurement>> shared_loop_closure(
-      num_robots);
+  std::vector<std::vector<DCORA::RelativePosePoseMeasurement>>
+      private_loop_closures(num_robots);
+  std::vector<std::vector<DCORA::RelativePosePoseMeasurement>>
+      shared_loop_closure(num_robots);
   for (auto mIn : dataset) {
     DCORA::PoseID src = PoseMap[mIn.p1];
     DCORA::PoseID dst = PoseMap[mIn.p2];
@@ -107,8 +108,8 @@ int main(int argc, char **argv) {
     unsigned dstRobot = dst.robot_id;
     unsigned dstIdx = dst.frame_id;
 
-    DCORA::RelativeSEMeasurement m(srcRobot, dstRobot, srcIdx, dstIdx, mIn.R,
-                                   mIn.t, mIn.kappa, mIn.tau);
+    DCORA::RelativePosePoseMeasurement m(srcRobot, dstRobot, srcIdx, dstIdx,
+                                         mIn.R, mIn.t, mIn.kappa, mIn.tau);
 
     if (srcRobot == dstRobot) {
       // private measurement

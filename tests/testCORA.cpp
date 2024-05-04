@@ -156,7 +156,7 @@ TEST(testDCORA, testPrior) {
   size_t robot_id = 0;
 
   // Odometry measurement
-  DCORA::RelativeSEMeasurement m;
+  DCORA::RelativePosePoseMeasurement m;
   m.r1 = 0;
   m.p1 = 0;
   m.r2 = 0;
@@ -167,7 +167,7 @@ TEST(testDCORA, testPrior) {
   m.tau = 100;
   m.weight = 1;
   m.fixedWeight = true;
-  std::vector<DCORA::RelativeSEMeasurement> measurements;
+  std::vector<DCORA::RelativePosePoseMeasurement> measurements;
   measurements.push_back(m);
 
   DCORA::PoseArray T(dimension, num_poses);
@@ -228,14 +228,14 @@ TEST(testDCORA, testRobustPGO) {
     Ti.translation() = i * Eigen::Vector3d::Ones();
     poses_gt.push_back(Ti);
   }
-  std::vector<DCORA::RelativeSEMeasurement> measurements;
+  std::vector<DCORA::RelativePosePoseMeasurement> measurements;
   // generate odometry
   for (int i = 0; i < n - 1; ++i) {
     int j = i + 1;
     DCORA::Pose Ti = poses_gt[i];
     DCORA::Pose Tj = poses_gt[j];
     DCORA::Pose Tij = Ti.inverse() * Tj;
-    DCORA::RelativeSEMeasurement m;
+    DCORA::RelativePosePoseMeasurement m;
     m.r1 = 0;
     m.r2 = 0;
     m.p1 = i;
@@ -251,7 +251,7 @@ TEST(testDCORA, testRobustPGO) {
   DCORA::Pose Ti = poses_gt[0];
   DCORA::Pose Tj = poses_gt[3];
   DCORA::Pose Tij = Ti.inverse() * Tj;
-  DCORA::RelativeSEMeasurement m_inlier;
+  DCORA::RelativePosePoseMeasurement m_inlier;
   m_inlier.r1 = 0;
   m_inlier.r2 = 0;
   m_inlier.p1 = 0;
@@ -263,7 +263,7 @@ TEST(testDCORA, testRobustPGO) {
   m_inlier.t = Tij.translation();
   measurements.push_back(m_inlier);
   // generate a single outlier loop closure
-  DCORA::RelativeSEMeasurement m_outlier;
+  DCORA::RelativePosePoseMeasurement m_outlier;
   m_outlier.r1 = 0;
   m_outlier.r2 = 0;
   m_outlier.p1 = 1;
