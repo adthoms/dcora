@@ -12,7 +12,7 @@
 #pragma once
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/RelativeMeasurement.h>
+#include <DCORA/Measurements.h>
 
 #include <fstream>
 #include <iostream>

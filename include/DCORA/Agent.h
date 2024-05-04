@@ -14,8 +14,8 @@
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_types.h>
 #include <DCORA/Logger.h>
+#include <DCORA/Measurements.h>
 #include <DCORA/QuadraticProblem.h>
-#include <DCORA/RelativeMeasurement.h>
 #include <DCORA/manifold/Elements.h>
 #include <DCORA/manifold/LiftedManifold.h>
 #include <DCORA/manifold/LiftedVariable.h>

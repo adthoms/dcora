@@ -13,7 +13,7 @@
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/DCORA_utils.h>
-#include <DCORA/RelativeMeasurement.h>
+#include <DCORA/Measurements.h>
 #include <DCORA/manifold/Elements.h>
 
 #include <map>
