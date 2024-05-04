@@ -57,6 +57,43 @@ enum class MeasurementType {
 };
 
 /**
+ * @brief PyFg types
+ */
+enum PyFGType {
+  POSE_TYPE_2D,
+  POSE_TYPE_3D,
+  POSE_PRIOR_2D,
+  POSE_PRIOR_3D,
+  LANDMARK_TYPE_2D,
+  LANDMARK_TYPE_3D,
+  LANDMARK_PRIOR_2D,
+  LANDMARK_PRIOR_3D,
+  REL_POSE_POSE_TYPE_2D,
+  REL_POSE_POSE_TYPE_3D,
+  REL_POSE_LANDMARK_TYPE_2D,
+  REL_POSE_LANDMARK_TYPE_3D,
+  RANGE_MEASURE_TYPE,
+};
+
+/**
+ * @brief PyFG string to type dictionary
+ */
+const std::map<std::string, PyFGType> PyFGStringToType{
+    {"VERTEX_SE2", POSE_TYPE_2D},
+    {"VERTEX_SE3:QUAT", POSE_TYPE_3D},
+    {"VERTEX_SE2:PRIOR", POSE_PRIOR_2D},
+    {"VERTEX_SE3:QUAT:PRIOR", POSE_PRIOR_3D},
+    {"VERTEX_XY", LANDMARK_TYPE_2D},
+    {"VERTEX_XYZ", LANDMARK_TYPE_3D},
+    {"VERTEX_XY:PRIOR", LANDMARK_PRIOR_2D},
+    {"VERTEX_XYZ:PRIOR", LANDMARK_PRIOR_3D},
+    {"EDGE_SE2", REL_POSE_POSE_TYPE_2D},
+    {"EDGE_SE3:QUAT", REL_POSE_POSE_TYPE_3D},
+    {"EDGE_SE2_XY", REL_POSE_LANDMARK_TYPE_2D},
+    {"EDGE_SE3_XYZ", REL_POSE_LANDMARK_TYPE_3D},
+    {"EDGE_RANGE", RANGE_MEASURE_TYPE}};
+
+/**
  * @brief Convert initialization method to string
  * @param method
  * @return
