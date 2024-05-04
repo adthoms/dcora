@@ -447,8 +447,8 @@ public:
 };
 
 // Ordered map of PoseID to LiftedPose object
-typedef std::map<PoseID, LiftedPose, ComparePoseID> PoseDict;
+typedef std::map<PoseID, LiftedPose, CompareStateID> PoseDict;
 // Ordered set of PoseID
-typedef std::set<PoseID, ComparePoseID> PoseSet;
+typedef std::set<PoseID, CompareStateID> PoseSet;
 
 } // namespace DCORA

@@ -19,7 +19,7 @@ namespace DCORA {
 PGOLogger::PGOLogger(std::string logDir) : logDirectory(std::move(logDir)) {}
 
 void PGOLogger::logMeasurements(
-    std::vector<RelativeSEMeasurement> *measurements,
+    std::vector<RelativePosePoseMeasurement> *measurements,
     const std::string &filename) {
   if (measurements->empty())
     return;
@@ -37,7 +37,7 @@ void PGOLogger::logMeasurements(
   file << "robot_src,pose_src,robot_dst,pose_dst,qx,qy,qz,qw,tx,ty,tz,kappa,"
           "tau,is_known_inlier,weight\n";
 
-  for (RelativeSEMeasurement m : *measurements) {
+  for (RelativePosePoseMeasurement m : *measurements) {
     // Convert rotation matrix to quaternion
     Eigen::Matrix3d R = m.R;
     Eigen::Quaternion<double> quat(R);
@@ -158,9 +158,9 @@ Matrix PGOLogger::loadTrajectory(const std::string &filename) {
   return T;
 }
 
-std::vector<RelativeSEMeasurement>
+std::vector<RelativePosePoseMeasurement>
 PGOLogger::loadMeasurements(const std::string &filename, bool load_weight) {
-  std::vector<RelativeSEMeasurement> measurements;
+  std::vector<RelativePosePoseMeasurement> measurements;
   std::cout << "Loading measurements from " << filename << "..." << std::endl;
   std::ifstream infile(filename);
 
@@ -224,8 +224,8 @@ PGOLogger::loadMeasurements(const std::string &filename, bool load_weight) {
     std::getline(ss, token, ',');
     weight = std::stod(token);
 
-    RelativeSEMeasurement m(robot_src, robot_dst, pose_src, pose_dst,
-                            quat.toRotationMatrix(), tVec, kappa, tau);
+    RelativePosePoseMeasurement m(robot_src, robot_dst, pose_src, pose_dst,
+                                  quat.toRotationMatrix(), tVec, kappa, tau);
     m.fixedWeight = fixed_weight;
     if (load_weight)
       m.weight = weight;

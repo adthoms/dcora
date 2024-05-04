@@ -12,7 +12,7 @@
 #pragma once
 
 #include <DCORA/DCORA_types.h>
-#include <DCORA/RelativeMeasurement.h>
+#include <DCORA/Measurements.h>
 
 #include <fstream>
 #include <iostream>
@@ -49,7 +49,7 @@ public:
    * @param measurements a vector of relative pose measurements
    * @param filename
    */
-  void logMeasurements(std::vector<RelativeSEMeasurement> *measurements,
+  void logMeasurements(std::vector<RelativePosePoseMeasurement> *measurements,
                        const std::string &filename);
 
   /**
@@ -65,7 +65,7 @@ public:
    * @param load_weight
    * @return
    */
-  static std::vector<RelativeSEMeasurement>
+  static std::vector<RelativePosePoseMeasurement>
   loadMeasurements(const std::string &filename, bool load_weight = false);
 
 private:

@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
          "non-convexity (GNC). "
       << std::endl;
   size_t num_poses;
-  std::vector<DCORA::RelativeSEMeasurement> measurements =
+  std::vector<DCORA::RelativePosePoseMeasurement> measurements =
       DCORA::read_g2o_file(argv[1], &num_poses);
   CHECK(!measurements.empty());
   unsigned int dimension = measurements[0].t.size();

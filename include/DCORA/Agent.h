@@ -14,8 +14,8 @@
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_types.h>
 #include <DCORA/Logger.h>
+#include <DCORA/Measurements.h>
 #include <DCORA/QuadraticProblem.h>
-#include <DCORA/RelativeMeasurement.h>
 #include <DCORA/manifold/Elements.h>
 #include <DCORA/manifold/LiftedManifold.h>
 #include <DCORA/manifold/LiftedVariable.h>
@@ -258,16 +258,16 @@ public:
    * @param inputSharedLoopClosures
    */
   void setMeasurements(
-      const std::vector<RelativeSEMeasurement> &inputOdometry,
-      const std::vector<RelativeSEMeasurement> &inputPrivateLoopClosures,
-      const std::vector<RelativeSEMeasurement> &inputSharedLoopClosures);
+      const std::vector<RelativePosePoseMeasurement> &inputOdometry,
+      const std::vector<RelativePosePoseMeasurement> &inputPrivateLoopClosures,
+      const std::vector<RelativePosePoseMeasurement> &inputSharedLoopClosures);
 
   /**
    * @brief Add a single measurement to this agent's pose graph. Do nothing if
    * the input factor already exists.
    * @param factor
    */
-  void addMeasurement(const RelativeSEMeasurement &factor);
+  void addMeasurement(const RelativePosePoseMeasurement &factor);
 
   /**
    * @brief Perform local initialization for this robot. After this function
@@ -754,8 +754,9 @@ protected:
    * @param residual The output residual
    * @return
    */
-  bool computeMeasurementResidual(const RelativeSEMeasurement &measurement,
-                                  double *residual) const;
+  bool
+  computeMeasurementResidual(const RelativePosePoseMeasurement &measurement,
+                             double *residual) const;
 
   /**
    * @brief Set weight for measurement in the pose graph. Return false if the
@@ -865,7 +866,7 @@ private:
    * @param neighbor_pose
    * @return
    */
-  Pose computeNeighborTransform(const RelativeSEMeasurement &measurement,
+  Pose computeNeighborTransform(const RelativePosePoseMeasurement &measurement,
                                 const LiftedPose &neighbor_pose);
 };
 

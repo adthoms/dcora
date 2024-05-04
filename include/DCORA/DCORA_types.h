@@ -41,11 +41,41 @@ typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
 enum class InitializationMethod { Odometry, Chordal, GNC_TLS };
 
 /**
+ * @brief State types
+ */
+enum class StateType { None, Pose, Point };
+
+/**
+ * @brief Measurement types
+ */
+enum class MeasurementType {
+  PosePrior,
+  PointPrior,
+  PosePose,
+  PosePoint,
+  Range
+};
+
+/**
  * @brief Convert initialization method to string
  * @param method
  * @return
  */
 std::string InitializationMethodToString(InitializationMethod method);
+
+/**
+ * @brief Convert state type to string
+ * @param type
+ * @return
+ */
+std::string StateTypeToString(const StateType &type);
+
+/**
+ * @brief Convert measurement type to string
+ * @param type
+ * @return
+ */
+std::string MeasurementTypeToString(const MeasurementType &type);
 
 /**
  * @brief Parameter settings for Riemannian optimization
@@ -121,50 +151,70 @@ struct ROPTResult {
                                    // (only used by trust region solver)
 };
 
-// Each pose is uniquely determined by the robot ID and frame ID
-class PoseID {
+// Each state is uniquely determined by the robot ID and frame ID
+class StateID {
 public:
+  StateType state_type;  // state type
   unsigned int robot_id; // robot ID
   unsigned int frame_id; // frame ID
-  explicit PoseID(unsigned int rid = 0, unsigned int fid = 0)
-      : robot_id(rid), frame_id(fid) {}
-  PoseID(const PoseID &other)
-      : robot_id(other.robot_id), frame_id(other.frame_id) {}
-  bool operator==(const PoseID &other) const {
-    return (robot_id == other.robot_id && frame_id == other.frame_id);
+  explicit StateID(const StateType &type = StateType::None,
+                   unsigned int rid = 0, unsigned int fid = 0)
+      : state_type(type), robot_id(rid), frame_id(fid) {}
+  StateID(const StateID &other)
+      : state_type(other.state_type),
+        robot_id(other.robot_id),
+        frame_id(other.frame_id) {}
+  bool operator==(const StateID &other) const {
+    return (state_type == other.state_type && robot_id == other.robot_id &&
+            frame_id == other.frame_id);
   }
+  bool isPose() const { return state_type == StateType::Pose; }
+  bool isPoint() const { return state_type == StateType::Point; }
 };
 
-// Comparator for PoseID
-struct ComparePoseID {
-  bool operator()(const PoseID &a, const PoseID &b) const {
-    auto pa = std::make_pair(a.robot_id, a.frame_id);
-    auto pb = std::make_pair(b.robot_id, b.frame_id);
+class PoseID : public StateID {
+public:
+  explicit PoseID(unsigned int rid = 0, unsigned int fid = 0)
+      : StateID(StateType::Pose, rid, fid) {}
+};
+
+class PointID : public StateID {
+public:
+  explicit PointID(unsigned int rid = 0, unsigned int fid = 0)
+      : StateID(StateType::Point, rid, fid) {}
+};
+
+// Comparator for StateID
+struct CompareStateID {
+  bool operator()(const StateID &a, const StateID &b) const {
+    auto pa = std::make_tuple(a.state_type, a.robot_id, a.frame_id);
+    auto pb = std::make_tuple(b.state_type, b.robot_id, b.frame_id);
     return pa < pb;
   }
 };
 
-// Edge measurement (edge) is uniquely determined by an ordered pair of poses
+// Edge measurement (edge) is uniquely determined by an ordered pair of states
 class EdgeID {
 public:
-  PoseID src_pose_id;
-  PoseID dst_pose_id;
-  EdgeID(const PoseID &src_id, const PoseID &dst_id)
-      : src_pose_id(src_id), dst_pose_id(dst_id) {}
+  StateID src_state_id;
+  StateID dst_state_id;
+  EdgeID(const StateID &srcId, const StateID &dstId)
+      : src_state_id(srcId), dst_state_id(dstId) {}
   bool operator==(const EdgeID &other) const {
-    return (src_pose_id == other.src_pose_id &&
-            dst_pose_id == other.dst_pose_id);
+    return (src_state_id == other.src_state_id &&
+            dst_state_id == other.dst_state_id);
   }
   bool isOdometry() const {
-    return (src_pose_id.robot_id == dst_pose_id.robot_id &&
-            src_pose_id.frame_id + 1 == dst_pose_id.frame_id);
+    return (src_state_id.state_type == StateType::Pose &&
+            dst_state_id.state_type == StateType::Pose &&
+            src_state_id.robot_id == dst_state_id.robot_id &&
+            src_state_id.frame_id + 1 == dst_state_id.frame_id);
   }
   bool isPrivateLoopClosure() const {
-    return (src_pose_id.robot_id == dst_pose_id.robot_id &&
-            src_pose_id.frame_id + 1 != dst_pose_id.frame_id);
+    return (src_state_id.robot_id == dst_state_id.robot_id && !isOdometry());
   }
   bool isSharedLoopClosure() const {
-    return src_pose_id.robot_id != dst_pose_id.robot_id;
+    return src_state_id.robot_id != dst_state_id.robot_id;
   }
 };
 
@@ -173,11 +223,13 @@ struct CompareEdgeID {
   bool operator()(const EdgeID &a, const EdgeID &b) const {
     // Treat edge ID as an ordered tuple
     const auto ta =
-        std::make_tuple(a.src_pose_id.robot_id, a.dst_pose_id.robot_id,
-                        a.src_pose_id.frame_id, a.dst_pose_id.frame_id);
+        std::make_tuple(a.src_state_id.state_type, a.dst_state_id.state_type,
+                        a.src_state_id.robot_id, a.dst_state_id.robot_id,
+                        a.src_state_id.frame_id, a.dst_state_id.frame_id);
     const auto tb =
-        std::make_tuple(b.src_pose_id.robot_id, b.dst_pose_id.robot_id,
-                        b.src_pose_id.frame_id, b.dst_pose_id.frame_id);
+        std::make_tuple(b.src_state_id.state_type, b.dst_state_id.state_type,
+                        b.src_state_id.robot_id, b.dst_state_id.robot_id,
+                        b.src_state_id.frame_id, b.dst_state_id.frame_id);
     return ta < tb;
   }
 };
@@ -195,10 +247,12 @@ struct HashEdgeID {
 
     // Modify 'seed' by XORing and bit-shifting in
     // one member of 'Key' after the other:
-    hash_combine(seed, hash_value(edge_id.src_pose_id.robot_id));
-    hash_combine(seed, hash_value(edge_id.dst_pose_id.robot_id));
-    hash_combine(seed, hash_value(edge_id.src_pose_id.frame_id));
-    hash_combine(seed, hash_value(edge_id.dst_pose_id.frame_id));
+    hash_combine(seed, hash_value(edge_id.src_state_id.state_type));
+    hash_combine(seed, hash_value(edge_id.dst_state_id.state_type));
+    hash_combine(seed, hash_value(edge_id.src_state_id.robot_id));
+    hash_combine(seed, hash_value(edge_id.dst_state_id.robot_id));
+    hash_combine(seed, hash_value(edge_id.src_state_id.frame_id));
+    hash_combine(seed, hash_value(edge_id.dst_state_id.frame_id));
 
     // Return the result.
     return seed;

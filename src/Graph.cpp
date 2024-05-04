@@ -63,14 +63,14 @@ unsigned int PoseGraph::numMeasurements() const {
 }
 
 void PoseGraph::setMeasurements(
-    const std::vector<RelativeSEMeasurement> &measurements) {
+    const std::vector<RelativePosePoseMeasurement> &measurements) {
   // Reset this pose graph to be empty
   empty();
   for (const auto &m : measurements)
     addMeasurement(m);
 }
 
-void PoseGraph::addMeasurement(const RelativeSEMeasurement &m) {
+void PoseGraph::addMeasurement(const RelativePosePoseMeasurement &m) {
   if (m.r1 != id_ && m.r2 != id_) {
     LOG(WARNING) << "Input contains irrelevant edges! \n" << m;
     return;
@@ -85,7 +85,7 @@ void PoseGraph::addMeasurement(const RelativeSEMeasurement &m) {
   }
 }
 
-void PoseGraph::addOdometry(const RelativeSEMeasurement &factor) {
+void PoseGraph::addOdometry(const RelativePosePoseMeasurement &factor) {
   // Check for duplicate inter-robot loop closure
   const PoseID src_id(factor.r1, factor.p1);
   const PoseID dst_id(factor.r2, factor.p2);
@@ -104,7 +104,8 @@ void PoseGraph::addOdometry(const RelativeSEMeasurement &factor) {
   edge_id_to_index_.emplace(edge_id, odometry_.size() - 1);
 }
 
-void PoseGraph::addPrivateLoopClosure(const RelativeSEMeasurement &factor) {
+void PoseGraph::addPrivateLoopClosure(
+    const RelativePosePoseMeasurement &factor) {
   // Check for duplicate inter-robot loop closure
   const PoseID src_id(factor.r1, factor.p1);
   const PoseID dst_id(factor.r2, factor.p2);
@@ -122,7 +123,8 @@ void PoseGraph::addPrivateLoopClosure(const RelativeSEMeasurement &factor) {
   edge_id_to_index_.emplace(edge_id, private_lcs_.size() - 1);
 }
 
-void PoseGraph::addSharedLoopClosure(const RelativeSEMeasurement &factor) {
+void PoseGraph::addSharedLoopClosure(
+    const RelativePosePoseMeasurement &factor) {
   // Check for duplicate inter-robot loop closure
   const PoseID src_id(factor.r1, factor.p1);
   const PoseID dst_id(factor.r2, factor.p2);
@@ -152,9 +154,9 @@ void PoseGraph::addSharedLoopClosure(const RelativeSEMeasurement &factor) {
   edge_id_to_index_.emplace(edge_id, shared_lcs_.size() - 1);
 }
 
-std::vector<RelativeSEMeasurement>
+std::vector<RelativePosePoseMeasurement>
 PoseGraph::sharedLoopClosuresWithRobot(unsigned int neighbor_id) const {
-  std::vector<RelativeSEMeasurement> result;
+  std::vector<RelativePosePoseMeasurement> result;
   for (const auto &m : shared_lcs_) {
     if (m.r1 == neighbor_id || m.r2 == neighbor_id)
       result.emplace_back(m);
@@ -162,8 +164,8 @@ PoseGraph::sharedLoopClosuresWithRobot(unsigned int neighbor_id) const {
   return result;
 }
 
-std::vector<RelativeSEMeasurement> PoseGraph::measurements() const {
-  std::vector<RelativeSEMeasurement> measurements = odometry_;
+std::vector<RelativePosePoseMeasurement> PoseGraph::measurements() const {
+  std::vector<RelativePosePoseMeasurement> measurements = odometry_;
   measurements.insert(measurements.end(), private_lcs_.begin(),
                       private_lcs_.end());
   measurements.insert(measurements.end(), shared_lcs_.begin(),
@@ -171,8 +173,8 @@ std::vector<RelativeSEMeasurement> PoseGraph::measurements() const {
   return measurements;
 }
 
-std::vector<RelativeSEMeasurement> PoseGraph::localMeasurements() const {
-  std::vector<RelativeSEMeasurement> measurements = odometry_;
+std::vector<RelativePosePoseMeasurement> PoseGraph::localMeasurements() const {
+  std::vector<RelativePosePoseMeasurement> measurements = odometry_;
   measurements.insert(measurements.end(), private_lcs_.begin(),
                       private_lcs_.end());
   return measurements;
@@ -222,9 +224,9 @@ bool PoseGraph::hasMeasurement(const PoseID &srcID, const PoseID &dstID) const {
   return edge_id_to_index_.find(edge_id) != edge_id_to_index_.end();
 }
 
-RelativeSEMeasurement *PoseGraph::findMeasurement(const PoseID &srcID,
-                                                  const PoseID &dstID) {
-  RelativeSEMeasurement *edge = nullptr;
+RelativePosePoseMeasurement *PoseGraph::findMeasurement(const PoseID &srcID,
+                                                        const PoseID &dstID) {
+  RelativePosePoseMeasurement *edge = nullptr;
   if (hasMeasurement(srcID, dstID)) {
     const EdgeID edge_id(srcID, dstID);
     size_t index = edge_id_to_index_.at(edge_id);
@@ -246,8 +248,8 @@ RelativeSEMeasurement *PoseGraph::findMeasurement(const PoseID &srcID,
   return edge;
 }
 
-std::vector<RelativeSEMeasurement *> PoseGraph::allLoopClosures() {
-  std::vector<RelativeSEMeasurement *> output;
+std::vector<RelativePosePoseMeasurement *> PoseGraph::allLoopClosures() {
+  std::vector<RelativePosePoseMeasurement *> output;
   for (auto &m : private_lcs_) {
     output.push_back(&m);
   }
@@ -281,8 +283,8 @@ PoseSet PoseGraph::activeNeighborPublicPoseIDs() const {
   return output;
 }
 
-std::vector<RelativeSEMeasurement *> PoseGraph::activeLoopClosures() {
-  std::vector<RelativeSEMeasurement *> output;
+std::vector<RelativePosePoseMeasurement *> PoseGraph::activeLoopClosures() {
+  std::vector<RelativePosePoseMeasurement *> output;
   for (auto &m : private_lcs_) {
     output.push_back(&m);
   }
@@ -296,8 +298,8 @@ std::vector<RelativeSEMeasurement *> PoseGraph::activeLoopClosures() {
   return output;
 }
 
-std::vector<RelativeSEMeasurement *> PoseGraph::inactiveLoopClosures() {
-  std::vector<RelativeSEMeasurement *> output;
+std::vector<RelativePosePoseMeasurement *> PoseGraph::inactiveLoopClosures() {
+  std::vector<RelativePosePoseMeasurement *> output;
   for (auto &m : shared_lcs_) {
     if (m.r1 == id_ && !isNeighborActive(m.r2)) {
       output.push_back(&m);
@@ -384,7 +386,7 @@ void PoseGraph::clearDataMatrices() {
 
 bool PoseGraph::constructQ() {
   timer_.tic();
-  std::vector<RelativeSEMeasurement> privateMeasurements = odometry_;
+  std::vector<RelativePosePoseMeasurement> privateMeasurements = odometry_;
   privateMeasurements.insert(privateMeasurements.end(), private_lcs_.begin(),
                              private_lcs_.end());
 

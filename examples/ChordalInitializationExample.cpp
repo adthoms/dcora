@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   std::cout << "Chordal Initialization Example. " << std::endl;
 
   size_t num_poses;
-  std::vector<DCORA::RelativeSEMeasurement> dataset =
+  std::vector<DCORA::RelativePosePoseMeasurement> dataset =
       DCORA::read_g2o_file(argv[1], &num_poses);
   size_t d = (!dataset.empty() ? dataset[0].t.size() : 0);
   std::cout << "Loaded dataset from file " << argv[1] << "." << std::endl;

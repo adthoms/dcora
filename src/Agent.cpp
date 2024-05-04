@@ -126,7 +126,7 @@ bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  std::vector<RelativeSEMeasurement> measurements =
+  std::vector<RelativePosePoseMeasurement> measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements) {
     if (m.r1 == getID()) {
@@ -164,7 +164,7 @@ bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  std::vector<RelativeSEMeasurement> measurements =
+  std::vector<RelativePosePoseMeasurement> measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements) {
     if (m.r1 == getID()) {
@@ -186,7 +186,7 @@ void PGOAgent::setLiftingMatrix(const Matrix &M) {
   YLift.emplace(M);
 }
 
-void PGOAgent::addMeasurement(const RelativeSEMeasurement &factor) {
+void PGOAgent::addMeasurement(const RelativePosePoseMeasurement &factor) {
   if (mState != PGOAgentState::WAIT_FOR_DATA) {
     LOG(WARNING)
         << "Robot state is not WAIT_FOR_DATA. Ignore new measurements!";
@@ -197,16 +197,16 @@ void PGOAgent::addMeasurement(const RelativeSEMeasurement &factor) {
 }
 
 void PGOAgent::setMeasurements(
-    const std::vector<RelativeSEMeasurement> &inputOdometry,
-    const std::vector<RelativeSEMeasurement> &inputPrivateLoopClosures,
-    const std::vector<RelativeSEMeasurement> &inputSharedLoopClosures) {
+    const std::vector<RelativePosePoseMeasurement> &inputOdometry,
+    const std::vector<RelativePosePoseMeasurement> &inputPrivateLoopClosures,
+    const std::vector<RelativePosePoseMeasurement> &inputSharedLoopClosures) {
   CHECK(!isOptimizationRunning());
   CHECK_EQ(mState, PGOAgentState::WAIT_FOR_DATA);
   if (inputOdometry.empty())
     return;
   // Set pose graph measurements
   mPoseGraph = std::make_shared<PoseGraph>(mID, r, d);
-  std::vector<RelativeSEMeasurement> measurements = inputOdometry;
+  std::vector<RelativePosePoseMeasurement> measurements = inputOdometry;
   measurements.insert(measurements.end(), inputPrivateLoopClosures.begin(),
                       inputPrivateLoopClosures.end());
   measurements.insert(measurements.end(), inputSharedLoopClosures.begin(),
@@ -264,7 +264,7 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       params.robust_params.GNCBarc = 5.0;
       params.robust_params.GNCMuStep = 1.4;
       PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
-      std::vector<RelativeSEMeasurement> mutable_local_measurements =
+      std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
           mPoseGraph->localMeasurements();
       // Solve for trajectory
       T = solveRobustPGO(&mutable_local_measurements, params, &TOdom);
@@ -464,7 +464,7 @@ void PGOAgent::reset() {
 
   if (mParams.logData) {
     // Save measurements (including final weights)
-    std::vector<RelativeSEMeasurement> measurements =
+    std::vector<RelativePosePoseMeasurement> measurements =
         mPoseGraph->measurements();
     mLogger.logMeasurements(&measurements, "measurements.csv");
 
@@ -551,7 +551,8 @@ bool PGOAgent::isOptimizationRunning() {
 }
 
 Pose PGOAgent::computeNeighborTransform(
-    const RelativeSEMeasurement &measurement, const LiftedPose &neighbor_pose) {
+    const RelativePosePoseMeasurement &measurement,
+    const LiftedPose &neighbor_pose) {
   CHECK(YLift);
   CHECK_EQ(neighbor_pose.r(), r);
   CHECK_EQ(neighbor_pose.d(), d);
@@ -1120,7 +1121,7 @@ void PGOAgent::initializeRobustOptimization() {
   }
   mRobustCost.reset();
   std::unique_lock<std::mutex> lock(mMeasurementsMutex);
-  for (RelativeSEMeasurement *m : mPoseGraph->activeLoopClosures()) {
+  for (RelativePosePoseMeasurement *m : mPoseGraph->activeLoopClosures()) {
     if (!m->fixedWeight) {
       m->weight = 1.0;
     }
@@ -1128,7 +1129,7 @@ void PGOAgent::initializeRobustOptimization() {
 }
 
 bool PGOAgent::computeMeasurementResidual(
-    const RelativeSEMeasurement &measurement, double *residual) const {
+    const RelativePosePoseMeasurement &measurement, double *residual) const {
   if (mState != PGOAgentState::INITIALIZED) {
     return false;
   }
@@ -1213,7 +1214,7 @@ void PGOAgent::updateMeasurementWeights() {
 
 bool PGOAgent::setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
                                     double weight, bool fixed_weight) {
-  RelativeSEMeasurement *m = mPoseGraph->findMeasurement(src_ID, dst_ID);
+  RelativePosePoseMeasurement *m = mPoseGraph->findMeasurement(src_ID, dst_ID);
   if (m) {
     std::unique_lock<std::mutex> lock(mMeasurementsMutex);
     m->weight = weight;
