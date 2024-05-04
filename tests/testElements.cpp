@@ -41,12 +41,12 @@ TEST(testDCORA, testLiftedPoseArray) {
   }
 }
 
-TEST(testDCORA, testLiftedTranslationArray) {
+TEST(testDCORA, testLiftedPointArray) {
   int r = 5;
   int d = 3;
   int n = 3;
   for (int trial = 0; trial < 50; ++trial) {
-    DCORA::LiftedTranslationArray var(r, d, n);
+    DCORA::LiftedPointArray var(r, d, n);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
       auto pi = DCORA::randomEuclideanVariable(r);
@@ -54,10 +54,10 @@ TEST(testDCORA, testLiftedTranslationArray) {
       ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
     }
     // Test copy constructor
-    DCORA::LiftedTranslationArray var2(var);
+    DCORA::LiftedPointArray var2(var);
     ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
     // Test assignment
-    DCORA::LiftedTranslationArray var3(r, d, n);
+    DCORA::LiftedPointArray var3(r, d, n);
     var3 = var;
     ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
   }
@@ -118,12 +118,12 @@ TEST(testDCORA, testLiftedPose) {
   }
 }
 
-TEST(testDCORA, testLiftedTranslation) {
+TEST(testDCORA, testLiftedPoint) {
   int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
     DCORA::Vector Pi = DCORA::randomEuclideanVariable(r);
     // Test constructor from Eigen vector
-    DCORA::LiftedTranslation var(Pi);
+    DCORA::LiftedPoint var(Pi);
     ASSERT_LE((Pi - var.getData()).norm(), 1e-6);
   }
 }
@@ -141,7 +141,7 @@ TEST(testDCORA, testPoseIdentity) {
 
 TEST(testDCORA, testTranslationZeroVector) {
   int d = 3;
-  DCORA::Translation P(d);
+  DCORA::Point P(d);
   ASSERT_LE((P.zeroVector().translation() - DCORA::Vector::Zero(d)).norm(),
             1e-6);
 }

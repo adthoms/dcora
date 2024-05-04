@@ -104,8 +104,8 @@ Matrix LiftedPoseArray::rotation(unsigned int index) const {
   return Xi.block(0, 0, r_, d_);
 }
 
-LiftedTranslationArray::LiftedTranslationArray(unsigned int r, unsigned int d,
-                                               unsigned int n)
+LiftedPointArray::LiftedPointArray(unsigned int r, unsigned int d,
+                                   unsigned int n)
     : LiftedArray(r, d, n) {
   dim_ = 1;
   X_ = Matrix::Zero(r_, dim_ * n_);
@@ -188,14 +188,12 @@ Matrix Pose::matrix() const {
   return T;
 }
 
-Translation::Translation(const Vector &P) : Translation(P.rows()) {
-  setData(P);
-}
+Point::Point(const Vector &P) : Point(P.rows()) { setData(P); }
 
-Translation Translation::ZeroVector(unsigned int d) { return Translation(d); }
+Point Point::ZeroVector(unsigned int d) { return Point(d); }
 
-Translation Translation::zeroVector() const { return Translation(d_); }
+Point Point::zeroVector() const { return Point(d_); }
 
-Vector Translation::vector() const { return translation(); }
+Vector Point::vector() const { return translation(); }
 
 } // namespace DCORA

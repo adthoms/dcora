@@ -155,7 +155,7 @@ public:
  * @brief A class representing an array of "lifted" translations
  * Internally store as r-by-n matrix: X = [pi ... pn]
  */
-class LiftedTranslationArray : public LiftedArray {
+class LiftedPointArray : public LiftedArray {
 public:
   /**
    * @brief Constructor
@@ -163,11 +163,11 @@ public:
    * @param d dimension (2/3)
    * @param n number of translations
    */
-  LiftedTranslationArray(unsigned int r, unsigned int d, unsigned int n);
+  LiftedPointArray(unsigned int r, unsigned int d, unsigned int n);
 };
 
-typedef LiftedTranslationArray LiftedRangeArray;
-typedef LiftedTranslationArray LiftedLandmarkArray;
+typedef LiftedPointArray LiftedRangeArray;
+typedef LiftedPointArray LiftedLandmarkArray;
 
 /**
  * @brief A class representing an array of "lifted" poses, unit-sphere auxiliary
@@ -278,20 +278,19 @@ public:
  * Internally store as d-by-n matrix: X = [p1 ... pn]
  * Each translation pi is a d-dimensional vector
  */
-class TranslationArray : public LiftedTranslationArray {
+class PointArray : public LiftedPointArray {
 public:
-  TranslationArray(unsigned int d, unsigned int n)
-      : LiftedTranslationArray(d, d, n) {}
+  PointArray(unsigned int d, unsigned int n) : LiftedPointArray(d, d, n) {}
 };
 
-typedef TranslationArray RangeArray;
-typedef TranslationArray LandmarkArray;
+typedef PointArray RangeArray;
+typedef PointArray LandmarkArray;
 
 /**
  * @brief A class representing an array of poses, unit-sphere auxiliary
  * variables, and translations in RA ordering. Internally store as
  * d-by-(d+1)n+l+b matrix: X = [X1, ... Xn | r1 ... rn | p1 ... pn | l1 ... ln]
- * See PoseArray, RangeArray, and TranslationArray for details
+ * See PoseArray, RangeArray, and PointArray for details
  */
 class RangeAidedArray : public LiftedRangeAidedArray {
 public:
@@ -349,31 +348,27 @@ public:
 /**
  * @brief A class representing a single "lifted" translation pi
  */
-class LiftedTranslation : public LiftedTranslationArray {
+class LiftedPoint : public LiftedPointArray {
 public:
-  LiftedTranslation() : LiftedTranslation(3, 3) {}
-  LiftedTranslation(unsigned int r, unsigned int d)
-      : LiftedTranslationArray(r, d, 1) {}
+  LiftedPoint() : LiftedPoint(3, 3) {}
+  LiftedPoint(unsigned int r, unsigned int d) : LiftedPointArray(r, d, 1) {}
   /**
    * @brief Constructor from Eigen vector
    * @param P r-dimensional vector
    */
-  explicit LiftedTranslation(const Vector &P)
-      : LiftedTranslation(P.rows(), P.rows()) {
+  explicit LiftedPoint(const Vector &P) : LiftedPoint(P.rows(), P.rows()) {
     setData(P);
   }
   /**
    * @brief Return the writable translation
    * @return
    */
-  Eigen::Ref<Vector> translation() {
-    return LiftedTranslationArray::translation(0);
-  }
+  Eigen::Ref<Vector> translation() { return LiftedPointArray::translation(0); }
   /**
    * @brief Return the read-only translation
    * @return
    */
-  Vector translation() const { return LiftedTranslationArray::translation(0); }
+  Vector translation() const { return LiftedPointArray::translation(0); }
 };
 
 /**
@@ -418,27 +413,27 @@ public:
   Matrix matrix() const;
 };
 
-class Translation : public LiftedTranslation {
+class Point : public LiftedPoint {
 public:
   // Constructor
-  Translation() : Translation(3) {}
-  explicit Translation(unsigned int d) : LiftedTranslation(d, d) {}
+  Point() : Point(3) {}
+  explicit Point(unsigned int d) : LiftedPoint(d, d) {}
   /**
    * @brief Constructor from Eigen vector
    * @param P r-dimensional vector
    */
-  explicit Translation(const Vector &P);
+  explicit Point(const Vector &P);
   /**
    * @brief Return the zero vector of specified dimension
    * @param d
    * @return
    */
-  static Translation ZeroVector(unsigned int d);
+  static Point ZeroVector(unsigned int d);
   /**
    * @brief Return the zero vector element
    * @return
    */
-  Translation zeroVector() const;
+  Point zeroVector() const;
   /**
    * @brief Return the vector representing this translation
    * @return
