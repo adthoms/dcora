@@ -300,6 +300,636 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
   return measurements;
 }
 
+int getDimFromPyfgFirstLine(const std::string &filename) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+
+  // Check if the file exists and if it can be read
+  std::ifstream in_file(filename);
+  if (!in_file.good()) {
+    LOG(FATAL) << "Error: could not open file: " << filename << "!";
+  }
+
+  // Get the first line and close the file
+  std::string line;
+  std::getline(in_file, line);
+  in_file.close();
+
+  // Get the item type with the first word
+  std::istringstream strstrm(line);
+  std::string item_type;
+
+  if (!(strstrm >> item_type)) {
+    LOG(FATAL) << "Error: could not read item type from line: " << line << "!";
+  }
+  if (PyFGStringToType.find(item_type) == PyFGStringToType.end()) {
+    LOG(FATAL) << "Error: unknown item type: " << item_type << "!";
+  }
+
+  switch (PyFGStringToType.find(item_type)->second) {
+  case POSE_TYPE_2D:
+    return 2;
+  case POSE_TYPE_3D:
+    return 3;
+  case LANDMARK_TYPE_2D:
+    return 2;
+  case LANDMARK_TYPE_3D:
+    return 3;
+  case POSE_PRIOR_2D:
+    return 2;
+  case POSE_PRIOR_3D:
+    return 3;
+  case LANDMARK_PRIOR_2D:
+    return 2;
+  case LANDMARK_PRIOR_3D:
+    return 3;
+  case REL_POSE_POSE_TYPE_2D:
+    return 2;
+  case REL_POSE_POSE_TYPE_3D:
+    return 3;
+  case REL_POSE_LANDMARK_TYPE_2D:
+    return 2;
+  case REL_POSE_LANDMARK_TYPE_3D:
+    return 3;
+  default:
+    LOG(FATAL) << "Error: the first line of the PyFG file is of type: "
+               << item_type << "\n"
+               << "This PyFG type` does not provide dimension information!";
+  }
+}
+
+PyFGDataset read_pyfg_file(const std::string &filename) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+
+  // Define helper lambda functions
+
+  auto readScalar = [](std::istringstream &strstrm) -> double {
+    double result;
+    if (strstrm >> result) {
+      return result;
+    } else {
+      LOG(FATAL) << "Error: could not read scalar from string stream: "
+                 << strstrm.str() << "!";
+    }
+  };
+
+  auto readVector = [](std::istringstream &strstrm, int dim) -> Vector {
+    Vector result(dim);
+    for (int i = 0; i < dim; i++) {
+      if (strstrm >> result(i)) {
+        continue;
+      } else {
+        LOG(FATAL) << "Error: could not read vector from string stream: "
+                   << strstrm.str() << "!";
+      }
+    }
+    return result;
+  };
+
+  auto readThetaAsRotation =
+      [readScalar](std::istringstream &strstrm) -> Matrix {
+    const double theta = readScalar(strstrm);
+    return Eigen::Rotation2Dd(theta).toRotationMatrix();
+  };
+
+  auto readQuatAsRotation =
+      [readVector](std::istringstream &strstrm) -> Matrix {
+    const Vector quat = readVector(strstrm, 4);
+    return Eigen::Quaterniond(quat(3), quat(0), quat(1), quat(2))
+        .toRotationMatrix();
+  };
+
+  auto readScalarAsRange = [readScalar](std::istringstream &strstrm) -> double {
+    const double range = readScalar(strstrm);
+    CHECK_GT(range, 0.0)
+        << "Error: range measurement must be greater than zero: " << range
+        << "!";
+    return range;
+  };
+
+  auto readSymmetric = [](std::istringstream &strstrm, int dim) -> Matrix {
+    Matrix cov(dim, dim);
+    double val;
+    for (int i = 0; i < dim; i++) {
+      for (int j = i; j < dim; j++) {
+        if (strstrm >> val) {
+          cov(i, j) = val;
+          cov(j, i) = val;
+        } else {
+          LOG(WARNING) << "Warning: attempted to parse covariance matrix. i: "
+                       << i << " j:" << j << " val:" << val;
+          LOG(FATAL)
+              << "Error: could not read covariance matrix from string stream: "
+              << strstrm.str() << "!";
+        }
+      }
+    }
+    return cov;
+  };
+
+  auto getTranslationAndRotationCov =
+      [](const Matrix &cov) -> std::pair<Matrix, Matrix> {
+    CHECK_EQ(cov.rows(), cov.cols())
+        << "Error: Covariance matrix is not square: \n"
+        << cov << "!";
+    Matrix cov_t;
+    Matrix cov_R;
+    if (cov.rows() == 3) {
+      // 2D case
+      cov_t = cov.block<2, 2>(0, 0);
+      cov_R = cov.block<1, 1>(2, 2);
+    } else if (cov.rows() == 6) {
+      // 3D case
+      cov_t = cov.block<3, 3>(0, 0);
+      cov_R = cov.block<3, 3>(3, 3);
+    } else {
+      LOG(FATAL) << "Error: could not get translation and rotation "
+                    "covariance matrices from covariance matrix: \n"
+                 << cov << "!";
+    }
+    return std::make_pair(cov_t, cov_R);
+  };
+
+  auto getTau = [](const Matrix &cov) -> double {
+    CHECK_EQ(cov.rows(), cov.cols())
+        << "Error: Translation covariance matrix is not square: \n"
+        << cov << "!";
+    int denominator;
+    if (cov.rows() == 2) {
+      // 2D case
+      denominator = 2;
+    } else if (cov.rows() == 3) {
+      // 3D case
+      denominator = 3;
+    } else {
+      LOG(FATAL) << "Error: could not get Tau value from translation "
+                    "covariance matrix: \n"
+                 << cov << "!";
+    }
+    return denominator / cov.trace();
+  };
+
+  auto getKappa = [](const Matrix &cov) -> double {
+    CHECK_EQ(cov.rows(), cov.cols())
+        << "Error: Rotation covariance matrix is not square: \n"
+        << cov << "!";
+    double kappa;
+    if (cov.rows() == 1) {
+      // 2D case
+      kappa = 1.0 / cov(0, 0);
+    } else if (cov.rows() == 3) {
+      // 3D case
+      kappa = 3 / (2 * cov.trace());
+    } else {
+      LOG(FATAL) << "Error: could not get Kappa value from rotation covariance "
+                    "matrix: \n"
+                 << cov << "!";
+    }
+    return kappa;
+  };
+
+  auto getRobotAndStateIDFromSymbol =
+      [](const std::string &sym) -> std::pair<int, int> {
+    int robotID;
+    int stateID;
+    if (sym[0] == 'L') {
+      // Symbol is a point
+      if (std::isalpha(sym[1])) {
+        if (sym[1] == 'M') {
+          // Point is associated with the map, though does not obey PyFG
+          // formatting.
+          LOG(WARNING)
+              << "Warning: point symbol 'LM#' is (by default) associated with "
+                 "the map. Map point features should be formatted as 'L#'.";
+        }
+        // Point is associated with a robot according to PyFG formatting
+        robotID = static_cast<int>(sym[1] - 'A');
+        stateID = std::stoi(sym.substr(2));
+      } else {
+        // Point is associated with the map
+        robotID = static_cast<int>('M' - 'A');
+        stateID = std::stoi(sym.substr(1));
+      }
+    } else if (std::isalpha(sym[0])) {
+      // Symbol is a pose
+      robotID = static_cast<int>(sym[0] - 'A');
+      stateID = std::stoi(sym.substr(1));
+    } else {
+      LOG(FATAL) << "Error: could not read robot and state ID from symbol: "
+                 << sym << "!";
+    }
+    return std::make_pair(robotID, stateID);
+  };
+
+  auto getStateTypeFromSymbol = [](const std::string &sym) -> StateType {
+    if (sym[0] == 'L')
+      return StateType::Point;
+    else if (std::isalpha(sym[0]))
+      return StateType::Pose;
+    else
+      LOG(FATAL) << "Error: could not read state type from symbol: " << sym
+                 << "!";
+  };
+
+  // Get dimension of PyFG file
+  const int dim = getDimFromPyfgFirstLine(filename);
+
+  // Initialize PyFG dataset
+  PyFGDataset dataset;
+
+  // Initialize measurements, whose values we will fill in
+  PosePrior pose_prior;
+  PointPrior point_prior;
+  RelativePosePoseMeasurement pose_pose_measurement;
+  RelativePosePointMeasurement pose_point_measurement;
+  RangeMeasurement range_measurement;
+
+  // Initialize ground truth pose and point matrices
+  std::vector<Matrix> GroundTruthPoseRotationMatrices;
+  std::vector<Vector> GroundTruthPoseTranslationVectors;
+  std::vector<Vector> GroundTruthPointVectors;
+
+  // A string used to contain the contents of a single line
+  std::string line;
+
+  // Open the file for reading
+  std::ifstream infile(filename);
+
+  while (std::getline(infile, line)) {
+    // Construct a stream from the string
+    std::istringstream strstrm(line);
+
+    // Tokens for timestamp and state symbols
+    double timestamp;
+    std::string sym1, sym2;
+
+    // Get the item type with the first word
+    std::string item_type;
+    if (!(strstrm >> item_type)) {
+      LOG(FATAL) << "Error: could not read item type from line: " << line
+                 << "!";
+    }
+    if (PyFGStringToType.find(item_type) == PyFGStringToType.end()) {
+      LOG(FATAL) << "Error: unknown item type: " << item_type << "!";
+    }
+
+    switch (PyFGStringToType.find(item_type)->second) {
+    case POSE_TYPE_2D:
+      // VERTEX_SE2 ts sym x y theta
+      if (strstrm >> timestamp >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 2);
+        const Matrix R = readThetaAsRotation(strstrm);
+
+        // Add Robot ID to dataset
+        dataset.robot_IDs.emplace(getRobotAndStateIDFromSymbol(sym1).first);
+
+        // Populate ground truth
+        GroundTruthPoseRotationMatrices.push_back(R);
+        GroundTruthPoseTranslationVectors.push_back(t);
+      } else {
+        LOG(FATAL) << "Error: could not read pose variable from line: " << line
+                   << "!";
+      }
+      break;
+    case POSE_TYPE_3D:
+      // VERTEX_SE3:QUAT ts sym x y z qx qy qz qw
+      if (strstrm >> timestamp >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 3);
+        const Matrix R = readQuatAsRotation(strstrm);
+
+        // Add Robot ID to dataset
+        dataset.robot_IDs.emplace(getRobotAndStateIDFromSymbol(sym1).first);
+
+        // Populate ground truth
+        GroundTruthPoseRotationMatrices.push_back(R);
+        GroundTruthPoseTranslationVectors.push_back(t);
+      } else {
+        LOG(FATAL) << "Error: could not read pose variable from line: " << line
+                   << "!";
+      }
+      break;
+    case POSE_PRIOR_2D:
+      // VERTEX_SE2:PRIOR ts sym x y theta cov_ij
+      // for i in [1,3] and j in [i,3]
+      if (strstrm >> timestamp >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 2);
+        const Matrix R = readThetaAsRotation(strstrm);
+        const Matrix cov = readSymmetric(strstrm, 3);
+
+        // Parse symbol and covariance
+        const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [cov_t, cov_R] = getTranslationAndRotationCov(cov);
+        // Fill in measurement
+        pose_prior.r = robotID;
+        pose_prior.p = stateID;
+        pose_prior.R = R;
+        pose_prior.t = t;
+        pose_prior.kappa = getKappa(cov_R);
+        pose_prior.tau = getTau(cov_t);
+
+        // Add measurement
+        dataset.pose_priors.push_back(pose_prior);
+      } else {
+        LOG(FATAL) << "Error: could not read pose prior from line: " << line
+                   << "!";
+      }
+      break;
+    case POSE_PRIOR_3D:
+      // VERTEX_SE3:QUAT:PRIOR ts sym x y z qx qy qz qw cov_ij
+      // for i in [1,6] and j in [i,6]
+      if (strstrm >> timestamp >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 3);
+        const Matrix R = readQuatAsRotation(strstrm);
+        const Matrix cov = readSymmetric(strstrm, 6);
+
+        // Parse symbol and covariance
+        const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [cov_t, cov_R] = getTranslationAndRotationCov(cov);
+
+        // Fill in measurement
+        pose_prior.r = robotID;
+        pose_prior.p = stateID;
+        pose_prior.R = R;
+        pose_prior.t = t;
+        pose_prior.kappa = getKappa(cov_R);
+        pose_prior.tau = getTau(cov_t);
+
+        // Add measurement
+        dataset.pose_priors.push_back(pose_prior);
+      } else {
+        LOG(FATAL) << "Error: could not read pose prior from line: " << line
+                   << "!";
+      }
+      break;
+    case LANDMARK_TYPE_2D:
+      // VERTEX_XY sym x y
+      if (strstrm >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 2);
+
+        // Add Robot ID to dataset
+        dataset.robot_IDs.emplace(getRobotAndStateIDFromSymbol(sym1).first);
+
+        // Populate ground truth
+        GroundTruthPointVectors.push_back(t);
+      } else {
+        LOG(FATAL) << "Error: could not read point variable from line: " << line
+                   << "!";
+      }
+      break;
+    case LANDMARK_TYPE_3D:
+      // VERTEX_XYZ sym x y z
+      if (strstrm >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 3);
+
+        // Add Robot ID to dataset
+        dataset.robot_IDs.emplace(getRobotAndStateIDFromSymbol(sym1).first);
+
+        // Populate ground truth
+        GroundTruthPointVectors.push_back(t);
+      } else {
+        LOG(FATAL) << "Error: could not read point variable from line: " << line
+                   << "!";
+      }
+      break;
+    case LANDMARK_PRIOR_2D:
+      // VERTEX_XY:PRIOR ts sym x y cov_11 cov_12 cov_22
+      if (strstrm >> timestamp >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 2);
+        const Matrix cov = readSymmetric(strstrm, 2);
+
+        // Parse symbol
+        const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
+
+        // Fill in measurement
+        point_prior.r = robotID;
+        point_prior.p = stateID;
+        point_prior.t = t;
+        point_prior.tau = getTau(cov);
+
+        // Add measurement
+        dataset.point_priors.push_back(point_prior);
+      } else {
+        LOG(FATAL) << "Error: could not read point prior from line: " << line
+                   << "!";
+      }
+      break;
+    case LANDMARK_PRIOR_3D:
+      // VERTEX_XYZ:PRIOR ts sym x y z cov_11 cov_12 cov_13 cov_22 cov_23 cov_33
+      if (strstrm >> timestamp >> sym1) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 3);
+        const Matrix cov = readSymmetric(strstrm, 3);
+
+        // Parse symbol
+        const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
+
+        // Fill in measurement
+        point_prior.r = robotID;
+        point_prior.p = stateID;
+        point_prior.t = t;
+        point_prior.tau = getTau(cov);
+
+        // Add measurement
+        dataset.point_priors.push_back(point_prior);
+      } else {
+        LOG(FATAL) << "Error: could not read point prior from line: " << line
+                   << "!";
+      }
+      break;
+    case REL_POSE_POSE_TYPE_2D:
+      // EDGE_SE2 ts sym1 sym2 x y theta cov_ij
+      // for i in [1,3] and j in [i,3]
+      if (strstrm >> timestamp >> sym1 >> sym2) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 2);
+        const Matrix R = readThetaAsRotation(strstrm);
+        const Matrix cov = readSymmetric(strstrm, 3);
+
+        // Parse symbols and covariance
+        const auto [robot1ID, state1ID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
+        const auto [cov_t, cov_R] = getTranslationAndRotationCov(cov);
+
+        // Fill in measurement
+        pose_pose_measurement.r1 = robot1ID;
+        pose_pose_measurement.p1 = state1ID;
+        pose_pose_measurement.r2 = robot2ID;
+        pose_pose_measurement.p2 = state2ID;
+        pose_pose_measurement.R = R;
+        pose_pose_measurement.t = t;
+        pose_pose_measurement.kappa = getKappa(cov_R);
+        pose_pose_measurement.tau = getTau(cov_t);
+
+        // Add measurement
+        dataset.pose_pose_measurements.push_back(pose_pose_measurement);
+      } else {
+        LOG(FATAL)
+            << "Error: could not read relative pose measurement from line: "
+            << line << "!";
+      }
+      break;
+    case REL_POSE_POSE_TYPE_3D:
+      // EDGE_SE3:QUAT ts sym1 sym2 x y z qx qy qz qw cov_ij
+      // for i in [1,6] and j in [i,6]
+      if (strstrm >> timestamp >> sym1 >> sym2) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 3);
+        const Matrix R = readQuatAsRotation(strstrm);
+        const Matrix cov = readSymmetric(strstrm, 6);
+
+        // Parse symbols and covariance
+        const auto [robot1ID, state1ID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
+        const auto [cov_t, cov_R] = getTranslationAndRotationCov(cov);
+
+        // Fill in measurement
+        pose_pose_measurement.r1 = robot1ID;
+        pose_pose_measurement.p1 = state1ID;
+        pose_pose_measurement.r2 = robot2ID;
+        pose_pose_measurement.p2 = state2ID;
+        pose_pose_measurement.R = R;
+        pose_pose_measurement.t = t;
+        pose_pose_measurement.kappa = getKappa(cov_R);
+        pose_pose_measurement.tau = getTau(cov_t);
+
+        // Add measurement
+        dataset.pose_pose_measurements.push_back(pose_pose_measurement);
+      } else {
+        LOG(FATAL)
+            << "Error: could not read relative pose measurement from line: "
+            << line << "!";
+      }
+      break;
+    case REL_POSE_LANDMARK_TYPE_2D:
+      // EDGE_SE2_XY ts sym1 sym2 x y cov_11 cov_12 cov_22
+      if (strstrm >> timestamp >> sym1 >> sym2) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 2);
+        const Matrix cov = readSymmetric(strstrm, 2);
+
+        // Parse symbols
+        const auto [robot1ID, state1ID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
+
+        // Fill in measurement
+        pose_point_measurement.r1 = robot1ID;
+        pose_point_measurement.p1 = state1ID;
+        pose_point_measurement.r2 = robot2ID;
+        pose_point_measurement.p2 = state2ID;
+        pose_point_measurement.t = t;
+        pose_point_measurement.tau = getTau(cov);
+
+        // Add measurement
+        dataset.pose_point_measurements.push_back(pose_point_measurement);
+      } else {
+        LOG(FATAL) << "Error: could not read relative pose-point measurement "
+                      "from line: "
+                   << line << "!";
+      }
+      break;
+    case REL_POSE_LANDMARK_TYPE_3D:
+      // EDGE_SE3_XYZ ts sym1 sym2 x y z cov_ij
+      // for i in [1,3] and j in [i,3]
+      if (strstrm >> timestamp >> sym1 >> sym2) {
+        // Read string stream
+        const Vector t = readVector(strstrm, 3);
+        const Matrix cov = readSymmetric(strstrm, 3);
+
+        // Parse symbols
+        const auto [robot1ID, state1ID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
+
+        // Fill in measurement
+        pose_point_measurement.r1 = robot1ID;
+        pose_point_measurement.p1 = state1ID;
+        pose_point_measurement.r2 = robot2ID;
+        pose_point_measurement.p2 = state2ID;
+        pose_point_measurement.t = t;
+        pose_point_measurement.tau = getTau(cov);
+
+        // Add measurement
+        dataset.pose_point_measurements.push_back(pose_point_measurement);
+      } else {
+        LOG(FATAL) << "Error: could not read relative pose-point measurement "
+                      "from line: "
+                   << line << "!";
+      }
+      break;
+    case RANGE_MEASURE_TYPE:
+      // EDGE_RANGE ts sym1 sym2 range cov
+      if (strstrm >> timestamp >> sym1 >> sym2) {
+        // Read string stream
+        const double range = readScalarAsRange(strstrm);
+        const double cov = readScalar(strstrm);
+
+        // Parse symbols
+        const auto [robot1ID, state1ID] = getRobotAndStateIDFromSymbol(sym1);
+        const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
+
+        // Fill in measurement
+        range_measurement.r1 = robot1ID;
+        range_measurement.p1 = state1ID;
+        range_measurement.r2 = robot2ID;
+        range_measurement.p2 = state2ID;
+        range_measurement.stateType1 = getStateTypeFromSymbol(sym1);
+        range_measurement.stateType2 = getStateTypeFromSymbol(sym2);
+        range_measurement.range = range;
+        range_measurement.precision = 1.0 / cov;
+
+        // Add measurement
+        dataset.range_measurements.push_back(range_measurement);
+      } else {
+        LOG(FATAL) << "Error: could not read range measurement from line: "
+                   << line << "!";
+      }
+      break;
+    }
+  }
+
+  infile.close();
+
+  // Get the number of poses and points
+  const unsigned int num_poses = GroundTruthPoseRotationMatrices.size();
+  const unsigned int num_points = GroundTruthPointVectors.size();
+
+  // Initialize ground truth pose and point matrices
+  PoseArray GroundTruthPoseArray(dim, num_poses);
+  PointArray GroundTruthPointArray(dim, num_points);
+
+  // Populate ground truth pose and point matrices
+  for (size_t i = 0; i < num_poses; i++) {
+    GroundTruthPoseArray.rotation(i) = GroundTruthPoseRotationMatrices.at(i);
+    GroundTruthPoseArray.translation(i) =
+        GroundTruthPoseTranslationVectors.at(i);
+  }
+  for (size_t i = 0; i < num_points; i++) {
+    GroundTruthPointArray.translation(i) = GroundTruthPointVectors.at(i);
+  }
+
+  // Populate remaining dataset member variables
+  dataset.dim = dim;
+  dataset.num_poses = num_poses;
+  dataset.num_points = num_points;
+  dataset.ground_truth_pose_array =
+      std::make_shared<PoseArray>(GroundTruthPoseArray);
+  dataset.ground_truth_point_array =
+      std::make_shared<PointArray>(GroundTruthPointArray);
+
+  return dataset;
+}
+
 void get_dimension_and_num_poses(
     const std::vector<RelativePosePoseMeasurement> &measurements,
     size_t *dimension, size_t *num_poses) {

@@ -13,6 +13,7 @@
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/Measurements.h>
+#include <DCORA/manifold/Elements.h>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -80,6 +81,21 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
  */
 std::vector<RelativePosePoseMeasurement>
 read_g2o_file(const std::string &filename, size_t *num_poses);
+
+/**
+ * @brief Helper function to get the dimension of the RA-SLAM problem encoded in
+ * a PyFG file.
+ * @param filename
+ * @return
+ */
+int getDimFromPyfgFirstLine(const std::string &filename);
+
+/**
+ * @brief Helper function to read a dataset in .pyfg format
+ * @param filename
+ * @return
+ */
+PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
  * @brief Get the dimension and number of poses from a vector of relative pose
