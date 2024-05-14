@@ -459,19 +459,19 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
     CHECK_EQ(cov.rows(), cov.cols())
         << "Error: Translation covariance matrix is not square: \n"
         << cov << "!";
-    int denominator;
+    double tau;
     if (cov.rows() == 2) {
       // 2D case
-      denominator = 2;
+      tau = 2 / cov.trace();
     } else if (cov.rows() == 3) {
       // 3D case
-      denominator = 3;
+      tau = 3 / cov.trace();
     } else {
       LOG(FATAL) << "Error: could not get Tau value from translation "
                     "covariance matrix: \n"
                  << cov << "!";
     }
-    return denominator / cov.trace();
+    return tau;
   };
 
   auto getKappa = [](const Matrix &cov) -> double {
@@ -494,12 +494,12 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   };
 
   auto getRobotAndStateIDFromSymbol =
-      [](const std::string &sym) -> std::pair<int, int> {
-    int robotID;
-    int stateID;
+      [](const std::string &sym) -> std::pair<unsigned int, unsigned int> {
+    unsigned int robotID;
+    unsigned int stateID;
     if (sym[0] == 'L') {
       // Symbol is a point
-      if (std::isalpha(sym[1])) {
+      if (std::isupper(sym[1])) {
         if (sym[1] == 'M') {
           // Point is associated with the map, though does not obey PyFG
           // formatting.
@@ -508,16 +508,16 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                  "the map. Map point features should be formatted as 'L#'.";
         }
         // Point is associated with a robot according to PyFG formatting
-        robotID = static_cast<int>(sym[1] - 'A');
+        robotID = static_cast<unsigned int>(sym[1] - 'A');
         stateID = std::stoi(sym.substr(2));
       } else {
         // Point is associated with the map
-        robotID = static_cast<int>('M' - 'A');
+        robotID = static_cast<unsigned int>('M' - 'A');
         stateID = std::stoi(sym.substr(1));
       }
-    } else if (std::isalpha(sym[0])) {
+    } else if (std::isupper(sym[0])) {
       // Symbol is a pose
-      robotID = static_cast<int>(sym[0] - 'A');
+      robotID = static_cast<unsigned int>(sym[0] - 'A');
       stateID = std::stoi(sym.substr(1));
     } else {
       LOG(FATAL) << "Error: could not read robot and state ID from symbol: "
@@ -529,7 +529,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   auto getStateTypeFromSymbol = [](const std::string &sym) -> StateType {
     if (sym[0] == 'L')
       return StateType::Point;
-    else if (std::isalpha(sym[0]))
+    else if (std::isupper(sym[0]))
       return StateType::Pose;
     else
       LOG(FATAL) << "Error: could not read state type from symbol: " << sym
@@ -537,7 +537,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   };
 
   // Get dimension of PyFG file
-  const int dim = getDimFromPyfgFirstLine(filename);
+  const unsigned int dim = getDimFromPyfgFirstLine(filename);
 
   // Initialize PyFG dataset
   PyFGDataset dataset;
@@ -627,6 +627,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Parse symbol and covariance
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
         const auto [cov_t, cov_R] = getTranslationAndRotationCov(cov);
+
         // Fill in measurement
         pose_prior.r = robotID;
         pose_prior.p = stateID;
