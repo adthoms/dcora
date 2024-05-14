@@ -102,7 +102,7 @@ if(OPENMP_FOUND)
   target_link_libraries(DCORA)
 endif()
 
-# Build Distributed CORA example
+# Build Distributed PGO examples
 add_executable(multi-robot-example
   examples/MultiRobotExample.cpp)
 target_link_libraries(multi-robot-example DCORA)
@@ -118,6 +118,15 @@ target_link_libraries(single-robot-example DCORA)
 add_executable(single-robot-gnc-example
   examples/SingleRobotGNCExample.cpp)
 target_link_libraries(single-robot-gnc-example DCORA)
+
+# Build Distributed RA-SLAM examples
+add_executable(multi-robot-example-ra-slam
+  examples/MultiRobotExample_RASLAM.cpp)
+target_link_libraries(multi-robot-example-ra-slam DCORA)
+
+add_executable(single-robot-example-ra-slam
+  examples/SingleRobotExample_RASLAM.cpp)
+target_link_libraries(single-robot-example-ra-slam DCORA)
 
 ############################### TESTS ##########################################
 ### Add testing
