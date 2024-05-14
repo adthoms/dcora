@@ -141,21 +141,14 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
   file.close();
 }
 
-/**
-###############################################################
-###############################################################
-The following implementations are originally implemented in:
-
-SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
-
-Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
-
-###############################################################
-###############################################################
-*/
-
 std::vector<RelativePosePoseMeasurement>
 read_g2o_file(const std::string &filename, size_t *num_poses) {
+  /*
+  The following implementation is adapted from:
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
+  Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
+  */
+
   // Preallocate output vector
   std::vector<DCORA::RelativePosePoseMeasurement> measurements;
 

@@ -13,7 +13,6 @@
 
 #include <DCORA/DCORA_types.h>
 #include <DCORA/Measurements.h>
-#include <DCORA/manifold/Elements.h>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
