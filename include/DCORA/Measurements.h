@@ -12,10 +12,14 @@
 #pragma once
 
 #include <DCORA/DCORA_types.h>
+#include <DCORA/manifold/Elements.h>
 
 #include <Eigen/Dense>
 #include <glog/logging.h>
 #include <iostream>
+#include <memory>
+#include <set>
+#include <vector>
 
 namespace DCORA {
 
@@ -24,7 +28,7 @@ namespace DCORA {
  * (robot, state).
  */
 struct Measurement {
-  // measurement type
+  // Measurement type
   MeasurementType measurementType;
 
   // 0-based index of robot
@@ -50,8 +54,7 @@ struct Measurement {
 
   // Basic constructor
   Measurement(MeasurementType type, size_t robot, size_t state,
-              StateType stateType = StateType::None, bool fixedWeight = false,
-              double weight = 1.0)
+              StateType stateType, bool fixedWeight, double weight)
       : measurementType(type),
         r(robot),
         p(state),
@@ -71,7 +74,7 @@ struct Measurement {
   // A utility function for streaming this struct to cout
   inline friend std::ostream &operator<<(std::ostream &os,
                                          const Measurement &measurement) {
-    os << "MeasurementType: "
+    os << "Measurement Type: "
        << MeasurementTypeToString(measurement.measurementType) << std::endl;
     os << "Fixed weight: " << measurement.fixedWeight << std::endl;
     os << "Weight: " << measurement.weight << std::endl;
@@ -100,8 +103,10 @@ struct PosePrior : Measurement {
   // Translational measurement precision
   double tau;
 
-  // Simple default constructor; does nothing
-  PosePrior() = default;
+  // Default constructor
+  PosePrior()
+      : Measurement(MeasurementType::PosePrior, 0, 0, StateType::Pose, false,
+                    1.0) {}
 
   // Basic constructor
   PosePrior(size_t robot, size_t pose, const Matrix &priorRotation,
@@ -142,8 +147,10 @@ struct PointPrior : Measurement {
   // Translational measurement precision
   double tau;
 
-  // Simple default constructor; does nothing
-  PointPrior() = default;
+  // Default constructor
+  PointPrior()
+      : Measurement(MeasurementType::PointPrior, 0, 0, StateType::Point, false,
+                    1.0) {}
 
   // Basic constructor
   PointPrior(size_t robot, size_t point, const Vector &priorTranslation,
@@ -172,7 +179,7 @@ struct PointPrior : Measurement {
  * from (robot, state) pairs: (robot1, state1) to (robot2, state2).
  */
 struct RelativeMeasurement {
-  // measurement type
+  // Measurement type
   MeasurementType measurementType;
 
   // 0-based index of first robot
@@ -208,9 +215,8 @@ struct RelativeMeasurement {
   // Basic constructor
   RelativeMeasurement(MeasurementType type, size_t firstRobot,
                       size_t secondRobot, size_t firstState, size_t secondState,
-                      StateType stateType1 = StateType::None,
-                      StateType stateType2 = StateType::None,
-                      bool fixedWeight = false, double weight = 1.0)
+                      StateType stateType1, StateType stateType2,
+                      bool fixedWeight, double weight)
       : measurementType(type),
         r1(firstRobot),
         r2(secondRobot),
@@ -236,7 +242,7 @@ struct RelativeMeasurement {
   // A utility function for streaming this struct to cout
   inline friend std::ostream &
   operator<<(std::ostream &os, const RelativeMeasurement &measurement) {
-    os << "MeasurementType: "
+    os << "Measurement Type: "
        << MeasurementTypeToString(measurement.measurementType) << std::endl;
     os << "Fixed weight: " << measurement.fixedWeight << std::endl;
     os << "Weight: " << measurement.weight << std::endl;
@@ -269,8 +275,10 @@ struct RelativePosePoseMeasurement : RelativeMeasurement {
   // Translational measurement precision
   double tau;
 
-  // Simple default constructor; does nothing
-  RelativePosePoseMeasurement() = default;
+  // Default constructor
+  RelativePosePoseMeasurement()
+      : RelativeMeasurement(MeasurementType::PosePose, 0, 0, 0, 0,
+                            StateType::Pose, StateType::Pose, false, 1.0) {}
 
   // Basic constructor
   RelativePosePoseMeasurement(size_t firstRobot, size_t secondRobot,
@@ -317,8 +325,10 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
   // Translational measurement precision
   double tau;
 
-  // Simple default constructor; does nothing
-  RelativePosePointMeasurement() = default;
+  // Default constructor
+  RelativePosePointMeasurement()
+      : RelativeMeasurement(MeasurementType::PosePoint, 0, 0, 0, 0,
+                            StateType::Pose, StateType::Point, false, 1.0) {}
 
   // Basic constructor
   RelativePosePointMeasurement(size_t firstRobot, size_t secondRobot,
@@ -358,8 +368,10 @@ struct RangeMeasurement : RelativeMeasurement {
   // Range measurement precision
   double precision;
 
-  // Simple default constructor; does nothing
-  RangeMeasurement() = default;
+  // Default constructor
+  RangeMeasurement()
+      : RelativeMeasurement(MeasurementType::Range, 0, 0, 0, 0, StateType::None,
+                            StateType::None, false, 1.0) {}
 
   // Basic constructor
   RangeMeasurement(size_t firstRobot, size_t secondRobot, size_t firstState,
@@ -399,6 +411,30 @@ struct RangeMeasurement : RelativeMeasurement {
     os << "range: " << range << std::endl;
     os << "precision: " << precision << std::endl;
   }
+};
+
+/**
+ * @brief A simple struct that contains the elements of a PyFG dataset.
+ */
+struct PyFGDataset {
+  unsigned int dim;                 // Problem dimension
+  size_t num_poses;                 // Number of poses
+  size_t num_points;                // Number of points
+  std::set<unsigned int> robot_IDs; // Robot IDs
+
+  // Measurements
+  std::vector<PosePrior> pose_priors;
+  std::vector<PointPrior> point_priors;
+  std::vector<RelativePosePoseMeasurement> pose_pose_measurements;
+  std::vector<RelativePosePointMeasurement> pose_point_measurements;
+  std::vector<RangeMeasurement> range_measurements;
+
+  // Ground truth Poses and Points
+  std::shared_ptr<PoseArray> ground_truth_pose_array;
+  std::shared_ptr<PointArray> ground_truth_point_array;
+
+  // Simple default constructor; does nothing
+  PyFGDataset() = default;
 };
 
 } // namespace DCORA
