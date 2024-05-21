@@ -19,6 +19,8 @@ Graph::Graph(unsigned int id, unsigned int r, unsigned int d)
       r_(r),
       d_(d),
       n_(0),
+      l_(0),
+      b_(0),
       use_inactive_neighbors_(false),
       prior_kappa_(10000),
       prior_tau_(100) {
@@ -31,6 +33,8 @@ Graph::~Graph() { empty(); }
 void Graph::empty() {
   // Reset this graph to be empty
   n_ = 0;
+  l_ = 0;
+  b_ = 0;
   edge_id_to_index_.clear();
   odometry_.clear();
   private_lcs_.clear();

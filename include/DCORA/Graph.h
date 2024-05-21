@@ -73,6 +73,16 @@ public:
    */
   unsigned int n() const { return n_; }
   /**
+   * @brief Get number of ranges
+   * @return
+   */
+  unsigned int l() const { return l_; }
+  /**
+   * @brief Get number of landmarks
+   * @return
+   */
+  unsigned int b() const { return b_; }
+  /**
    * @brief Return number of odometry edges
    * @return
    */
@@ -328,7 +338,7 @@ protected:
   const unsigned int id_;
 
   // Problem dimensions
-  unsigned int r_, d_, n_;
+  unsigned int r_, d_, n_, l_, b_;
 
   // Store odometry measurements of this robot
   std::vector<RelativePosePoseMeasurement> odometry_;
