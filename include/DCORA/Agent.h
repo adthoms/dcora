@@ -618,7 +618,7 @@ protected:
   RobustCost mRobustCost;
 
   // Pointer to pose graph
-  std::shared_ptr<PoseGraph> mPoseGraph;
+  std::shared_ptr<Graph> mPoseGraph;
 
   // Current PGO instance
   unsigned mInstanceNumber;

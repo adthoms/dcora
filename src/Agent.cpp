@@ -33,7 +33,7 @@ PGOAgent::PGOAgent(unsigned ID, const PGOAgentParameters &params)
       mState(PGOAgentState::WAIT_FOR_DATA),
       mStatus(ID, mState, 0, 0, false, 0),
       mRobustCost(params.robustCostParams),
-      mPoseGraph(std::make_shared<PoseGraph>(mID, r, d)),
+      mPoseGraph(std::make_shared<Graph>(mID, r, d)),
       mInstanceNumber(0),
       mIterationNumber(0),
       mLatestWeightUpdateIteration(0),
@@ -205,7 +205,7 @@ void PGOAgent::setMeasurements(
   if (inputOdometry.empty())
     return;
   // Set pose graph measurements
-  mPoseGraph = std::make_shared<PoseGraph>(mID, r, d);
+  mPoseGraph = std::make_shared<Graph>(mID, r, d);
   std::vector<RelativePosePoseMeasurement> measurements = inputOdometry;
   measurements.insert(measurements.end(), inputPrivateLoopClosures.begin(),
                       inputPrivateLoopClosures.end());

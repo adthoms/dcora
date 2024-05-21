@@ -29,7 +29,7 @@ namespace DCORA {
  * @brief A pose graph class representing the local optimization problem in
  * distributed PGO.
  */
-class PoseGraph {
+class Graph {
 public:
   /**
    * @brief Store statistics for the current pose graph
@@ -52,11 +52,11 @@ public:
    * @param r
    * @param d
    */
-  PoseGraph(unsigned int id, unsigned int r, unsigned int d);
+  Graph(unsigned int id, unsigned int r, unsigned int d);
   /**
    * @brief Destructor
    */
-  ~PoseGraph();
+  ~Graph();
   /**
    * @brief Get dimension
    * @return

@@ -175,7 +175,7 @@ TEST(testDCORA, testPrior) {
 
   // Form pose graph and add a prior
   auto pose_graph =
-      std::make_shared<DCORA::PoseGraph>(robot_id, dimension, dimension);
+      std::make_shared<DCORA::Graph>(robot_id, dimension, dimension);
   pose_graph->setMeasurements(measurements);
   DCORA::Matrix prior_rotation(dimension, dimension);
 
@@ -275,7 +275,7 @@ TEST(testDCORA, testRobustPGO) {
   m_outlier.t = Eigen::Vector3d::Zero();
   measurements.push_back(m_outlier);
   // Solve!
-  auto pose_graph = std::make_shared<DCORA::PoseGraph>(0, d, d);
+  auto pose_graph = std::make_shared<DCORA::Graph>(0, d, d);
   pose_graph->setMeasurements(measurements);
   DCORA::solveRobustPGOParams params;
   params.verbose = false;

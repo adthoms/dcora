@@ -16,7 +16,7 @@
 
 namespace DCORA {
 
-QuadraticProblem::QuadraticProblem(const std::shared_ptr<PoseGraph> &pose_graph)
+QuadraticProblem::QuadraticProblem(const std::shared_ptr<Graph> &pose_graph)
     : pose_graph_(pose_graph),
       M(new LiftedSEManifold(pose_graph_->r(), pose_graph_->d(),
                              pose_graph_->n())) {
