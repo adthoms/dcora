@@ -29,7 +29,7 @@ Graph::Graph(unsigned int id, unsigned int r, unsigned int d)
 Graph::~Graph() { empty(); }
 
 void Graph::empty() {
-  // Reset this pose graph to be empty
+  // Reset this graph to be empty
   n_ = 0;
   edge_id_to_index_.clear();
   odometry_.clear();
@@ -64,7 +64,7 @@ unsigned int Graph::numMeasurements() const {
 
 void Graph::setMeasurements(
     const std::vector<RelativePosePoseMeasurement> &measurements) {
-  // Reset this pose graph to be empty
+  // Reset this graph to be empty
   empty();
   for (const auto &m : measurements)
     addMeasurement(m);
@@ -311,7 +311,7 @@ Graph::Statistics Graph::statistics() const {
   double totalCount = 0;
   double acceptCount = 0;
   double rejectCount = 0;
-  // TODO(adthoms): specify tolerance for rejected and accepted loop closures
+  // TODO(YT): specify tolerance for rejected and accepted loop closures
   for (const auto &m : private_lcs_) {
     // if (m.fixedWeight) continue;
     if (m.weight == 1) {
@@ -589,10 +589,7 @@ bool Graph::hasPreconditioner() {
     constructPreconditioner();
   return precon_.has_value();
 }
-/**
- * @brief Get preconditioner
- * @return
- */
+
 const CholmodSolverPtr &Graph::preconditioner() {
   if (!precon_.has_value())
     constructPreconditioner();

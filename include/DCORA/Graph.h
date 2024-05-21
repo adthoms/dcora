@@ -26,13 +26,13 @@
 namespace DCORA {
 
 /**
- * @brief A pose graph class representing the local optimization problem in
- * distributed PGO.
+ * @brief A graph class representing the local optimization problem in
+ * distributed PGO and/or RA-SLAM.
  */
 class Graph {
 public:
   /**
-   * @brief Store statistics for the current pose graph
+   * @brief Store statistics for the current graph
    */
   class Statistics {
   public:
@@ -48,9 +48,9 @@ public:
   };
   /**
    * @brief Constructor
-   * @param id
-   * @param r
-   * @param d
+   * @param id robot ID
+   * @param r relaxation rank
+   * @param d dimension (2/3)
    */
   Graph(unsigned int id, unsigned int r, unsigned int d);
   /**
@@ -93,7 +93,7 @@ public:
    */
   unsigned int numMeasurements() const;
   /**
-   * @brief Clear all contents and reset this pose graph to be empty
+   * @brief Clear all contents and reset this graph to be empty
    */
   void empty();
   /**
@@ -105,13 +105,13 @@ public:
    */
   void clearNeighborPoses();
   /**
-   * @brief Set measurements for this pose graph
+   * @brief Set measurements for this graph
    * @param measurements
    */
   void
   setMeasurements(const std::vector<RelativePosePoseMeasurement> &measurements);
   /**
-   * @brief Add a single measurement to this pose graph. Ignored if the input
+   * @brief Add a single measurement to this graph. Ignored if the input
    * measurement already exists.
    * @param m
    */
@@ -240,12 +240,14 @@ public:
    * @brief Return the IDs of active neighbors.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
+   * @return
    */
   std::set<unsigned> activeNeighborIDs() const;
   /**
    * @brief Return the number of active neighbors.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
+   * @return
    */
   size_t numActiveNeighbors() const;
   /**
@@ -258,11 +260,15 @@ public:
   /**
    * @brief Check if the input neighbor is active
    * @return false if the input robot is not a neighbor or is ignored
+   * @param neighbor_id
+   * @return
    */
   bool isNeighborActive(unsigned int neighbor_id) const;
   /**
    * @brief Set the input neighbor to be active or inactive.
    * Does nothing if the input is not a neighbor.
+   * @param neighbor_id
+   * @param active
    */
   void setNeighborActive(unsigned int neighbor_id, bool active);
   /**
@@ -278,12 +284,15 @@ public:
    */
   Statistics statistics() const;
   /**
-   * @brief Check if a measurement exists in the pose graph
+   * @brief Check if a measurement exists in the graph
+   * @param srcID
+   * @param dstID
+   * @return
    */
   bool hasMeasurement(const PoseID &srcID, const PoseID &dstID) const;
   /**
    * @brief Find and return a writable pointer to the specified measurement
-   * within this pose graph
+   * within this graph
    * @param measurements
    * @param srcID
    * @param dstID
@@ -294,20 +303,23 @@ public:
                                                const PoseID &dstID);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
-   * pose graph (contains both private and inter-robot loop closures)
-   * @return Vector of pointers to all loop closures
+   * graph (contains both private and inter-robot loop closures)
+   * @return
    */
   std::vector<RelativePosePoseMeasurement *> allLoopClosures();
   /**
    * @brief Return a vector of pointers to all active loop closures
+   * @return
    */
   std::vector<RelativePosePoseMeasurement *> activeLoopClosures();
   /**
    * @brief Return a vector of pointers to all inactive loop closures
+   * @return
    */
   std::vector<RelativePosePoseMeasurement *> inactiveLoopClosures();
   /**
    * @brief Set to true to use measurements with inactive neighbors
+   * @return
    */
   void useInactiveNeighbors(bool use = true);
 
@@ -318,7 +330,7 @@ protected:
   // Problem dimensions
   unsigned int r_, d_, n_;
 
-  // Store odometry measurement of this robot
+  // Store odometry measurements of this robot
   std::vector<RelativePosePoseMeasurement> odometry_;
 
   // Store private loop closures of this robot
@@ -403,7 +415,7 @@ private:
   // Use measurements with inactive neighbors when constructing data matrices
   bool use_inactive_neighbors_;
 
-  // Weights for prior terms (TODO: expose as parameter)
+  // Weights for prior terms (TODO(YT): expose as parameter)
   double prior_kappa_;
   double prior_tau_;
 
