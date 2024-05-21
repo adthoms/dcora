@@ -19,6 +19,8 @@
 #include <iostream>
 #include <memory>
 #include <set>
+#include <tuple>
+#include <variant>
 #include <vector>
 
 namespace DCORA {
@@ -74,13 +76,14 @@ struct Measurement {
   // A utility function for streaming this struct to cout
   inline friend std::ostream &operator<<(std::ostream &os,
                                          const Measurement &measurement) {
-    os << "Measurement Type: "
+    os << "MeasurementType: "
        << MeasurementTypeToString(measurement.measurementType) << std::endl;
-    os << "Fixed weight: " << measurement.fixedWeight << std::endl;
+    os << "StateType: " << StateTypeToString(measurement.stateType)
+       << std::endl;
+    os << "FixedWeight: " << measurement.fixedWeight << std::endl;
     os << "Weight: " << measurement.weight << std::endl;
     os << "Robot: " << measurement.r << std::endl;
-    os << "State: " << measurement.p << " ("
-       << StateTypeToString(measurement.stateType) << ")" << std::endl;
+    os << "State: " << measurement.p << std::endl;
     measurement.print(os);
     return os;
   }
@@ -242,16 +245,18 @@ struct RelativeMeasurement {
   // A utility function for streaming this struct to cout
   inline friend std::ostream &
   operator<<(std::ostream &os, const RelativeMeasurement &measurement) {
-    os << "Measurement Type: "
+    os << "MeasurementType: "
        << MeasurementTypeToString(measurement.measurementType) << std::endl;
-    os << "Fixed weight: " << measurement.fixedWeight << std::endl;
+    os << "StateType1: " << StateTypeToString(measurement.stateType1)
+       << std::endl;
+    os << "StateType2: " << StateTypeToString(measurement.stateType2)
+       << std::endl;
+    os << "FixedWeight: " << measurement.fixedWeight << std::endl;
     os << "Weight: " << measurement.weight << std::endl;
     os << "Robot1: " << measurement.r1 << std::endl;
-    os << "State1: " << measurement.p1 << " ("
-       << StateTypeToString(measurement.stateType1) << ")" << std::endl;
+    os << "State1: " << measurement.p1 << std::endl;
     os << "Robot2: " << measurement.r2 << std::endl;
-    os << "State2: " << measurement.p2 << " ("
-       << StateTypeToString(measurement.stateType2) << ")" << std::endl;
+    os << "State2: " << measurement.p2 << std::endl;
     measurement.print(os);
     return os;
   }
@@ -295,6 +300,23 @@ struct RelativePosePoseMeasurement : RelativeMeasurement {
         t(relativeTranslation),
         kappa(rotationalPrecision),
         tau(translationalPrecision) {}
+
+  // Copy constructor
+  RelativePosePoseMeasurement(const RelativePosePoseMeasurement &other)
+      : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
+                            other.p2, other.stateType1, other.stateType2,
+                            other.fixedWeight, other.weight),
+        R(other.R),
+        t(other.t),
+        kappa(other.kappa),
+        tau(other.tau) {}
+
+  // Equality operator
+  bool operator==(const RelativePosePoseMeasurement &other) const {
+    return std::tie(r1, r2, p1, p2, fixedWeight, weight, R, t, kappa, tau) ==
+           std::tie(other.r1, other.r2, other.p1, other.p2, other.fixedWeight,
+                    other.weight, other.R, other.t, other.kappa, other.tau);
+  }
 
   void checkDim(unsigned int d) const override {
     CHECK(d == 2 || d == 3);
@@ -342,6 +364,21 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
         t(relativeTranslation),
         tau(translationalPrecision) {}
 
+  // Copy constructor
+  RelativePosePointMeasurement(const RelativePosePointMeasurement &other)
+      : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
+                            other.p2, other.stateType1, other.stateType2,
+                            other.fixedWeight, other.weight),
+        t(other.t),
+        tau(other.tau) {}
+
+  // Equality operator
+  bool operator==(const RelativePosePointMeasurement &other) const {
+    return std::tie(r1, r2, p1, p2, fixedWeight, weight, t, tau) ==
+           std::tie(other.r1, other.r2, other.p1, other.p2, other.fixedWeight,
+                    other.weight, other.t, other.tau);
+  }
+
   void checkDim(unsigned int d) const override {
     CHECK(d == 2 || d == 3);
     CHECK(t.size() == d);
@@ -385,6 +422,23 @@ struct RangeMeasurement : RelativeMeasurement {
         range(rangeMeasurement),
         precision(rangePrecision) {}
 
+  // Copy constructor
+  RangeMeasurement(const RangeMeasurement &other)
+      : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
+                            other.p2, other.stateType1, other.stateType2,
+                            other.fixedWeight, other.weight),
+        range(other.range),
+        precision(other.precision) {}
+
+  // Equality operator
+  bool operator==(const RangeMeasurement &other) const {
+    return std::tie(r1, r2, p1, p2, stateType1, stateType2, fixedWeight, weight,
+                    range, precision) ==
+           std::tie(other.r1, other.r2, other.p1, other.p2, other.stateType1,
+                    other.stateType2, other.fixedWeight, other.weight,
+                    other.range, other.precision);
+  }
+
   void checkDim(unsigned int d) const override { CHECK(d == 2 || d == 3); }
 
   StateID getSrcID() const override {
@@ -414,27 +468,228 @@ struct RangeMeasurement : RelativeMeasurement {
 };
 
 /**
+ * @brief A class that contains all relative measurements within a common
+ * vector.
+ */
+class RelativeMeasurements {
+public:
+  using RelativeMeasurementVariant =
+      std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,
+                   RangeMeasurement>;
+
+  // Simple default constructor; does nothing
+  RelativeMeasurements() = default;
+
+  // Copy constructor
+  RelativeMeasurements(const RelativeMeasurements &other) : vec(other.vec) {}
+
+  // Assignment operator
+  RelativeMeasurements &operator=(const RelativeMeasurements &other) {
+    if (this == &other)
+      return *this;
+    vec = other.vec;
+    return *this;
+  }
+
+  // Validators
+  bool isPGOCompatible() const {
+    for (const auto &m : vec) {
+      if (std::holds_alternative<RelativePosePointMeasurement>(m) ||
+          std::holds_alternative<RangeMeasurement>(m))
+        return false;
+    }
+    return true;
+  }
+
+  // Getters
+  std::vector<RelativePosePoseMeasurement>
+  GetRelativePosePoseMeasurements() const {
+    std::vector<RelativePosePoseMeasurement> pose_pose_measurements;
+    for (const auto &m : vec) {
+      if (std::holds_alternative<RelativePosePoseMeasurement>(m))
+        pose_pose_measurements.emplace_back(
+            std::get<RelativePosePoseMeasurement>(m));
+    }
+
+    return pose_pose_measurements;
+  }
+
+  std::vector<RelativePosePointMeasurement>
+  GetRelativePosePointMeasurements() const {
+    std::vector<RelativePosePointMeasurement> pose_point_measurements;
+    for (const auto &m : vec) {
+      if (std::holds_alternative<RelativePosePointMeasurement>(m))
+        pose_point_measurements.emplace_back(
+            std::get<RelativePosePointMeasurement>(m));
+    }
+    return pose_point_measurements;
+  }
+
+  std::vector<RangeMeasurement> GetRangeMeasurements() const {
+    std::vector<RangeMeasurement> range_measurements;
+    for (const auto &m : vec) {
+      if (std::holds_alternative<RangeMeasurement>(m))
+        range_measurements.emplace_back(std::get<RangeMeasurement>(m));
+    }
+    return range_measurements;
+  }
+
+  void push_back(const RelativeMeasurement &relative_measurement) {
+    switch (relative_measurement.measurementType) {
+    case MeasurementType::PosePose:
+      addPosePoseMeasurement(relative_measurement);
+      break;
+    case MeasurementType::PosePoint:
+      addPosePointMeasurement(relative_measurement);
+      break;
+    case MeasurementType::Range:
+      addRangeMeasurement(relative_measurement);
+      break;
+    default:
+      LOG(WARNING) << "Warning: unknown relative measurement type: "
+                   << MeasurementTypeToString(
+                          relative_measurement.measurementType)
+                   << "!";
+    }
+  }
+
+  // A utility function for streaming this class to cout
+  inline friend std::ostream &
+  operator<<(std::ostream &os,
+             const RelativeMeasurements &relative_measurements) {
+    for (const auto &m : relative_measurements.vec) {
+      std::visit([&os](const auto &arg) { os << arg; }, m);
+    }
+    return os;
+  }
+
+  // Vector of relative measurements
+  std::vector<RelativeMeasurementVariant> vec;
+
+private:
+  /**
+   * @brief Template function to cast a Relative Measurement object to a
+   * specific type T, such as RelativePosePoseMeasurement,
+   * RelativePosePointMeasurement, or RangeMeasurement.
+   * @tparam T
+   * @param relative_measurement
+   * @return
+   */
+  template <typename T>
+  T castRelativeMeasurement(const RelativeMeasurement &relative_measurement) {
+    if constexpr (std::is_same_v<T, RelativePosePoseMeasurement>)
+      return dynamic_cast<const T &>(relative_measurement);
+    else if constexpr (std::is_same_v<T, RelativePosePointMeasurement>)
+      return dynamic_cast<const T &>(relative_measurement);
+    else if constexpr (std::is_same_v<T, RangeMeasurement>)
+      return dynamic_cast<const T &>(relative_measurement);
+    else
+      LOG(FATAL) << "Error: cannot cast relative measurement: "
+                 << relative_measurement << "!";
+
+    return T{};
+  }
+
+  /**
+   * Add a relative pose pose measurement.
+   * @param relative_measurement
+   */
+  void addPosePoseMeasurement(const RelativeMeasurement &relative_measurement) {
+    const RelativePosePoseMeasurement &pose_pose_measurement =
+        castRelativeMeasurement<RelativePosePoseMeasurement>(
+            relative_measurement);
+    vec.push_back(pose_pose_measurement);
+  }
+
+  /**
+   * Add a relative pose point measurement.
+   * @param relative_measurement
+   */
+  void
+  addPosePointMeasurement(const RelativeMeasurement &relative_measurement) {
+    const RelativePosePointMeasurement &pose_point_measurement =
+        castRelativeMeasurement<RelativePosePointMeasurement>(
+            relative_measurement);
+    vec.push_back(pose_point_measurement);
+  }
+
+  /**
+   * Add a range measurement.
+   * @param relative_measurement
+   */
+  void addRangeMeasurement(const RelativeMeasurement &relative_measurement) {
+    const RangeMeasurement &range_measurement =
+        castRelativeMeasurement<RangeMeasurement>(relative_measurement);
+    vec.push_back(range_measurement);
+  }
+};
+
+/**
  * @brief A simple struct that contains the elements of a PyFG dataset.
  */
 struct PyFGDataset {
   unsigned int dim;                 // Problem dimension
   size_t num_poses;                 // Number of poses
   size_t num_points;                // Number of points
-  std::set<unsigned int> robot_IDs; // Robot IDs
+  std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
 
   // Measurements
   std::vector<PosePrior> pose_priors;
   std::vector<PointPrior> point_priors;
-  std::vector<RelativePosePoseMeasurement> pose_pose_measurements;
-  std::vector<RelativePosePointMeasurement> pose_point_measurements;
-  std::vector<RangeMeasurement> range_measurements;
+  RelativeMeasurements relative_measurements;
 
-  // Ground truth Poses and Points
+  // Ground truth poses
+  std::vector<unsigned int> ground_truth_pose_robot_ids;
+  std::vector<unsigned int> ground_truth_pose_state_ids;
   std::shared_ptr<PoseArray> ground_truth_pose_array;
+
+  // Ground truth points
+  std::vector<unsigned int> ground_truth_point_robot_ids;
+  std::vector<unsigned int> ground_truth_point_state_ids;
   std::shared_ptr<PointArray> ground_truth_point_array;
 
   // Simple default constructor; does nothing
   PyFGDataset() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const PyFGDataset &pyfg_dataset) {
+    os << "PyFGDataset:" << std::endl;
+    os << "Dimension: " << pyfg_dataset.dim << std::endl;
+    os << "NumPoses: " << pyfg_dataset.num_poses << std::endl;
+    os << "NumPoints: " << pyfg_dataset.num_points << std::endl;
+    os << "NumRobots: " << pyfg_dataset.robot_IDs.size() - 1 << std::endl;
+    os << "Measurements:" << std::endl;
+    os << "Priors:" << std::endl;
+    for (const auto &pose_prior : pyfg_dataset.pose_priors) {
+      os << pose_prior;
+    }
+    for (const auto &point_prior : pyfg_dataset.point_priors) {
+      os << point_prior;
+    }
+    os << "Relative Measurements:" << std::endl;
+    os << pyfg_dataset.relative_measurements << std::endl;
+    os << "GroundTruth:" << std::endl;
+    os << "Poses:" << std::endl;
+    for (size_t i = 0; i < pyfg_dataset.ground_truth_pose_array->n(); i++) {
+      os << "r: " << pyfg_dataset.ground_truth_pose_robot_ids.at(i)
+         << std::endl;
+      os << "p: " << pyfg_dataset.ground_truth_pose_state_ids.at(i)
+         << std::endl;
+      os << "T: \n"
+         << pyfg_dataset.ground_truth_pose_array->pose(i) << std::endl;
+    }
+    os << "Points:" << std::endl;
+    for (size_t i = 0; i < pyfg_dataset.ground_truth_point_array->n(); i++) {
+      os << "r: " << pyfg_dataset.ground_truth_point_robot_ids.at(i)
+         << std::endl;
+      os << "p: " << pyfg_dataset.ground_truth_point_state_ids.at(i)
+         << std::endl;
+      os << "t: \n"
+         << pyfg_dataset.ground_truth_point_array->translation(i) << std::endl;
+    }
+    return os;
+  }
 };
 
 } // namespace DCORA
