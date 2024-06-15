@@ -17,6 +17,7 @@
 #include <Eigen/Dense>
 #include <glog/logging.h>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <set>
 #include <tuple>
@@ -624,6 +625,33 @@ private:
 };
 
 /**
+ * @brief A simple struct that contains all measurement types.
+ */
+struct Measurements {
+  std::vector<PosePrior> pose_priors;
+  std::vector<PointPrior> point_priors;
+  RelativeMeasurements relative_measurements;
+
+  // Simple default constructor; does nothing
+  Measurements() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const Measurements &measurements) {
+    os << "Priors:" << std::endl;
+    for (const auto &pose_prior : measurements.pose_priors) {
+      os << pose_prior;
+    }
+    for (const auto &point_prior : measurements.point_priors) {
+      os << point_prior;
+    }
+    os << "Relative Measurements:" << std::endl;
+    os << measurements.relative_measurements << std::endl;
+    return os;
+  }
+};
+
+/**
  * @brief A simple struct that contains the elements of a PyFG dataset.
  */
 struct PyFGDataset {
@@ -633,9 +661,7 @@ struct PyFGDataset {
   std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
 
   // Measurements
-  std::vector<PosePrior> pose_priors;
-  std::vector<PointPrior> point_priors;
-  RelativeMeasurements relative_measurements;
+  Measurements measurements;
 
   // Ground truth poses
   std::vector<unsigned int> ground_truth_pose_robot_ids;
@@ -659,15 +685,7 @@ struct PyFGDataset {
     os << "NumPoints: " << pyfg_dataset.num_points << std::endl;
     os << "NumRobots: " << pyfg_dataset.robot_IDs.size() - 1 << std::endl;
     os << "Measurements:" << std::endl;
-    os << "Priors:" << std::endl;
-    for (const auto &pose_prior : pyfg_dataset.pose_priors) {
-      os << pose_prior;
-    }
-    for (const auto &point_prior : pyfg_dataset.point_priors) {
-      os << point_prior;
-    }
-    os << "Relative Measurements:" << std::endl;
-    os << pyfg_dataset.relative_measurements << std::endl;
+    os << pyfg_dataset.measurements;
     os << "GroundTruth:" << std::endl;
     os << "Poses:" << std::endl;
     for (size_t i = 0; i < pyfg_dataset.ground_truth_pose_array->n(); i++) {
@@ -690,5 +708,18 @@ struct PyFGDataset {
     return os;
   }
 };
+
+// Ordered map of robot IDs and associated measurements
+typedef std::map<unsigned int, Measurements> RobotMeasurements;
+
+// A utility function for streaming RobotMeasurements to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const RobotMeasurements &robot_measurements) {
+  for (const auto &[robot_id, measurements] : robot_measurements) {
+    os << "Robot " << robot_id << " Measurements" << std::endl;
+    os << measurements;
+  }
+  return os;
+}
 
 } // namespace DCORA

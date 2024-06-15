@@ -97,6 +97,14 @@ int getDimFromPyfgFirstLine(const std::string &filename);
 PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
+ * @brief Helper function to partition a PyFG dataset's measurements among its
+ * robots
+ * @param pyfg_dataset
+ * @return
+ */
+RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset);
+
+/**
  * @brief Get the dimension and number of poses from a vector of relative pose
  * measurements
  * @param measurements

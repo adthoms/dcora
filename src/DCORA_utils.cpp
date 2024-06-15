@@ -636,7 +636,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pose_prior.tau = getTau(cov_t);
 
         // Add measurement
-        pyfg_dataset.pose_priors.push_back(pose_prior);
+        pyfg_dataset.measurements.pose_priors.push_back(pose_prior);
       } else {
         LOG(FATAL) << "Error: could not read pose prior from line: " << line
                    << "!";
@@ -664,7 +664,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pose_prior.tau = getTau(cov_t);
 
         // Add measurement
-        pyfg_dataset.pose_priors.push_back(pose_prior);
+        pyfg_dataset.measurements.pose_priors.push_back(pose_prior);
       } else {
         LOG(FATAL) << "Error: could not read pose prior from line: " << line
                    << "!";
@@ -725,7 +725,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         point_prior.tau = getTau(cov);
 
         // Add measurement
-        pyfg_dataset.point_priors.push_back(point_prior);
+        pyfg_dataset.measurements.point_priors.push_back(point_prior);
       } else {
         LOG(FATAL) << "Error: could not read point prior from line: " << line
                    << "!";
@@ -748,7 +748,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         point_prior.tau = getTau(cov);
 
         // Add measurement
-        pyfg_dataset.point_priors.push_back(point_prior);
+        pyfg_dataset.measurements.point_priors.push_back(point_prior);
       } else {
         LOG(FATAL) << "Error: could not read point prior from line: " << line
                    << "!";
@@ -779,7 +779,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pose_pose_measurement.tau = getTau(cov_t);
 
         // Add measurement
-        pyfg_dataset.relative_measurements.vec.push_back(pose_pose_measurement);
+        pyfg_dataset.measurements.relative_measurements.vec.push_back(
+            pose_pose_measurement);
       } else {
         LOG(FATAL)
             << "Error: could not read relative pose measurement from line: "
@@ -811,7 +812,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pose_pose_measurement.tau = getTau(cov_t);
 
         // Add measurement
-        pyfg_dataset.relative_measurements.vec.push_back(pose_pose_measurement);
+        pyfg_dataset.measurements.relative_measurements.vec.push_back(
+            pose_pose_measurement);
       } else {
         LOG(FATAL)
             << "Error: could not read relative pose measurement from line: "
@@ -838,7 +840,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pose_point_measurement.tau = getTau(cov);
 
         // Add measurement
-        pyfg_dataset.relative_measurements.vec.push_back(
+        pyfg_dataset.measurements.relative_measurements.vec.push_back(
             pose_point_measurement);
       } else {
         LOG(FATAL) << "Error: could not read relative pose-point measurement "
@@ -867,7 +869,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pose_point_measurement.tau = getTau(cov);
 
         // Add measurement
-        pyfg_dataset.relative_measurements.vec.push_back(
+        pyfg_dataset.measurements.relative_measurements.vec.push_back(
             pose_point_measurement);
       } else {
         LOG(FATAL) << "Error: could not read relative pose-point measurement "
@@ -897,7 +899,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         range_measurement.precision = 1.0 / cov;
 
         // Add measurement
-        pyfg_dataset.relative_measurements.vec.push_back(range_measurement);
+        pyfg_dataset.measurements.relative_measurements.vec.push_back(
+            range_measurement);
       } else {
         LOG(FATAL) << "Error: could not read range measurement from line: "
                    << line << "!";
@@ -936,6 +939,35 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
       std::make_shared<PointArray>(GroundTruthPointArray);
 
   return pyfg_dataset;
+}
+
+RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset) {
+  RobotMeasurements robot_measurements;
+  for (const auto &robot_id : pyfg_dataset.robot_IDs) {
+    Measurements measurements;
+    // add priors
+    for (const auto &pose_prior : pyfg_dataset.measurements.pose_priors) {
+      if (pose_prior.r == robot_id)
+        measurements.pose_priors.push_back(pose_prior);
+    }
+    for (const auto &point_prior : pyfg_dataset.measurements.point_priors) {
+      if (point_prior.r == robot_id)
+        measurements.point_priors.push_back(point_prior);
+    }
+    // add relative measurements
+    for (const auto &m : pyfg_dataset.measurements.relative_measurements.vec) {
+      std::visit(
+          [robot_id, &measurements](auto &&m) {
+            if (m.r1 == robot_id) {
+              measurements.relative_measurements.vec.push_back(m);
+            }
+          },
+          m);
+    }
+    // emplace
+    robot_measurements[robot_id] = measurements;
+  }
+  return robot_measurements;
 }
 
 void get_dimension_and_num_poses(
