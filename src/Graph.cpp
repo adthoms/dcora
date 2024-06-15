@@ -85,9 +85,8 @@ void Graph::setMeasurements(
 void Graph::setMeasurements(const RelativeMeasurements &measurements) {
   // Reset this graph to be empty
   empty();
-  // TODO(AT): update for all measurements
-  for (const auto &m : measurements.GetRelativePosePoseMeasurements())
-    addMeasurement(m);
+  for (const auto &m : measurements.vec)
+    std::visit([this](auto &&m) { this->addMeasurement(m); }, m);
 }
 
 void Graph::addMeasurement(const RelativeMeasurement &m) {
