@@ -91,17 +91,21 @@ public:
    * @brief Return number of private loop closures;
    * @return
    */
-  unsigned int numPrivateLoopClosures() const { return private_lcs_.size(); }
+  unsigned int numPrivateLoopClosures() const {
+    return private_lcs_.vec.size();
+  }
   /**
    * @brief Return number of shared loop closures
    * @return
    */
-  unsigned int numSharedLoopClosures() const { return shared_lcs_.size(); }
+  unsigned int numSharedLoopClosures() const { return shared_lcs_.vec.size(); }
   /**
    * @brief Return the number of all measurements
    * @return
    */
-  unsigned int numMeasurements() const;
+  unsigned int numMeasurements() const {
+    return numOdometry() + numPrivateLoopClosures() + numSharedLoopClosures();
+  }
   /**
    * @brief Clear all contents and reset this graph to be empty
    */
@@ -111,9 +115,14 @@ public:
    */
   void reset();
   /**
-   * @brief Clear all cached neighbor poses
+   * @brief Clear all cached neighbor states
    */
-  void clearNeighborPoses();
+  void clearNeighborStates();
+  /**
+   * @brief Update the number of poses and landmarks according to state ID
+   * @return
+   */
+  void updateNumStates(const StateID &stateID);
   /**
    * @brief Set measurements for this graph
    * @param measurements
@@ -121,11 +130,16 @@ public:
   void
   setMeasurements(const std::vector<RelativePosePoseMeasurement> &measurements);
   /**
+   * @brief Set measurements for this graph
+   * @param measurements
+   */
+  void setMeasurements(const RelativeMeasurements &measurements);
+  /**
    * @brief Add a single measurement to this graph. Ignored if the input
    * measurement already exists.
    * @param m
    */
-  void addMeasurement(const RelativePosePoseMeasurement &m);
+  void addMeasurement(const RelativeMeasurement &m);
   /**
    * @brief Return a copy of the list of odometry edges
    * @return
@@ -137,50 +151,63 @@ public:
    * @brief Return a copy of the list of private loop closures
    * @return
    */
-  std::vector<RelativePosePoseMeasurement> privateLoopClosures() const {
-    return private_lcs_;
-  }
+  RelativeMeasurements privateLoopClosures() const { return private_lcs_; }
   /**
    * @brief Return a copy of the list of shared loop closures
    * @return
    */
-  std::vector<RelativePosePoseMeasurement> sharedLoopClosures() const {
-    return shared_lcs_;
-  }
+  RelativeMeasurements sharedLoopClosures() const { return shared_lcs_; }
   /**
    * @brief Return a copy of all inter-robot loop closures with the specified
    * neighbor
    * @param neighbor_id
    * @return
    */
-  std::vector<RelativePosePoseMeasurement>
-  sharedLoopClosuresWithRobot(unsigned neighbor_id) const;
+  RelativeMeasurements sharedLoopClosuresWithRobot(unsigned neighbor_id) const;
   /**
    * @brief Return a copy of all measurements
    * @return
    */
-  std::vector<RelativePosePoseMeasurement> measurements() const;
+  RelativeMeasurements measurements() const;
   /**
    * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot
    * loop closures)
    * @return
    */
-  std::vector<RelativePosePoseMeasurement> localMeasurements() const;
+  RelativeMeasurements localMeasurements() const;
   /**
    * @brief Clear all priors
    */
   void clearPriors();
   /**
-   * @brief Add a prior term
+   * @brief Add a pose prior term
    * @param index The index of the local variable
-   * @param Xi Corresponding prior term
+   * @param Xi Corresponding pose prior term
    */
   void setPrior(unsigned index, const LiftedPose &Xi);
+  /**
+   * @brief Add a point prior term
+   * @param index The index of the local variable
+   * @param ti Corresponding point prior term
+   */
+  void setPrior(unsigned index, const LiftedPoint &ti);
+  /**
+   * @brief Set neighbor state
+   * @param pose_dict
+   * @param point_dict
+   */
+  void setNeighborStates(const PoseDict &pose_dict,
+                         const PointDict &point_dict);
   /**
    * @brief Set neighbor poses
    * @param pose_dict
    */
   void setNeighborPoses(const PoseDict &pose_dict);
+  /**
+   * @brief Set neighbor points
+   * @param point_dict
+   */
+  void setNeighborPoints(const PointDict &point_dict);
   /**
    * @brief Get quadratic cost matrix.
    * @return
@@ -225,16 +252,32 @@ public:
    */
   PoseSet myPublicPoseIDs() const { return local_shared_pose_ids_; }
   /**
+   * @brief Get the set of my point IDs that are shared with other robots
+   * @return
+   */
+  PointSet myPublicPointIDs() const { return local_shared_point_ids_; }
+  /**
    * @brief Get the set of Pose IDs that ALL neighbors need to share with me
    * @return
    */
   PoseSet neighborPublicPoseIDs() const { return nbr_shared_pose_ids_; }
+  /**
+   * @brief Get the set of Point IDs that ALL neighbors need to share with me
+   * @return
+   */
+  PointSet neighborPublicPointIDs() const { return nbr_shared_point_ids_; }
   /**
    * @brief Get the set of Pose IDs that active neighbors need to share with me.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
    */
   PoseSet activeNeighborPublicPoseIDs() const;
+  /**
+   * @brief Get the set of Point IDs that active neighbors need to share with
+   * me. A neighbor is active if it is actively participating in distributed
+   * optimization with this robot.
+   */
+  PointSet activeNeighborPublicPointIDs() const;
   /**
    * @brief Get the set of neighbor robot IDs that share inter-robot loop
    * closures with me
@@ -288,6 +331,12 @@ public:
    */
   bool requireNeighborPose(const PoseID &pose_id) const;
   /**
+   * @brief Return true if the given neighbor point ID is required by me
+   * @param point_id
+   * @return
+   */
+  bool requireNeighborPoint(const PointID &point_id) const;
+  /**
    * @brief Compute number of accepted, rejected, and undecided loop closures
    * Note that loop closures with inactive neighbors are not included
    * @return
@@ -299,7 +348,7 @@ public:
    * @param dstID
    * @return
    */
-  bool hasMeasurement(const PoseID &srcID, const PoseID &dstID) const;
+  bool hasMeasurement(const StateID &srcID, const StateID &dstID) const;
   /**
    * @brief Find and return a writable pointer to the specified measurement
    * within this graph
@@ -309,8 +358,8 @@ public:
    * @return writable pointer to the desired measurement (nullptr if measurement
    * does not exists)
    */
-  RelativePosePoseMeasurement *findMeasurement(const PoseID &srcID,
-                                               const PoseID &dstID);
+  RelativeMeasurement *findMeasurement(const StateID &srcID,
+                                       const StateID &dstID);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
    * graph (contains both private and inter-robot loop closures)
@@ -344,16 +393,22 @@ protected:
   std::vector<RelativePosePoseMeasurement> odometry_;
 
   // Store private loop closures of this robot
-  std::vector<RelativePosePoseMeasurement> private_lcs_;
+  RelativeMeasurements private_lcs_;
 
   // Store shared loop closure measurements
-  std::vector<RelativePosePoseMeasurement> shared_lcs_;
+  RelativeMeasurements shared_lcs_;
 
   // Store the set of public poses that need to be sent to other robots
   PoseSet local_shared_pose_ids_;
 
+  // Store the set of public points that need to be sent to other robots
+  PointSet local_shared_point_ids_;
+
   // Store the set of public poses needed from other robots
   PoseSet nbr_shared_pose_ids_;
+
+  // Store the set of public points needed from other robots
+  PointSet nbr_shared_point_ids_;
 
   // Store the set of neighboring agents
   std::set<unsigned> nbr_robot_ids_;
@@ -363,6 +418,9 @@ protected:
 
   // Store public poses from neighbors
   PoseDict neighbor_poses_;
+
+  // Store public points from neighbors
+  PointDict neighbor_points_;
 
   // Quadratic matrix in cost function
   std::optional<SparseMatrix> Q_;
@@ -382,19 +440,19 @@ protected:
    * @brief Add odometry edge. Ignored if the input measurement already exists.
    * @param factor
    */
-  void addOdometry(const RelativePosePoseMeasurement &factor);
+  void addOdometry(const RelativeMeasurement &factor);
   /**
    * @brief Add private loop closure. Ignored if the input measurement already
    * exists.
    * @param factor
    */
-  void addPrivateLoopClosure(const RelativePosePoseMeasurement &factor);
+  void addPrivateLoopClosure(const RelativeMeasurement &factor);
   /**
    * @brief Add shared loop closure. Ignored if the input measurement already
    * exists.
    * @param factor
    */
-  void addSharedLoopClosure(const RelativePosePoseMeasurement &factor);
+  void addSharedLoopClosure(const RelativeMeasurement &factor);
   /**
    * @brief Construct the quadratic cost matrix
    * @return
@@ -430,7 +488,8 @@ private:
   double prior_tau_;
 
   // Priors
-  std::map<unsigned, LiftedPose> priors_;
+  std::map<unsigned, LiftedPose> pose_priors_;
+  std::map<unsigned, LiftedPoint> point_priors_;
 };
 
 } // namespace DCORA

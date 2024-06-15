@@ -37,19 +37,21 @@ void Graph::empty() {
   b_ = 0;
   edge_id_to_index_.clear();
   odometry_.clear();
-  private_lcs_.clear();
-  shared_lcs_.clear();
+  private_lcs_.vec.clear();
+  shared_lcs_.vec.clear();
   local_shared_pose_ids_.clear();
+  local_shared_point_ids_.clear();
   nbr_shared_pose_ids_.clear();
+  nbr_shared_point_ids_.clear();
   nbr_robot_ids_.clear();
   neighbor_active_.clear();
-  clearNeighborPoses();
+  clearNeighborStates();
   clearDataMatrices();
   clearPriors();
 }
 
 void Graph::reset() {
-  clearNeighborPoses();
+  clearNeighborStates();
   clearDataMatrices();
   clearPriors();
   for (const auto neighbor_id : nbr_robot_ids_) {
@@ -57,13 +59,19 @@ void Graph::reset() {
   }
 }
 
-void Graph::clearNeighborPoses() {
+void Graph::clearNeighborStates() {
   neighbor_poses_.clear();
+  neighbor_points_.clear();
   G_.reset(); // Clearing neighbor poses requires re-computing linear matrix
 }
 
-unsigned int Graph::numMeasurements() const {
-  return numOdometry() + numPrivateLoopClosures() + numSharedLoopClosures();
+void Graph::updateNumStates(const StateID &stateID) {
+  // Update num poses
+  if (stateID.isPose())
+    n_ = std::max(n_, static_cast<unsigned int>(stateID.frame_id + 1));
+  // Update num landmarks
+  if (stateID.isPoint())
+    b_ = std::max(b_, static_cast<unsigned int>(stateID.frame_id + 1));
 }
 
 void Graph::setMeasurements(
@@ -74,13 +82,21 @@ void Graph::setMeasurements(
     addMeasurement(m);
 }
 
-void Graph::addMeasurement(const RelativePosePoseMeasurement &m) {
+void Graph::setMeasurements(const RelativeMeasurements &measurements) {
+  // Reset this graph to be empty
+  empty();
+  // TODO(AT): update for all measurements
+  for (const auto &m : measurements.GetRelativePosePoseMeasurements())
+    addMeasurement(m);
+}
+
+void Graph::addMeasurement(const RelativeMeasurement &m) {
   if (m.r1 != id_ && m.r2 != id_) {
     LOG(WARNING) << "Input contains irrelevant edges! \n" << m;
     return;
   }
   if (m.r1 == id_ && m.r2 == id_) {
-    if (m.p1 + 1 == m.p2)
+    if (m.measurementType == MeasurementType::PosePose && m.p1 + 1 == m.p2)
       addOdometry(m);
     else
       addPrivateLoopClosure(m);
@@ -89,111 +105,220 @@ void Graph::addMeasurement(const RelativePosePoseMeasurement &m) {
   }
 }
 
-void Graph::addOdometry(const RelativePosePoseMeasurement &factor) {
-  // Check for duplicate inter-robot loop closure
-  const PoseID src_id(factor.r1, factor.p1);
-  const PoseID dst_id(factor.r2, factor.p2);
+void Graph::addOdometry(const RelativeMeasurement &factor) {
+  // Check for duplicate odometry
+  const StateID src_id = factor.getSrcID();
+  const StateID dst_id = factor.getDstID();
   if (hasMeasurement(src_id, dst_id))
     return;
 
+  // Check that this is a valid measurement
+  factor.checkDim(d_);
+
   // Check that this is an odometry measurement
+  CHECK(factor.measurementType == MeasurementType::PosePose);
   CHECK(factor.r1 == id_);
   CHECK(factor.r2 == id_);
   CHECK(factor.p1 + 1 == factor.p2);
-  CHECK(factor.R.rows() == d_ && factor.R.cols() == d_);
-  CHECK(factor.t.rows() == d_ && factor.t.cols() == 1);
-  n_ = std::max(n_, (unsigned int)factor.p2 + 1);
-  odometry_.push_back(factor);
+
+  // Dynamically cast to odometry measurement
+  const RelativePosePoseMeasurement &odom_factor =
+      dynamic_cast<const RelativePosePoseMeasurement &>(factor);
+
+  // Update states
+  updateNumStates(dst_id); // dst_id > src_id
+
+  // Add relative measurement factor to odometry
+  odometry_.push_back(odom_factor);
+
+  // Update edges
   const EdgeID edge_id(src_id, dst_id);
   edge_id_to_index_.emplace(edge_id, odometry_.size() - 1);
 }
 
-void Graph::addPrivateLoopClosure(const RelativePosePoseMeasurement &factor) {
-  // Check for duplicate inter-robot loop closure
-  const PoseID src_id(factor.r1, factor.p1);
-  const PoseID dst_id(factor.r2, factor.p2);
+void Graph::addPrivateLoopClosure(const RelativeMeasurement &factor) {
+  // Check for duplicate private loop closure
+  const StateID src_id = factor.getSrcID();
+  const StateID dst_id = factor.getDstID();
   if (hasMeasurement(src_id, dst_id))
     return;
 
+  // Check that this is a valid measurement
+  factor.checkDim(d_);
+
+  // Check that this is a private loop closure
   CHECK(factor.r1 == id_);
   CHECK(factor.r2 == id_);
-  CHECK(factor.R.rows() == d_ && factor.R.cols() == d_);
-  CHECK(factor.t.rows() == d_ && factor.t.cols() == 1);
-  // update number of poses
-  n_ = std::max(n_, (unsigned int)std::max(factor.p1 + 1, factor.p2 + 1));
+
+  // Update states
+  updateNumStates(src_id);
+  updateNumStates(dst_id);
+
+  // Add relative measurement factor to private loop closures
   private_lcs_.push_back(factor);
+
+  // Update edges
   const EdgeID edge_id(src_id, dst_id);
-  edge_id_to_index_.emplace(edge_id, private_lcs_.size() - 1);
+  edge_id_to_index_.emplace(edge_id, private_lcs_.vec.size() - 1);
 }
 
-void Graph::addSharedLoopClosure(const RelativePosePoseMeasurement &factor) {
-  // Check for duplicate inter-robot loop closure
-  const PoseID src_id(factor.r1, factor.p1);
-  const PoseID dst_id(factor.r2, factor.p2);
+void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
+  // Check for duplicate shared loop closure
+  const StateID src_id = factor.getSrcID();
+  const StateID dst_id = factor.getDstID();
   if (hasMeasurement(src_id, dst_id))
     return;
 
-  CHECK(factor.R.rows() == d_ && factor.R.cols() == d_);
-  CHECK(factor.t.rows() == d_ && factor.t.cols() == 1);
+  // Check that this is a valid measurement
+  factor.checkDim(d_);
+
+  // Update local and neighbor shared state IDs. Set active neighbor.
   if (factor.r1 == id_) {
     CHECK(factor.r2 != id_);
-    n_ = std::max(n_, (unsigned int)factor.p1 + 1);
-    local_shared_pose_ids_.emplace(factor.r1, factor.p1);
-    nbr_shared_pose_ids_.emplace(factor.r2, factor.p2);
+
+    // Update states
+    updateNumStates(src_id);
+
+    // Add local shared state to graph
+    switch (factor.stateType1) {
+    case StateType::Pose:
+      local_shared_pose_ids_.emplace(factor.r1, factor.p1);
+      break;
+    case StateType::Point:
+      local_shared_point_ids_.emplace(factor.r1, factor.p1);
+      break;
+    default:
+      LOG(FATAL) << "Invalid StateType1: "
+                 << StateTypeToString(factor.stateType1) << "!";
+    }
+
+    // Add neighbor shared state to graph
+    switch (factor.stateType2) {
+    case StateType::Pose:
+      nbr_shared_pose_ids_.emplace(factor.r2, factor.p2);
+      break;
+    case StateType::Point:
+      nbr_shared_point_ids_.emplace(factor.r2, factor.p2);
+      break;
+    default:
+      LOG(FATAL) << "Invalid StateType2: "
+                 << StateTypeToString(factor.stateType2) << "!";
+    }
+
+    // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r2);
+
+    // Set active neighbor
     neighbor_active_[factor.r2] = true;
   } else {
     CHECK(factor.r2 == id_);
-    n_ = std::max(n_, (unsigned int)factor.p2 + 1);
-    local_shared_pose_ids_.emplace(factor.r2, factor.p2);
-    nbr_shared_pose_ids_.emplace(factor.r1, factor.p1);
+
+    // Update states
+    updateNumStates(dst_id);
+
+    // Add local shared state to graph
+    switch (factor.stateType2) {
+    case StateType::Pose:
+      local_shared_pose_ids_.emplace(factor.r2, factor.p2);
+      break;
+    case StateType::Point:
+      local_shared_point_ids_.emplace(factor.r2, factor.p2);
+      break;
+    default:
+      LOG(FATAL) << "Invalid StateType2: "
+                 << StateTypeToString(factor.stateType2) << "!";
+    }
+
+    // Add neighbor shared state to graph
+    switch (factor.stateType1) {
+    case StateType::Pose:
+      nbr_shared_pose_ids_.emplace(factor.r1, factor.p1);
+      break;
+    case StateType::Point:
+      nbr_shared_point_ids_.emplace(factor.r1, factor.p1);
+      break;
+    default:
+      LOG(FATAL) << "Invalid StateType1: "
+                 << StateTypeToString(factor.stateType1) << "!";
+    }
+
+    // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r1);
+
+    // Set active neighbor
     neighbor_active_[factor.r1] = true;
   }
 
+  // Add relative measurement factor to shared loop closures
   shared_lcs_.push_back(factor);
+
+  // Update edges
   const EdgeID edge_id(src_id, dst_id);
-  edge_id_to_index_.emplace(edge_id, shared_lcs_.size() - 1);
+  edge_id_to_index_.emplace(edge_id, shared_lcs_.vec.size() - 1);
 }
 
-std::vector<RelativePosePoseMeasurement>
+RelativeMeasurements
 Graph::sharedLoopClosuresWithRobot(unsigned int neighbor_id) const {
-  std::vector<RelativePosePoseMeasurement> result;
-  for (const auto &m : shared_lcs_) {
+  RelativeMeasurements result;
+  // TODO(AT): update for all measurements
+  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     if (m.r1 == neighbor_id || m.r2 == neighbor_id)
-      result.emplace_back(m);
+      result.vec.emplace_back(m);
   }
   return result;
 }
 
-std::vector<RelativePosePoseMeasurement> Graph::measurements() const {
-  std::vector<RelativePosePoseMeasurement> measurements = odometry_;
-  measurements.insert(measurements.end(), private_lcs_.begin(),
-                      private_lcs_.end());
-  measurements.insert(measurements.end(), shared_lcs_.begin(),
-                      shared_lcs_.end());
+RelativeMeasurements Graph::measurements() const {
+  RelativeMeasurements measurements(localMeasurements());
+  measurements.vec.insert(measurements.vec.end(), shared_lcs_.vec.begin(),
+                          shared_lcs_.vec.end());
   return measurements;
 }
 
-std::vector<RelativePosePoseMeasurement> Graph::localMeasurements() const {
-  std::vector<RelativePosePoseMeasurement> measurements = odometry_;
-  measurements.insert(measurements.end(), private_lcs_.begin(),
-                      private_lcs_.end());
+RelativeMeasurements Graph::localMeasurements() const {
+  RelativeMeasurements measurements;
+  measurements.vec.reserve(odometry_.size() + private_lcs_.vec.size());
+  measurements.vec.insert(measurements.vec.end(), odometry_.begin(),
+                          odometry_.end());
+  measurements.vec.insert(measurements.vec.end(), private_lcs_.vec.begin(),
+                          private_lcs_.vec.end());
   return measurements;
 }
 
-void Graph::clearPriors() { priors_.clear(); }
+void Graph::clearPriors() {
+  pose_priors_.clear();
+  point_priors_.clear();
+}
 
 void Graph::setPrior(unsigned index, const LiftedPose &Xi) {
   CHECK_LT(index, n());
   CHECK_EQ(d(), Xi.d());
   CHECK_EQ(r(), Xi.r());
-  priors_[index] = Xi;
+  pose_priors_[index] = Xi;
+}
+
+void Graph::setPrior(unsigned index, const LiftedPoint &ti) {
+  CHECK_LT(index, b());
+  CHECK_EQ(d(), ti.d());
+  CHECK_EQ(r(), ti.r());
+  point_priors_[index] = ti;
+}
+
+void Graph::setNeighborStates(const PoseDict &pose_dict,
+                              const PointDict &point_dict) {
+  neighbor_poses_ = pose_dict;
+  neighbor_points_ = point_dict;
+  G_.reset(); // Setting neighbor states requires re-computing linear matrix
 }
 
 void Graph::setNeighborPoses(const PoseDict &pose_dict) {
   neighbor_poses_ = pose_dict;
   G_.reset(); // Setting neighbor poses requires re-computing linear matrix
+}
+
+void Graph::setNeighborPoints(const PointDict &point_dict) {
+  neighbor_points_ = point_dict;
+  G_.reset(); // Setting neighbor points requires re-computing linear matrix
 }
 
 bool Graph::hasNeighbor(unsigned int robot_id) const {
@@ -221,27 +346,37 @@ bool Graph::requireNeighborPose(const PoseID &pose_id) const {
   return nbr_shared_pose_ids_.find(pose_id) != nbr_shared_pose_ids_.end();
 }
 
-bool Graph::hasMeasurement(const PoseID &srcID, const PoseID &dstID) const {
+bool Graph::requireNeighborPoint(const PointID &point_id) const {
+  return nbr_shared_point_ids_.find(point_id) != nbr_shared_point_ids_.end();
+}
+
+bool Graph::hasMeasurement(const StateID &srcID, const StateID &dstID) const {
   const EdgeID edge_id(srcID, dstID);
   return edge_id_to_index_.find(edge_id) != edge_id_to_index_.end();
 }
 
-RelativePosePoseMeasurement *Graph::findMeasurement(const PoseID &srcID,
-                                                    const PoseID &dstID) {
-  RelativePosePoseMeasurement *edge = nullptr;
+RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
+                                            const StateID &dstID) {
+  RelativeMeasurement *edge = nullptr;
   if (hasMeasurement(srcID, dstID)) {
     const EdgeID edge_id(srcID, dstID);
     size_t index = edge_id_to_index_.at(edge_id);
     if (edge_id.isOdometry()) {
       edge = &odometry_[index];
     } else if (edge_id.isPrivateLoopClosure()) {
-      edge = &private_lcs_[index];
+      // TODO(AT): update for all measurements
+      auto m = private_lcs_.GetRelativePosePoseMeasurements();
+      edge = &m[index];
     } else {
-      edge = &shared_lcs_[index];
+      // TODO(AT): update for all measurements
+      auto m = shared_lcs_.GetRelativePosePoseMeasurements();
+      edge = &m[index];
     }
   }
   if (edge) {
     // Sanity check
+    CHECK(edge->stateType1 == srcID.state_type);
+    CHECK(edge->stateType2 == dstID.state_type);
     CHECK_EQ(edge->r1, srcID.robot_id);
     CHECK_EQ(edge->p1, srcID.frame_id);
     CHECK_EQ(edge->r2, dstID.robot_id);
@@ -252,10 +387,11 @@ RelativePosePoseMeasurement *Graph::findMeasurement(const PoseID &srcID,
 
 std::vector<RelativePosePoseMeasurement *> Graph::allLoopClosures() {
   std::vector<RelativePosePoseMeasurement *> output;
-  for (auto &m : private_lcs_) {
+  // TODO(AT): Function is unused. Deprecate.
+  for (auto &m : private_lcs_.GetRelativePosePoseMeasurements()) {
     output.push_back(&m);
   }
-  for (auto &m : shared_lcs_) {
+  for (auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     output.push_back(&m);
   }
   return output;
@@ -283,12 +419,23 @@ PoseSet Graph::activeNeighborPublicPoseIDs() const {
   return output;
 }
 
+PointSet Graph::activeNeighborPublicPointIDs() const {
+  PointSet output;
+  for (const auto &point_id : nbr_shared_point_ids_) {
+    if (isNeighborActive(point_id.robot_id)) {
+      output.emplace(point_id);
+    }
+  }
+  return output;
+}
+
 std::vector<RelativePosePoseMeasurement *> Graph::activeLoopClosures() {
   std::vector<RelativePosePoseMeasurement *> output;
-  for (auto &m : private_lcs_) {
+  // TODO(AT): update for all measurements
+  for (auto &m : private_lcs_.GetRelativePosePoseMeasurements()) {
     output.push_back(&m);
   }
-  for (auto &m : shared_lcs_) {
+  for (auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     if (m.r1 == id_ && isNeighborActive(m.r2)) {
       output.push_back(&m);
     } else if (m.r2 == id_ && isNeighborActive(m.r1)) {
@@ -300,7 +447,8 @@ std::vector<RelativePosePoseMeasurement *> Graph::activeLoopClosures() {
 
 std::vector<RelativePosePoseMeasurement *> Graph::inactiveLoopClosures() {
   std::vector<RelativePosePoseMeasurement *> output;
-  for (auto &m : shared_lcs_) {
+  // TODO(AT): Function is unused. Deprecate.
+  for (auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     if (m.r1 == id_ && !isNeighborActive(m.r2)) {
       output.push_back(&m);
     } else if (m.r2 == id_ && !isNeighborActive(m.r1)) {
@@ -316,7 +464,8 @@ Graph::Statistics Graph::statistics() const {
   double acceptCount = 0;
   double rejectCount = 0;
   // TODO(YT): specify tolerance for rejected and accepted loop closures
-  for (const auto &m : private_lcs_) {
+  // TODO(AT): update for all measurements
+  for (const auto &m : private_lcs_.GetRelativePosePoseMeasurements()) {
     // if (m.fixedWeight) continue;
     if (m.weight == 1) {
       acceptCount += 1;
@@ -325,7 +474,8 @@ Graph::Statistics Graph::statistics() const {
     }
     totalCount += 1;
   }
-  for (const auto &m : shared_lcs_) {
+  // TODO(AT): update for all measurements
+  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     // Skip loop closures with inactive neighbors
     if (m.r1 == id_ && !isNeighborActive(m.r2)) {
       continue;
@@ -386,9 +536,14 @@ void Graph::clearDataMatrices() {
 
 bool Graph::constructQ() {
   timer_.tic();
+  if (!private_lcs_.isPGOCompatible() || !shared_lcs_.isPGOCompatible())
+    LOG(FATAL) << "Error: Loop closures are not PGO compatible!";
   std::vector<RelativePosePoseMeasurement> privateMeasurements = odometry_;
-  privateMeasurements.insert(privateMeasurements.end(), private_lcs_.begin(),
-                             private_lcs_.end());
+  std::vector<RelativePosePoseMeasurement> private_lcs_pose_pose =
+      private_lcs_.GetRelativePosePoseMeasurements();
+  privateMeasurements.insert(privateMeasurements.end(),
+                             private_lcs_pose_pose.begin(),
+                             private_lcs_pose_pose.end());
 
   // Initialize Q with private measurements
   SparseMatrix QLocal = constructConnectionLaplacianSE(privateMeasurements);
@@ -404,7 +559,7 @@ bool Graph::constructQ() {
   QDiagRow.setZero();
 
   // Go through shared loop closures
-  for (const auto &m : shared_lcs_) {
+  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     // Set relative SE matrix (homogeneous form)
     T.block(0, 0, d_, d_) = m.R;
     T.block(0, d_, d_, 1) = m.t;
@@ -468,7 +623,7 @@ bool Graph::constructQ() {
   }
 
   // Go through priors
-  for (const auto &it : priors_) {
+  for (const auto &it : pose_priors_) {
     unsigned idx = it.first;
     for (unsigned row = 0; row < d_; ++row) {
       Omega(row, row) = prior_kappa_;
@@ -507,7 +662,7 @@ bool Graph::constructG() {
   Matrix T = Matrix::Zero(d + 1, d + 1);
   Matrix Omega = Matrix::Zero(d + 1, d + 1);
   // Go through shared measurements
-  for (const auto &m : shared_lcs_) {
+  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     // Construct relative SE matrix in homogeneous form
     T.block(0, 0, d, d) = m.R;
     T.block(0, d, d, 1) = m.t;
@@ -572,7 +727,7 @@ bool Graph::constructG() {
     }
   }
   // Go through priors
-  for (const auto &it : priors_) {
+  for (const auto &it : pose_priors_) {
     unsigned idx = it.first;
     const Matrix &P = it.second.getData();
     for (unsigned row = 0; row < d_; ++row) {
@@ -619,10 +774,10 @@ bool Graph::constructPreconditioner() {
 }
 
 void Graph::updatePublicPoseIDs() {
+  // TODO(AT): Function is unused. Deprecate.
   local_shared_pose_ids_.clear();
   nbr_shared_pose_ids_.clear();
-
-  for (const auto &m : shared_lcs_) {
+  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
     if (m.r1 == id_) {
       CHECK(m.r2 != id_);
       local_shared_pose_ids_.emplace(m.r1, m.p1);
@@ -636,6 +791,7 @@ void Graph::updatePublicPoseIDs() {
 }
 
 void Graph::useInactiveNeighbors(bool use) {
+  // TODO(AT): Function is unused. Deprecate.
   use_inactive_neighbors_ = use;
   clearDataMatrices();
 }

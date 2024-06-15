@@ -575,9 +575,9 @@ public:
   void updateAuxNeighborPoses(unsigned neighborID, const PoseDict &poseDict);
 
   /**
-   * @brief Clear local caches of all neighbors' poses
+   * @brief Clear local caches of all neighbors' states
    */
-  void clearNeighborPoses();
+  void clearNeighborStates();
 
   /**
    * @brief Clear local caches of all active neighbors' poses

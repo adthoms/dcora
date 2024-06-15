@@ -122,13 +122,15 @@ bool PGOAgent::getSharedPoseDict(PoseDict *map) {
 
 bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
                                              unsigned neighborID) {
+  // TODO(AT): update function for PointDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  std::vector<RelativePosePoseMeasurement> measurements =
+  // TODO(AT): update for all measurements
+  const RelativeMeasurements measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
-  for (const auto &m : measurements) {
+  for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
     if (m.r1 == getID()) {
       PoseID pose_id(m.r1, m.p1);
       LiftedPose Xi(X.pose(m.p1));
@@ -160,13 +162,15 @@ bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
 
 bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
                                                 unsigned neighborID) {
+  // TODO(AT): update function for PointDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  std::vector<RelativePosePoseMeasurement> measurements =
+  // TODO(AT): update for all measurements
+  const RelativeMeasurements measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
-  for (const auto &m : measurements) {
+  for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
     if (m.r1 == getID()) {
       PoseID pose_id(m.r1, m.p1);
       LiftedPose Yi(Y.pose(m.p1));
@@ -247,7 +251,11 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
     }
     case (InitializationMethod::Chordal): {
       LOG(INFO) << "Computing local chordal initialization.";
-      T = chordalInitialization(mPoseGraph->localMeasurements());
+      const RelativeMeasurements m = mPoseGraph->localMeasurements();
+      if (!m.isPGOCompatible())
+        LOG(FATAL) << "Chordal initialization requires all relative "
+                      "measurement to be pose-pose measuremenst!";
+      T = chordalInitialization(m.GetRelativePosePoseMeasurements());
       break;
     }
     case (InitializationMethod::GNC_TLS): {
@@ -264,8 +272,12 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       params.robust_params.GNCBarc = 5.0;
       params.robust_params.GNCMuStep = 1.4;
       PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
+      const RelativeMeasurements m = mPoseGraph->localMeasurements();
+      if (!m.isPGOCompatible())
+        LOG(FATAL) << "Error: relative measurements must be pose-pose for "
+                      "GNC_TLS initialization!";
       std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
-          mPoseGraph->localMeasurements();
+          m.GetRelativePosePoseMeasurements();
       // Solve for trajectory
       T = solveRobustPGO(&mutable_local_measurements, params, &TOdom);
       // Reject outlier local loop closures
@@ -344,7 +356,7 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
   std::lock_guard<std::mutex> tLock(mPosesMutex);
 
   // Clear cache
-  clearNeighborPoses();
+  clearNeighborStates();
 
   // Apply global transformation to local trajectory estimate
   auto T = TLocalInit.value();
@@ -464,9 +476,10 @@ void PGOAgent::reset() {
 
   if (mParams.logData) {
     // Save measurements (including final weights)
-    std::vector<RelativePosePoseMeasurement> measurements =
-        mPoseGraph->measurements();
-    mLogger.logMeasurements(&measurements, "measurements.csv");
+    // TODO(JV): update for all measurements
+    std::vector<RelativePosePoseMeasurement> m =
+        mPoseGraph->measurements().GetRelativePosePoseMeasurements();
+    mLogger.logMeasurements(&m, "measurements.csv");
 
     // Save trajectory estimates after rounding
     Matrix T;
@@ -500,7 +513,7 @@ void PGOAgent::reset() {
 
   // This function will activate all robots in pose graph again
   mPoseGraph->reset();
-  clearNeighborPoses();
+  clearNeighborStates();
 }
 
 void PGOAgent::startOptimizationLoop() {
@@ -590,11 +603,15 @@ Pose PGOAgent::computeNeighborTransform(
 bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
                                                       const PoseDict &poseDict,
                                                       Pose *T_world_robot) {
+  // TODO(AT): update function for PointDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
   // Each alignment corresponds to a single inter-robot loop closure
-  for (const auto &m : mPoseGraph->sharedLoopClosuresWithRobot(neighborID)) {
+  // TODO(AT): update for all measurements
+  const RelativeMeasurements measurements =
+      mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
+  for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
     PoseID nbr_pose_id;
     nbr_pose_id.robot_id = neighborID;
     if (m.r1 == neighborID)
@@ -648,11 +665,15 @@ bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
 bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
                                               const PoseDict &poseDict,
                                               Pose *T_world_robot) {
+  // TODO(AT): update function for PointDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
   // Each alignment corresponds to a single inter-robot loop closure
-  for (const auto &m : mPoseGraph->sharedLoopClosuresWithRobot(neighborID)) {
+  // TODO(AT): update for all measurements
+  const RelativeMeasurements measurements =
+      mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
+  for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
     PoseID nbr_pose_id;
     nbr_pose_id.robot_id = neighborID;
     if (m.r1 == neighborID)
@@ -698,6 +719,7 @@ bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
 
 void PGOAgent::updateNeighborPoses(unsigned neighborID,
                                    const PoseDict &poseDict) {
+  // TODO(AT): update function for PointDict
   CHECK(neighborID != mID);
   if (!YLift)
     return;
@@ -730,6 +752,7 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID,
 
 void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
                                       const PoseDict &poseDict) {
+  // TODO(AT): update function for PointDict
   CHECK(mParams.acceleration);
   CHECK(neighborID != mID);
   if (!YLift)
@@ -753,13 +776,15 @@ void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
   }
 }
 
-void PGOAgent::clearNeighborPoses() {
+void PGOAgent::clearNeighborStates() {
+  // TODO(AT): update for point dicts
   std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   neighborPoseDict.clear();
   neighborAuxPoseDict.clear();
 }
 
 void PGOAgent::clearActiveNeighborPoses() {
+  // TODO(AT): update for point dicts
   std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   for (const auto &pose_id : mPoseGraph->activeNeighborPublicPoseIDs()) {
     neighborPoseDict.erase(pose_id);
@@ -885,7 +910,11 @@ std::vector<unsigned> PGOAgent::getNeighbors() const {
 Matrix PGOAgent::localPoseGraphOptimization() {
   ROptParameters pgo_params;
   pgo_params.verbose = true;
-  const auto T = solvePGO(mPoseGraph->localMeasurements(), pgo_params);
+  const RelativeMeasurements m = mPoseGraph->localMeasurements();
+  if (!m.isPGOCompatible())
+    LOG(FATAL) << "Local PGO requires all relative measurement to be pose-pose "
+                  "measuremenst!";
+  const auto T = solvePGO(m.GetRelativePosePoseMeasurements(), pgo_params);
   return T.getData();
 }
 
@@ -1020,8 +1049,10 @@ bool PGOAgent::updateX(bool doOptimization, bool acceleration) {
 
   // Initialize pose graph for optimization
   if (acceleration) {
+    // TODO(AT): update neighbor states
     mPoseGraph->setNeighborPoses(neighborAuxPoseDict);
   } else {
+    // TODO(AT): update neighbor states
     mPoseGraph->setNeighborPoses(neighborPoseDict);
   }
 
@@ -1121,6 +1152,7 @@ void PGOAgent::initializeRobustOptimization() {
   }
   mRobustCost.reset();
   std::unique_lock<std::mutex> lock(mMeasurementsMutex);
+  // TODO(AT): update for all measurements
   for (RelativePosePoseMeasurement *m : mPoseGraph->activeLoopClosures()) {
     if (!m->fixedWeight) {
       m->weight = 1.0;
@@ -1177,6 +1209,7 @@ void PGOAgent::updateMeasurementWeights() {
   }
   std::unique_lock<std::mutex> lock(mMeasurementsMutex);
   double residual = 0;
+  // TODO(AT): update for all measurements
   for (auto &m : mPoseGraph->activeLoopClosures()) {
     if (m->fixedWeight)
       continue;
@@ -1203,7 +1236,7 @@ void PGOAgent::updateMeasurementWeights() {
     LOG(INFO) << "Robot " << getID()
               << " resets trajectory estimates after weight updates.";
     setXToInitialGuess();
-    clearNeighborPoses();
+    clearNeighborStates();
   }
 
   // Reset acceleration
@@ -1214,7 +1247,7 @@ void PGOAgent::updateMeasurementWeights() {
 
 bool PGOAgent::setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
                                     double weight, bool fixed_weight) {
-  RelativePosePoseMeasurement *m = mPoseGraph->findMeasurement(src_ID, dst_ID);
+  RelativeMeasurement *m = mPoseGraph->findMeasurement(src_ID, dst_ID);
   if (m) {
     std::unique_lock<std::mutex> lock(mMeasurementsMutex);
     m->weight = weight;
