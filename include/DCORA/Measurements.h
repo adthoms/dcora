@@ -26,10 +26,10 @@
 namespace DCORA {
 
 /**
- * @brief A simple struct that contains the elements of a single measurement for
- * (robot, state).
+ * @brief A simple struct that contains the elements of an absolute measurement
+ * for (robot, state).
  */
-struct Measurement {
+struct AbsoluteMeasurement {
   // Measurement type
   MeasurementType measurementType;
 
@@ -49,14 +49,14 @@ struct Measurement {
   double weight;
 
   // Simple default constructor; does nothing
-  Measurement() = default;
+  AbsoluteMeasurement() = default;
 
   // Virtual destructor to enforce abstract class
-  virtual ~Measurement() {}
+  virtual ~AbsoluteMeasurement() {}
 
   // Basic constructor
-  Measurement(MeasurementType type, size_t robot, size_t state,
-              StateType stateType, bool fixedWeight, double weight)
+  AbsoluteMeasurement(MeasurementType type, size_t robot, size_t state,
+                      StateType stateType, bool fixedWeight, double weight)
       : measurementType(type),
         r(robot),
         p(state),
@@ -74,8 +74,8 @@ struct Measurement {
   virtual void print(std::ostream &os) const = 0;
 
   // A utility function for streaming this struct to cout
-  inline friend std::ostream &operator<<(std::ostream &os,
-                                         const Measurement &measurement) {
+  inline friend std::ostream &
+  operator<<(std::ostream &os, const AbsoluteMeasurement &measurement) {
     os << "MeasurementType: "
        << MeasurementTypeToString(measurement.measurementType) << std::endl;
     os << "StateType: " << StateTypeToString(measurement.stateType)
@@ -93,7 +93,7 @@ struct Measurement {
  * @brief A simple struct that contains the elements of a single pose prior for
  * (robot, pose).
  */
-struct PosePrior : Measurement {
+struct PosePrior : AbsoluteMeasurement {
   // Rotational measurement
   Matrix R;
 
@@ -108,16 +108,16 @@ struct PosePrior : Measurement {
 
   // Default constructor
   PosePrior()
-      : Measurement(MeasurementType::PosePrior, 0, 0, StateType::Pose, false,
-                    1.0) {}
+      : AbsoluteMeasurement(MeasurementType::PosePrior, 0, 0, StateType::Pose,
+                            false, 1.0) {}
 
   // Basic constructor
   PosePrior(size_t robot, size_t pose, const Matrix &priorRotation,
             const Vector &priorTranslation, double rotationalPrecision,
             double translationalPrecision, bool fixedWeight = false,
             double weight = 1.0)
-      : Measurement(MeasurementType::PosePrior, robot, pose, StateType::Pose,
-                    fixedWeight, weight),
+      : AbsoluteMeasurement(MeasurementType::PosePrior, robot, pose,
+                            StateType::Pose, fixedWeight, weight),
         R(priorRotation),
         t(priorTranslation),
         kappa(rotationalPrecision),
@@ -143,7 +143,7 @@ struct PosePrior : Measurement {
  * @brief A simple struct that contains the elements of a single point prior for
  * (robot, point).
  */
-struct PointPrior : Measurement {
+struct PointPrior : AbsoluteMeasurement {
   // Translational measurement
   Vector t;
 
@@ -152,15 +152,15 @@ struct PointPrior : Measurement {
 
   // Default constructor
   PointPrior()
-      : Measurement(MeasurementType::PointPrior, 0, 0, StateType::Point, false,
-                    1.0) {}
+      : AbsoluteMeasurement(MeasurementType::PointPrior, 0, 0, StateType::Point,
+                            false, 1.0) {}
 
   // Basic constructor
   PointPrior(size_t robot, size_t point, const Vector &priorTranslation,
              double translationalPrecision, bool fixedWeight = false,
              double weight = 1.0)
-      : Measurement(MeasurementType::PointPrior, robot, point, StateType::Point,
-                    fixedWeight, weight),
+      : AbsoluteMeasurement(MeasurementType::PointPrior, robot, point,
+                            StateType::Point, fixedWeight, weight),
         t(priorTranslation),
         tau(translationalPrecision) {}
 
@@ -510,7 +510,6 @@ public:
         pose_pose_measurements.emplace_back(
             std::get<RelativePosePoseMeasurement>(m));
     }
-
     return pose_pose_measurements;
   }
 
@@ -534,6 +533,7 @@ public:
     return range_measurements;
   }
 
+  // Setters
   void push_back(const RelativeMeasurement &relative_measurement) {
     switch (relative_measurement.measurementType) {
     case MeasurementType::PosePose:
@@ -558,7 +558,7 @@ public:
   operator<<(std::ostream &os,
              const RelativeMeasurements &relative_measurements) {
     for (const auto &m : relative_measurements.vec) {
-      std::visit([&os](const auto &arg) { os << arg; }, m);
+      std::visit([&os](const auto &m) { os << m; }, m);
     }
     return os;
   }
@@ -586,7 +586,6 @@ private:
     else
       LOG(FATAL) << "Error: cannot cast relative measurement: "
                  << relative_measurement << "!";
-
     return T{};
   }
 
