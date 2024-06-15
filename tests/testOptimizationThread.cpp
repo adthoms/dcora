@@ -62,7 +62,8 @@ TEST(testDCORA, OptimizationThreadTriangleGraph) {
   // clang-format on
 
   DCORA::Matrix Ttrue(d, 3 * (d + 1));
-  Ttrue << Tw0, Tw1, Tw2;
+  Ttrue << Tw0.block(0, 0, d, (d + 1)), Tw1.block(0, 0, d, (d + 1)),
+      Tw2.block(0, 0, d, (d + 1));
 
   std::vector<DCORA::RelativePosePoseMeasurement> odometry;
   std::vector<DCORA::RelativePosePoseMeasurement> private_loop_closures;
