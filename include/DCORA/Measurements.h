@@ -468,16 +468,20 @@ struct RangeMeasurement : RelativeMeasurement {
   }
 };
 
+// Type-safe unions of relative measurements
+typedef std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,
+                     RangeMeasurement>
+    RelativeMeasurementVariant;
+typedef std::variant<RelativePosePoseMeasurement *,
+                     RelativePosePointMeasurement *, RangeMeasurement *>
+    RelativeMeasurementPointerVariant;
+
 /**
  * @brief A class that contains all relative measurements within a common
  * vector.
  */
 class RelativeMeasurements {
 public:
-  using RelativeMeasurementVariant =
-      std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,
-                   RangeMeasurement>;
-
   // Simple default constructor; does nothing
   RelativeMeasurements() = default;
 
