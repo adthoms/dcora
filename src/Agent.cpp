@@ -1152,17 +1152,25 @@ void PGOAgent::initializeRobustOptimization() {
   }
   mRobustCost.reset();
   std::unique_lock<std::mutex> lock(mMeasurementsMutex);
-  // TODO(AT): update for all measurements
-  for (RelativePosePoseMeasurement *m : mPoseGraph->activeLoopClosures()) {
-    if (!m->fixedWeight) {
-      m->weight = 1.0;
-    }
+  for (auto &m : mPoseGraph->activeLoopClosures()) {
+    std::visit(
+        [](auto &&m) {
+          if (!m->fixedWeight)
+            m->weight = 1.0;
+        },
+        m);
   }
 }
 
 bool PGOAgent::computeMeasurementResidual(
-    const RelativePosePoseMeasurement &measurement, double *residual) const {
+    const RelativeMeasurement &measurement, double *residual) const {
   if (mState != PGOAgentState::INITIALIZED) {
+    return false;
+  }
+  // TODO(AT): update for all measurements
+  if (measurement.measurementType != MeasurementType::PosePose) {
+    LOG(WARNING) << "Warning: computeMeasurementResidual only supports "
+                    "PosePose measurements.";
     return false;
   }
   CHECK_NOTNULL(residual);
@@ -1197,7 +1205,12 @@ bool PGOAgent::computeMeasurementResidual(
       p1 = KVpair->second.translation();
     }
   }
-  *residual = std::sqrt(computeMeasurementError(measurement, Y1, p1, Y2, p2));
+  // Dynamically cast to pose-pose measurement
+  const RelativePosePoseMeasurement &pose_pose_measurement =
+      dynamic_cast<const RelativePosePoseMeasurement &>(measurement);
+  // TODO(AT): update for all measurements.
+  *residual =
+      std::sqrt(computeMeasurementError(pose_pose_measurement, Y1, p1, Y2, p2));
   return true;
 }
 
@@ -1209,15 +1222,17 @@ void PGOAgent::updateMeasurementWeights() {
   }
   std::unique_lock<std::mutex> lock(mMeasurementsMutex);
   double residual = 0;
-  // TODO(AT): update for all measurements
   for (auto &m : mPoseGraph->activeLoopClosures()) {
-    if (m->fixedWeight)
-      continue;
-    if (computeMeasurementResidual(*m, &residual)) {
-      m->weight = mRobustCost.weight(residual);
-    } else {
-      LOG(WARNING) << "Failed to update weight for edge: \n" << *m;
-    }
+    std::visit(
+        [&residual, this](auto &&m) {
+          if (!m->fixedWeight) {
+            if (computeMeasurementResidual(*m, &residual))
+              m->weight = mRobustCost.weight(residual);
+            else
+              LOG(WARNING) << "Failed to update weight for edge: \n" << *m;
+          }
+        },
+        m);
   }
   mWeightUpdateCount++;
   mLatestWeightUpdateIteration = iteration_number();

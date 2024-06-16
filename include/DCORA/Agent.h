@@ -754,9 +754,8 @@ protected:
    * @param residual The output residual
    * @return
    */
-  bool
-  computeMeasurementResidual(const RelativePosePoseMeasurement &measurement,
-                             double *residual) const;
+  bool computeMeasurementResidual(const RelativeMeasurement &measurement,
+                                  double *residual) const;
 
   /**
    * @brief Set weight for measurement in the pose graph. Return false if the

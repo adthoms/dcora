@@ -86,7 +86,7 @@ void Graph::setMeasurements(const RelativeMeasurements &measurements) {
   // Reset this graph to be empty
   empty();
   for (const auto &m : measurements.vec)
-    std::visit([this](auto &&m) { this->addMeasurement(m); }, m);
+    std::visit([this](auto &&m) { addMeasurement(m); }, m);
 }
 
 void Graph::addMeasurement(const RelativeMeasurement &m) {
@@ -259,10 +259,13 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
 RelativeMeasurements
 Graph::sharedLoopClosuresWithRobot(unsigned int neighbor_id) const {
   RelativeMeasurements result;
-  // TODO(AT): update for all measurements
-  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
-    if (m.r1 == neighbor_id || m.r2 == neighbor_id)
-      result.vec.emplace_back(m);
+  for (const auto &m : shared_lcs_.vec) {
+    std::visit(
+        [&result, neighbor_id](auto &&m) {
+          if (m.r1 == neighbor_id || m.r2 == neighbor_id)
+            result.vec.emplace_back(m);
+        },
+        m);
   }
   return result;
 }
@@ -357,19 +360,25 @@ bool Graph::hasMeasurement(const StateID &srcID, const StateID &dstID) const {
 RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
                                             const StateID &dstID) {
   RelativeMeasurement *edge = nullptr;
+  auto getEdgePointerFromRelativeMeasurementVariant = [](auto &&arg) {
+    using T = std::decay_t<decltype(arg)>;
+    if constexpr (std::is_base_of_v<RelativeMeasurement, T>)
+      return dynamic_cast<RelativeMeasurement *>(&arg);
+    else
+      LOG(FATAL) << "Error: Cannot dynamically cast RelativeMeasurement!";
+    return static_cast<RelativeMeasurement *>(nullptr);
+  };
   if (hasMeasurement(srcID, dstID)) {
     const EdgeID edge_id(srcID, dstID);
     size_t index = edge_id_to_index_.at(edge_id);
     if (edge_id.isOdometry()) {
       edge = &odometry_[index];
     } else if (edge_id.isPrivateLoopClosure()) {
-      // TODO(AT): update for all measurements
-      auto m = private_lcs_.GetRelativePosePoseMeasurements();
-      edge = &m[index];
+      edge = std::visit(getEdgePointerFromRelativeMeasurementVariant,
+                        private_lcs_.vec[index]);
     } else {
-      // TODO(AT): update for all measurements
-      auto m = shared_lcs_.GetRelativePosePoseMeasurements();
-      edge = &m[index];
+      edge = std::visit(getEdgePointerFromRelativeMeasurementVariant,
+                        shared_lcs_.vec[index]);
     }
   }
   if (edge) {
@@ -382,18 +391,6 @@ RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
     CHECK_EQ(edge->p2, dstID.frame_id);
   }
   return edge;
-}
-
-std::vector<RelativePosePoseMeasurement *> Graph::allLoopClosures() {
-  std::vector<RelativePosePoseMeasurement *> output;
-  // TODO(AT): Function is unused. Deprecate.
-  for (auto &m : private_lcs_.GetRelativePosePoseMeasurements()) {
-    output.push_back(&m);
-  }
-  for (auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
-    output.push_back(&m);
-  }
-  return output;
 }
 
 std::set<unsigned> Graph::activeNeighborIDs() const {
@@ -428,31 +425,21 @@ PointSet Graph::activeNeighborPublicPointIDs() const {
   return output;
 }
 
-std::vector<RelativePosePoseMeasurement *> Graph::activeLoopClosures() {
-  std::vector<RelativePosePoseMeasurement *> output;
-  // TODO(AT): update for all measurements
-  for (auto &m : private_lcs_.GetRelativePosePoseMeasurements()) {
-    output.push_back(&m);
+std::vector<RelativeMeasurementPointerVariant> Graph::activeLoopClosures() {
+  std::vector<RelativeMeasurementPointerVariant> output;
+  for (auto &m : private_lcs_.vec) {
+    std::visit([&output](auto &&m) { output.push_back(&m); }, m);
   }
-  for (auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
-    if (m.r1 == id_ && isNeighborActive(m.r2)) {
-      output.push_back(&m);
-    } else if (m.r2 == id_ && isNeighborActive(m.r1)) {
-      output.push_back(&m);
-    }
-  }
-  return output;
-}
-
-std::vector<RelativePosePoseMeasurement *> Graph::inactiveLoopClosures() {
-  std::vector<RelativePosePoseMeasurement *> output;
-  // TODO(AT): Function is unused. Deprecate.
-  for (auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
-    if (m.r1 == id_ && !isNeighborActive(m.r2)) {
-      output.push_back(&m);
-    } else if (m.r2 == id_ && !isNeighborActive(m.r1)) {
-      output.push_back(&m);
-    }
+  for (auto &m : shared_lcs_.vec) {
+    std::visit(
+        [&output, this](auto &&m) {
+          if (m.r1 == id_ && isNeighborActive(m.r2)) {
+            output.push_back(&m);
+          } else if (m.r2 == id_ && isNeighborActive(m.r1)) {
+            output.push_back(&m);
+          }
+        },
+        m);
   }
   return output;
 }
@@ -463,31 +450,38 @@ Graph::Statistics Graph::statistics() const {
   double acceptCount = 0;
   double rejectCount = 0;
   // TODO(YT): specify tolerance for rejected and accepted loop closures
-  // TODO(AT): update for all measurements
-  for (const auto &m : private_lcs_.GetRelativePosePoseMeasurements()) {
-    // if (m.fixedWeight) continue;
-    if (m.weight == 1) {
-      acceptCount += 1;
-    } else if (m.weight == 0) {
-      rejectCount += 1;
-    }
-    totalCount += 1;
+  for (const auto &m : private_lcs_.vec) {
+    std::visit(
+        [&](auto &&m) {
+          // if (m.fixedWeight) continue;
+          if (m.weight == 1) {
+            acceptCount += 1;
+          } else if (m.weight == 0) {
+            rejectCount += 1;
+          }
+          totalCount += 1;
+        },
+        m);
   }
-  // TODO(AT): update for all measurements
-  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
-    // Skip loop closures with inactive neighbors
-    if (m.r1 == id_ && !isNeighborActive(m.r2)) {
-      continue;
-    }
-    if (m.r2 == id_ && !isNeighborActive(m.r1)) {
-      continue;
-    }
-    if (m.weight == 1) {
-      acceptCount += 1;
-    } else if (m.weight == 0) {
-      rejectCount += 1;
-    }
-    totalCount += 1;
+  for (const auto &m : shared_lcs_.vec) {
+    std::visit(
+        [&](auto &&m) {
+          // Skip loop closures with inactive neighbors
+          bool skip = false;
+          if (m.r1 == id_ && !isNeighborActive(m.r2))
+            skip = true;
+          if (m.r2 == id_ && !isNeighborActive(m.r1))
+            skip = true;
+          if (!skip) {
+            if (m.weight == 1) {
+              acceptCount += 1;
+            } else if (m.weight == 0) {
+              rejectCount += 1;
+            }
+            totalCount += 1;
+          }
+        },
+        m);
   }
 
   Graph::Statistics statistics;
@@ -770,29 +764,6 @@ bool Graph::constructPreconditioner() {
   ms_construct_precon_ = timer_.toc();
   // LOG(INFO) << "Construct precon ms: " << ms_construct_precon_;
   return true;
-}
-
-void Graph::updatePublicPoseIDs() {
-  // TODO(AT): Function is unused. Deprecate.
-  local_shared_pose_ids_.clear();
-  nbr_shared_pose_ids_.clear();
-  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
-    if (m.r1 == id_) {
-      CHECK(m.r2 != id_);
-      local_shared_pose_ids_.emplace(m.r1, m.p1);
-      nbr_shared_pose_ids_.emplace(m.r2, m.p2);
-    } else {
-      CHECK(m.r2 == id_);
-      local_shared_pose_ids_.emplace(m.r2, m.p2);
-      nbr_shared_pose_ids_.emplace(m.r1, m.p1);
-    }
-  }
-}
-
-void Graph::useInactiveNeighbors(bool use) {
-  // TODO(AT): Function is unused. Deprecate.
-  use_inactive_neighbors_ = use;
-  clearDataMatrices();
 }
 
 } // namespace DCORA

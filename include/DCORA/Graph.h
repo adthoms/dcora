@@ -365,22 +365,7 @@ public:
    * graph (contains both private and inter-robot loop closures)
    * @return
    */
-  std::vector<RelativePosePoseMeasurement *> allLoopClosures();
-  /**
-   * @brief Return a vector of pointers to all active loop closures
-   * @return
-   */
-  std::vector<RelativePosePoseMeasurement *> activeLoopClosures();
-  /**
-   * @brief Return a vector of pointers to all inactive loop closures
-   * @return
-   */
-  std::vector<RelativePosePoseMeasurement *> inactiveLoopClosures();
-  /**
-   * @brief Set to true to use measurements with inactive neighbors
-   * @return
-   */
-  void useInactiveNeighbors(bool use = true);
+  std::vector<RelativeMeasurementPointerVariant> activeLoopClosures();
 
 protected:
   // ID associated with this agent
@@ -468,12 +453,6 @@ protected:
    * @return
    */
   bool constructPreconditioner();
-  /**
-   * @brief Based on the current list of inter-robot (shared)
-   * loop closures, update the list of public pose IDs of myself
-   * and my neighbors.
-   */
-  void updatePublicPoseIDs();
 
 private:
   // Mapping Edge ID to the corresponding index in the vector of measurements
