@@ -74,10 +74,14 @@ void Graph::updateNumStates(const StateID &stateID) {
     b_ = std::max(b_, static_cast<unsigned int>(stateID.frame_id + 1));
 }
 
-void Graph::updateNumRanges(const RelativeMeasurement &measurement) {
+void Graph::updateNumRanges(const RelativeMeasurement &measurement,
+                            bool useSourceIDforOwnership) {
+  // unit sphere variables belong to agent that took range measurement
+  const unsigned int robotOwnershipID = useSourceIDforOwnership
+                                            ? measurement.getSrcID().robot_id
+                                            : measurement.getDstID().robot_id;
   if (!hasMeasurement(measurement.getSrcID(), measurement.getDstID()) &&
-      // unit sphere variables belong to agent that took range measurement
-      measurement.getSrcID().robot_id == id_ &&
+      robotOwnershipID == id_ &&
       measurement.measurementType == MeasurementType::Range)
     l_++;
 }
@@ -181,18 +185,14 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   // Check that this is a valid measurement
   factor.checkDim(d_);
 
-  // For inter-agent range measurements, corresponding unit sphere variables are
-  // owned by the agent taking the measurement (i.e. the measurement's source ID
-  // matches with the agent's ID). This condition is implicitly handled during
-  // the update.
-  updateNumRanges(factor);
-
   // Update local and neighbor shared state IDs. Set active neighbor.
   if (factor.r1 == id_) {
     CHECK(factor.r2 != id_);
 
     // Update number of poses and landmarks
     updateNumStates(src_id);
+    // Update number of unit sphere variables
+    updateNumRanges(factor, true);
 
     // Add local shared state to graph
     switch (factor.stateType1) {
@@ -227,9 +227,15 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     neighbor_active_[factor.r2] = true;
   } else {
     CHECK(factor.r2 == id_);
+    // Note: In DCORA, agent measurements are those who's source robot ID
+    // matches with the ID of the agent. As such, this block will not be
+    // entered. We leave this block to maintain backward compatibility with
+    // DPGO while adapting DCORA's logic to suite.
 
     // Update number of poses and landmarks
     updateNumStates(dst_id);
+    // Update number of unit sphere variables
+    updateNumRanges(factor, false);
 
     // Add local shared state to graph
     switch (factor.stateType2) {

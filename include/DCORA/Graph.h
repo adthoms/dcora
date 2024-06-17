@@ -125,11 +125,14 @@ public:
    */
   void updateNumStates(const StateID &stateID);
   /**
-   * @brief Update the number of ranges
+   * @brief Update the number of unit sphere variables. A flag sets the robot ID
+   * to be used for ownership of the associated range measurement.
    * @param measurement
+   * @param useSourceIDforOwnership
    * @return
    */
-  void updateNumRanges(const RelativeMeasurement &measurement);
+  void updateNumRanges(const RelativeMeasurement &measurement,
+                       bool useSourceIDforOwnership = true);
   /**
    * @brief Set measurements for this graph
    * @param measurements
