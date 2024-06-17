@@ -27,10 +27,10 @@
 namespace DCORA {
 
 /**
- * @brief A simple struct that contains the elements of an absolute measurement
- * for (robot, state).
+ * @brief A simple struct that contains the elements of a prior measurement for
+ * (robot, state).
  */
-struct AbsoluteMeasurement {
+struct PriorMeasurement {
   // Measurement type
   MeasurementType measurementType;
 
@@ -50,14 +50,14 @@ struct AbsoluteMeasurement {
   double weight;
 
   // Simple default constructor; does nothing
-  AbsoluteMeasurement() = default;
+  PriorMeasurement() = default;
 
   // Virtual destructor to enforce abstract class
-  virtual ~AbsoluteMeasurement() {}
+  virtual ~PriorMeasurement() {}
 
   // Basic constructor
-  AbsoluteMeasurement(MeasurementType type, size_t robot, size_t state,
-                      StateType stateType, bool fixedWeight, double weight)
+  PriorMeasurement(MeasurementType type, size_t robot, size_t state,
+                   StateType stateType, bool fixedWeight, double weight)
       : measurementType(type),
         r(robot),
         p(state),
@@ -75,8 +75,8 @@ struct AbsoluteMeasurement {
   virtual void print(std::ostream &os) const = 0;
 
   // A utility function for streaming this struct to cout
-  inline friend std::ostream &
-  operator<<(std::ostream &os, const AbsoluteMeasurement &measurement) {
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const PriorMeasurement &measurement) {
     os << "MeasurementType: "
        << MeasurementTypeToString(measurement.measurementType) << std::endl;
     os << "StateType: " << StateTypeToString(measurement.stateType)
@@ -94,7 +94,7 @@ struct AbsoluteMeasurement {
  * @brief A simple struct that contains the elements of a single pose prior for
  * (robot, pose).
  */
-struct PosePrior : AbsoluteMeasurement {
+struct PosePrior : PriorMeasurement {
   // Rotational measurement
   Matrix R;
 
@@ -109,16 +109,16 @@ struct PosePrior : AbsoluteMeasurement {
 
   // Default constructor
   PosePrior()
-      : AbsoluteMeasurement(MeasurementType::PosePrior, 0, 0, StateType::Pose,
-                            false, 1.0) {}
+      : PriorMeasurement(MeasurementType::PosePrior, 0, 0, StateType::Pose,
+                         false, 1.0) {}
 
   // Basic constructor
   PosePrior(size_t robot, size_t pose, const Matrix &priorRotation,
             const Vector &priorTranslation, double rotationalPrecision,
             double translationalPrecision, bool fixedWeight = false,
             double weight = 1.0)
-      : AbsoluteMeasurement(MeasurementType::PosePrior, robot, pose,
-                            StateType::Pose, fixedWeight, weight),
+      : PriorMeasurement(MeasurementType::PosePrior, robot, pose,
+                         StateType::Pose, fixedWeight, weight),
         R(priorRotation),
         t(priorTranslation),
         kappa(rotationalPrecision),
@@ -144,7 +144,7 @@ struct PosePrior : AbsoluteMeasurement {
  * @brief A simple struct that contains the elements of a single point prior for
  * (robot, point).
  */
-struct PointPrior : AbsoluteMeasurement {
+struct PointPrior : PriorMeasurement {
   // Translational measurement
   Vector t;
 
@@ -153,15 +153,15 @@ struct PointPrior : AbsoluteMeasurement {
 
   // Default constructor
   PointPrior()
-      : AbsoluteMeasurement(MeasurementType::PointPrior, 0, 0, StateType::Point,
-                            false, 1.0) {}
+      : PriorMeasurement(MeasurementType::PointPrior, 0, 0, StateType::Point,
+                         false, 1.0) {}
 
   // Basic constructor
   PointPrior(size_t robot, size_t point, const Vector &priorTranslation,
              double translationalPrecision, bool fixedWeight = false,
              double weight = 1.0)
-      : AbsoluteMeasurement(MeasurementType::PointPrior, robot, point,
-                            StateType::Point, fixedWeight, weight),
+      : PriorMeasurement(MeasurementType::PointPrior, robot, point,
+                         StateType::Point, fixedWeight, weight),
         t(priorTranslation),
         tau(translationalPrecision) {}
 
