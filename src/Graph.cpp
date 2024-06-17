@@ -74,6 +74,14 @@ void Graph::updateNumStates(const StateID &stateID) {
     b_ = std::max(b_, static_cast<unsigned int>(stateID.frame_id + 1));
 }
 
+void Graph::updateNumRanges(const RelativeMeasurement &measurement) {
+  if (!hasMeasurement(measurement.getSrcID(), measurement.getDstID()) &&
+      // unit sphere variables belong to agent that took range measurement
+      measurement.getSrcID().robot_id == id_ &&
+      measurement.measurementType == MeasurementType::Range)
+    l_++;
+}
+
 void Graph::setMeasurements(
     const std::vector<RelativePosePoseMeasurement> &measurements) {
   // Reset this graph to be empty
@@ -149,9 +157,11 @@ void Graph::addPrivateLoopClosure(const RelativeMeasurement &factor) {
   CHECK(factor.r1 == id_);
   CHECK(factor.r2 == id_);
 
-  // Update states
+  // Update number of poses and landmarks
   updateNumStates(src_id);
   updateNumStates(dst_id);
+  // Update number of unit sphere variables
+  updateNumRanges(factor);
 
   // Add relative measurement factor to private loop closures
   private_lcs_.push_back(factor);
@@ -171,11 +181,17 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   // Check that this is a valid measurement
   factor.checkDim(d_);
 
+  // For inter-agent range measurements, corresponding unit sphere variables are
+  // owned by the agent taking the measurement (i.e. the measurement's source ID
+  // matches with the agent's ID). This condition is implicitly handled during
+  // the update.
+  updateNumRanges(factor);
+
   // Update local and neighbor shared state IDs. Set active neighbor.
   if (factor.r1 == id_) {
     CHECK(factor.r2 != id_);
 
-    // Update states
+    // Update number of poses and landmarks
     updateNumStates(src_id);
 
     // Add local shared state to graph
@@ -212,7 +228,7 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   } else {
     CHECK(factor.r2 == id_);
 
-    // Update states
+    // Update number of poses and landmarks
     updateNumStates(dst_id);
 
     // Add local shared state to graph

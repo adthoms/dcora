@@ -119,10 +119,17 @@ public:
    */
   void clearNeighborStates();
   /**
-   * @brief Update the number of poses and landmarks according to state ID
+   * @brief Update the number of poses and landmarks
+   * @param stateID
    * @return
    */
   void updateNumStates(const StateID &stateID);
+  /**
+   * @brief Update the number of ranges
+   * @param measurement
+   * @return
+   */
+  void updateNumRanges(const RelativeMeasurement &measurement);
   /**
    * @brief Set measurements for this graph
    * @param measurements
