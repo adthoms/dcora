@@ -970,6 +970,21 @@ RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset) {
   return robot_measurements;
 }
 
+void executeStateDependantFunctionals(std::function<void()> poseFunction,
+                                      std::function<void()> pointFunction,
+                                      const StateType &state_type) {
+  switch (state_type) {
+  case StateType::Pose:
+    poseFunction();
+    break;
+  case StateType::Point:
+    pointFunction();
+    break;
+  default:
+    LOG(FATAL) << "Invalid StateType: " << StateTypeToString(state_type) << "!";
+  }
+}
+
 void get_dimension_and_num_poses(
     const std::vector<RelativePosePoseMeasurement> &measurements,
     size_t *dimension, size_t *num_poses) {
