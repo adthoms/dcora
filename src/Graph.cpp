@@ -77,9 +77,8 @@ void Graph::updateNumStates(const StateID &stateID) {
 void Graph::updateNumRanges(const RelativeMeasurement &measurement,
                             bool useSourceIDforOwnership) {
   // unit sphere variables belong to agent that took range measurement
-  const unsigned int robotOwnershipID = useSourceIDforOwnership
-                                            ? measurement.getSrcID().robot_id
-                                            : measurement.getDstID().robot_id;
+  const unsigned int robotOwnershipID =
+      useSourceIDforOwnership ? measurement.r1 : measurement.r2;
   if (!hasMeasurement(measurement.getSrcID(), measurement.getDstID()) &&
       robotOwnershipID == id_ &&
       measurement.measurementType == MeasurementType::Range)
@@ -195,30 +194,16 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     updateNumRanges(factor, true);
 
     // Add local shared state to graph
-    switch (factor.stateType1) {
-    case StateType::Pose:
-      local_shared_pose_ids_.emplace(factor.r1, factor.p1);
-      break;
-    case StateType::Point:
-      local_shared_point_ids_.emplace(factor.r1, factor.p1);
-      break;
-    default:
-      LOG(FATAL) << "Invalid StateType1: "
-                 << StateTypeToString(factor.stateType1) << "!";
-    }
+    executeStateDependantFunctionals(
+        [&, this]() { local_shared_pose_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { local_shared_point_ids_.emplace(factor.r1, factor.p1); },
+        factor.stateType1);
 
     // Add neighbor shared state to graph
-    switch (factor.stateType2) {
-    case StateType::Pose:
-      nbr_shared_pose_ids_.emplace(factor.r2, factor.p2);
-      break;
-    case StateType::Point:
-      nbr_shared_point_ids_.emplace(factor.r2, factor.p2);
-      break;
-    default:
-      LOG(FATAL) << "Invalid StateType2: "
-                 << StateTypeToString(factor.stateType2) << "!";
-    }
+    executeStateDependantFunctionals(
+        [&, this]() { nbr_shared_pose_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { nbr_shared_point_ids_.emplace(factor.r2, factor.p2); },
+        factor.stateType2);
 
     // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r2);
@@ -238,30 +223,16 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     updateNumRanges(factor, false);
 
     // Add local shared state to graph
-    switch (factor.stateType2) {
-    case StateType::Pose:
-      local_shared_pose_ids_.emplace(factor.r2, factor.p2);
-      break;
-    case StateType::Point:
-      local_shared_point_ids_.emplace(factor.r2, factor.p2);
-      break;
-    default:
-      LOG(FATAL) << "Invalid StateType2: "
-                 << StateTypeToString(factor.stateType2) << "!";
-    }
+    executeStateDependantFunctionals(
+        [&, this]() { local_shared_pose_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { local_shared_point_ids_.emplace(factor.r2, factor.p2); },
+        factor.stateType2);
 
     // Add neighbor shared state to graph
-    switch (factor.stateType1) {
-    case StateType::Pose:
-      nbr_shared_pose_ids_.emplace(factor.r1, factor.p1);
-      break;
-    case StateType::Point:
-      nbr_shared_point_ids_.emplace(factor.r1, factor.p1);
-      break;
-    default:
-      LOG(FATAL) << "Invalid StateType1: "
-                 << StateTypeToString(factor.stateType1) << "!";
-    }
+    executeStateDependantFunctionals(
+        [&, this]() { nbr_shared_pose_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { nbr_shared_point_ids_.emplace(factor.r1, factor.p1); },
+        factor.stateType1);
 
     // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r1);
@@ -387,7 +358,7 @@ RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
     if constexpr (std::is_base_of_v<RelativeMeasurement, T>)
       return dynamic_cast<RelativeMeasurement *>(&arg);
     else
-      LOG(FATAL) << "Error: Cannot dynamically cast RelativeMeasurement!";
+      LOG(FATAL) << "Error: cannot dynamically cast RelativeMeasurement!";
     return static_cast<RelativeMeasurement *>(nullptr);
   };
   if (hasMeasurement(srcID, dstID)) {
