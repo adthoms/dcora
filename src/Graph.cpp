@@ -522,8 +522,9 @@ void Graph::clearDataMatrices() {
 
 bool Graph::constructQ() {
   timer_.tic();
-  if (!private_lcs_.isPGOCompatible() || !shared_lcs_.isPGOCompatible())
-    LOG(FATAL) << "Error: Loop closures are not PGO compatible!";
+  if (!isPGOCompatible())
+    LOG(FATAL) << "Error: graph is not PGO compatible! Q must be constructed "
+                  "for RA-SLAM domain!";
   std::vector<RelativePosePoseMeasurement> privateMeasurements = odometry_;
   std::vector<RelativePosePoseMeasurement> private_lcs_pose_pose =
       private_lcs_.GetRelativePosePoseMeasurements();

@@ -107,6 +107,11 @@ public:
     return numOdometry() + numPrivateLoopClosures() + numSharedLoopClosures();
   }
   /**
+   * @brief Return true if the graph is compatible with PGO
+   * @return
+   */
+  bool isPGOCompatible() const { return (b_ == 0 && l_ == 0); }
+  /**
    * @brief Clear all contents and reset this graph to be empty
    */
   void empty();

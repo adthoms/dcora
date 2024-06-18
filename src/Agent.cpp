@@ -251,10 +251,10 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
     }
     case (InitializationMethod::Chordal): {
       LOG(INFO) << "Computing local chordal initialization.";
-      const RelativeMeasurements m = mPoseGraph->localMeasurements();
-      if (!m.isPGOCompatible())
+      if (!mPoseGraph->isPGOCompatible())
         LOG(FATAL) << "Chordal initialization requires all relative "
-                      "measurement to be pose-pose measuremenst!";
+                      "measurement to be pose-pose measurements!";
+      const RelativeMeasurements m = mPoseGraph->localMeasurements();
       T = chordalInitialization(m.GetRelativePosePoseMeasurements());
       break;
     }
@@ -272,10 +272,10 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       params.robust_params.GNCBarc = 5.0;
       params.robust_params.GNCMuStep = 1.4;
       PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
-      const RelativeMeasurements m = mPoseGraph->localMeasurements();
-      if (!m.isPGOCompatible())
+      if (!mPoseGraph->isPGOCompatible())
         LOG(FATAL) << "Error: relative measurements must be pose-pose for "
                       "GNC_TLS initialization!";
+      const RelativeMeasurements m = mPoseGraph->localMeasurements();
       std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
           m.GetRelativePosePoseMeasurements();
       // Solve for trajectory
@@ -910,10 +910,10 @@ std::vector<unsigned> PGOAgent::getNeighbors() const {
 Matrix PGOAgent::localPoseGraphOptimization() {
   ROptParameters pgo_params;
   pgo_params.verbose = true;
-  const RelativeMeasurements m = mPoseGraph->localMeasurements();
-  if (!m.isPGOCompatible())
+  if (!mPoseGraph->isPGOCompatible())
     LOG(FATAL) << "Local PGO requires all relative measurement to be pose-pose "
-                  "measuremenst!";
+                  "measurements!";
+  const RelativeMeasurements m = mPoseGraph->localMeasurements();
   const auto T = solvePGO(m.GetRelativePosePoseMeasurements(), pgo_params);
   return T.getData();
 }

@@ -496,16 +496,6 @@ public:
     return *this;
   }
 
-  // Validators
-  bool isPGOCompatible() const {
-    for (const auto &m : vec) {
-      if (std::holds_alternative<RelativePosePointMeasurement>(m) ||
-          std::holds_alternative<RangeMeasurement>(m))
-        return false;
-    }
-    return true;
-  }
-
   // Getters
   std::vector<RelativePosePoseMeasurement>
   GetRelativePosePoseMeasurements() const {
