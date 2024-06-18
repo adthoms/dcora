@@ -943,30 +943,100 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 
 RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset) {
   RobotMeasurements robot_measurements;
+  std::map<unsigned int, unsigned int> robot_first_pose_id;
+  std::map<unsigned int, unsigned int> robot_first_point_id;
+
+  // Copy measurements from dataset to robot
   for (const auto &robot_id : pyfg_dataset.robot_IDs) {
     Measurements measurements;
+    std::set<unsigned int> pose_ids;
+    std::set<unsigned int> point_ids;
+
     // add priors
     for (const auto &pose_prior : pyfg_dataset.measurements.pose_priors) {
-      if (pose_prior.r == robot_id)
+      if (pose_prior.r == robot_id) {
         measurements.pose_priors.push_back(pose_prior);
+        pose_ids.insert(pose_prior.p);
+      }
     }
     for (const auto &point_prior : pyfg_dataset.measurements.point_priors) {
-      if (point_prior.r == robot_id)
+      if (point_prior.r == robot_id) {
         measurements.point_priors.push_back(point_prior);
+        point_ids.insert(point_prior.p);
+      }
     }
+
     // add relative measurements
     for (const auto &m : pyfg_dataset.measurements.relative_measurements.vec) {
       std::visit(
-          [robot_id, &measurements](auto &&m) {
+          [&](auto &&m) {
             if (m.r1 == robot_id) {
+              // measurement belongs to this agent
               measurements.relative_measurements.vec.push_back(m);
+              executeStateDependantFunctionals(
+                  [&]() { pose_ids.insert(m.p1); },
+                  [&]() { point_ids.insert(m.p1); }, m.stateType1);
+            }
+            if (m.r2 == robot_id) {
+              executeStateDependantFunctionals(
+                  [&]() { pose_ids.insert(m.p2); },
+                  [&]() { point_ids.insert(m.p2); }, m.stateType2);
             }
           },
           m);
     }
+
+    // check for monotonically increasing sets of consecutive IDs
+    auto areStateIDsConsecutive = [](const std::set<unsigned int> &ids) {
+      auto it = std::adjacent_find(ids.begin(), ids.end(),
+                                   [](int a, int b) { return a + 1 != b; });
+      return it == ids.end();
+    };
+    if (!areStateIDsConsecutive(pose_ids))
+      LOG(FATAL) << "Error: Pose IDs are not consecutive for robot " << robot_id
+                 << "!";
+    if (!areStateIDsConsecutive(point_ids))
+      LOG(FATAL) << "Error: Point IDs are not consecutive for robot "
+                 << robot_id << "!";
+
+    // get first IDs for reindexing
+    const unsigned int first_pose_id = *pose_ids.begin();
+    const unsigned int first_point_id = *point_ids.begin();
+    if (first_pose_id != 0)
+      LOG(WARNING) << "WARNING: Pose IDs do not start at 0 for robot "
+                   << robot_id << " and will be reindexed.";
+    if (first_point_id != 0)
+      LOG(WARNING) << "WARNING: Point IDs do not start at 0 for robot "
+                   << robot_id << " and will be reindexed.";
+    robot_first_pose_id[robot_id] = first_pose_id;
+    robot_first_point_id[robot_id] = first_point_id;
+
     // emplace
     robot_measurements[robot_id] = measurements;
   }
+
+  // reindex state IDs from zero
+  for (auto &[robot_id, measurements] : robot_measurements) {
+    for (auto &pose_prior : measurements.pose_priors) {
+      pose_prior.p -= robot_first_pose_id[robot_id];
+    }
+    for (auto &point_prior : measurements.point_priors) {
+      point_prior.p -= robot_first_point_id[robot_id];
+    }
+    for (auto &m : measurements.relative_measurements.vec) {
+      std::visit(
+          [&](auto &&m) {
+            executeStateDependantFunctionals(
+                [&]() { m.p1 -= robot_first_pose_id[m.r1]; },
+                [&]() { m.p1 -= robot_first_point_id[m.r1]; }, m.stateType1);
+            executeStateDependantFunctionals(
+                [&]() { m.p2 -= robot_first_pose_id[m.r2]; },
+                [&]() { m.p2 -= robot_first_point_id[m.r2]; }, m.stateType2);
+          },
+          m);
+    }
+  }
+
   return robot_measurements;
 }
 
