@@ -34,6 +34,23 @@ int main(int argc, char **argv) {
   std::cout << "Multi-robot RA-SLAM demo. " << std::endl;
 
   DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(argv[1]);
+  DCORA::RobotMeasurements robot_measurements =
+      DCORA::GetRobotMeasurements(dataset);
+
+  unsigned int n, d, r;
+  d = dataset.dim;
+  n = dataset.num_poses;
+  r = 5;
+  bool acceleration = true;
+  bool verbose = false;
+  unsigned numIters = 1000;
+
+  // TODO(Alex): Used for debugging purposes for Graph Milestone.
+  for (const auto &[robot_id, measurements] : robot_measurements) {
+    std::shared_ptr<DCORA::Graph> graph =
+        std::make_shared<DCORA::Graph>(robot_id, r, d);
+    graph->setMeasurements(measurements.relative_measurements);
+  }
 
   // TODO(Alex): Implement remaining RA-SLAM demo similar to
   // MultiRobotExample.cpp

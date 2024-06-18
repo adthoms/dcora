@@ -35,7 +35,7 @@ find_package(SPQR REQUIRED)
 find_package(Cholmod REQUIRED)
 find_package(BLAS REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Boost)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 find_package(Eigen3 REQUIRED)
 message(STATUS "Found Eigen version: ${EIGEN3_VERSION}")
 message(STATUS "EIGEN3_INCLUDE_DIR: ${EIGEN3_INCLUDE_DIR}")
@@ -175,6 +175,7 @@ if(BUILD_DCORA_TESTS)
     tests/testEigenMap.cpp
     tests/testConstruction.cpp
     tests/testLineGraph.cpp
+    tests/testMeasurements.cpp
     tests/testTriangleGraph.cpp
     tests/testOptimizationThread.cpp
   )

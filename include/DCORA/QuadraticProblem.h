@@ -39,7 +39,7 @@ public:
    * @param pose_graph input pose graph must be initialized (or can be
    * initialized) otherwise throw a runtime error
    */
-  explicit QuadraticProblem(const std::shared_ptr<PoseGraph> &pose_graph);
+  explicit QuadraticProblem(const std::shared_ptr<Graph> &pose_graph);
 
   /**
    * @brief Deconstructor
@@ -119,7 +119,7 @@ public:
 
 private:
   // The pose graph that represents the optimization problem
-  std::shared_ptr<PoseGraph> pose_graph_;
+  std::shared_ptr<Graph> pose_graph_;
 
   // Underlying manifold
   LiftedSEManifold *M;

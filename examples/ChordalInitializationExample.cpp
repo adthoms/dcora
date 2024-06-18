@@ -40,8 +40,8 @@ int main(int argc, char **argv) {
   std::cout << "Loaded dataset from file " << argv[1] << "." << std::endl;
 
   // Construct optimization problem
-  std::shared_ptr<DCORA::PoseGraph> pose_graph =
-      std::make_shared<DCORA::PoseGraph>(0, d, d);
+  std::shared_ptr<DCORA::Graph> pose_graph =
+      std::make_shared<DCORA::Graph>(0, d, d);
   pose_graph->setMeasurements(dataset);
   DCORA::QuadraticProblem problemCentral(pose_graph);
 

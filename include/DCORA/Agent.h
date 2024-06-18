@@ -575,9 +575,9 @@ public:
   void updateAuxNeighborPoses(unsigned neighborID, const PoseDict &poseDict);
 
   /**
-   * @brief Clear local caches of all neighbors' poses
+   * @brief Clear local caches of all neighbors' states
    */
-  void clearNeighborPoses();
+  void clearNeighborStates();
 
   /**
    * @brief Clear local caches of all active neighbors' poses
@@ -618,7 +618,7 @@ protected:
   RobustCost mRobustCost;
 
   // Pointer to pose graph
-  std::shared_ptr<PoseGraph> mPoseGraph;
+  std::shared_ptr<Graph> mPoseGraph;
 
   // Current PGO instance
   unsigned mInstanceNumber;
@@ -754,9 +754,8 @@ protected:
    * @param residual The output residual
    * @return
    */
-  bool
-  computeMeasurementResidual(const RelativePosePoseMeasurement &measurement,
-                             double *residual) const;
+  bool computeMeasurementResidual(const RelativeMeasurement &measurement,
+                                  double *residual) const;
 
   /**
    * @brief Set weight for measurement in the pose graph. Return false if the

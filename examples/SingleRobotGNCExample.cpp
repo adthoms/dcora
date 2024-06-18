@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
       DCORA::read_g2o_file(argv[1], &num_poses);
   CHECK(!measurements.empty());
   unsigned int dimension = measurements[0].t.size();
-  auto pose_graph = std::make_shared<DCORA::PoseGraph>(0, dimension, dimension);
+  auto pose_graph = std::make_shared<DCORA::Graph>(0, dimension, dimension);
   pose_graph->setMeasurements(measurements);
 
   DCORA::solveRobustPGOParams params;

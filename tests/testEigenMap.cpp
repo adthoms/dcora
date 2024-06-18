@@ -83,6 +83,6 @@ TEST(testDCORA, EigenMapRA) {
   // Check that the internal value of x is modified accordingly
   ASSERT_LE((xMat - x.getData()).norm(), 1e-4);
 
-  xMat = DCORA::Matrix::Random(d, (d + 1) * n);
+  xMat = DCORA::Matrix::Random(d, (d + 1) * n + l + b);
   ASSERT_LE((xMat - x.getData()).norm(), 1e-4);
 }

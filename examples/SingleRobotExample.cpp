@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   }
 
   // Construct the centralized PGO problem (used for evaluation)
-  auto pose_graph = std::make_shared<DCORA::PoseGraph>(0, d, d);
+  auto pose_graph = std::make_shared<DCORA::Graph>(0, d, d);
   pose_graph->setMeasurements(dataset);
   DCORA::QuadraticProblem problemCentral(pose_graph);
 

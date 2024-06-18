@@ -17,6 +17,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SVD>
 #include <chrono> // NOLINT(build/c++11)
+#include <functional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -95,6 +96,24 @@ int getDimFromPyfgFirstLine(const std::string &filename);
  * @return
  */
 PyFGDataset read_pyfg_file(const std::string &filename);
+
+/**
+ * @brief Helper function to partition a PyFG dataset's measurements among its
+ * robots
+ * @param pyfg_dataset
+ * @return
+ */
+RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset);
+
+/**
+ * @brief Execute functionals based on state type
+ * @param poseFunction
+ * @param pointFunction
+ * @param state_type
+ */
+void executeStateDependantFunctionals(std::function<void()> poseFunction,
+                                      std::function<void()> pointFunction,
+                                      const StateType &state_type);
 
 /**
  * @brief Get the dimension and number of poses from a vector of relative pose
