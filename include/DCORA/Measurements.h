@@ -21,6 +21,7 @@
 #include <memory>
 #include <set>
 #include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -467,6 +468,9 @@ struct RangeMeasurement : RelativeMeasurement {
     os << "precision: " << precision << std::endl;
   }
 };
+
+// Robot and state ID pairing
+typedef std::pair<size_t, size_t> RobotStateIDPair;
 
 // Type-safe unions of relative measurements
 typedef std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,

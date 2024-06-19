@@ -66,6 +66,7 @@ void Graph::clearNeighborStates() {
 }
 
 void Graph::updateNumStates(const StateID &stateID) {
+  CHECK_EQ(stateID.robot_id, id_);
   // Update num poses
   if (stateID.isPose())
     n_ = std::max(n_, static_cast<unsigned int>(stateID.frame_id + 1));
