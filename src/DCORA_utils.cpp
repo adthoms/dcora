@@ -1146,22 +1146,14 @@ void getGraphDimensionsFromLocalMeasurements(
 }
 
 void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativePosePoseMeasurement> &measurements,
-    SparseMatrix *AT, DiagonalMatrix *OmegaT) {
+    const RelativeMeasurements &measurements, SparseMatrix *AT,
+    DiagonalMatrix *OmegaT) {
   // Deduce graph dimensions from measurements
-  size_t d; // Dimension of Euclidean space
-  d = (!measurements.empty() ? measurements[0].t.size() : 0);
-  size_t dh = d + 1; // Homogenized dimension of Euclidean space
-  size_t m;          // Number of measurements
-  m = measurements.size();
-  size_t n = 0; // Number of poses
-  for (const RelativePosePoseMeasurement &meas : measurements) {
-    if (n < meas.p1)
-      n = meas.p1;
-    if (n < meas.p2)
-      n = meas.p2;
-  }
-  n++; // Account for 0-based indexing: node indexes go from 0 to max({i,j})
+  size_t d;
+  size_t n;
+  getGraphDimensionsFromLocalMeasurements(measurements, &d, &n);
+  size_t m = measurements.vec.size();
+  unsigned int dh = d + 1;
 
   // Define connection incidence matrix dimensions
   // This is a [n x m] (dh x dh)-block matrix
@@ -1178,7 +1170,8 @@ void constructOrientedConnectionIncidenceMatrixSE(
   // Insert actual measurement values
   size_t i, j;
   for (size_t k = 0; k < m; k++) {
-    const RelativePosePoseMeasurement &meas = measurements[k];
+    const RelativePosePoseMeasurement &meas =
+        std::get<RelativePosePoseMeasurement>(measurements.vec[k]);
     i = meas.p1;
     j = meas.p2;
 
@@ -1215,8 +1208,8 @@ void constructOrientedConnectionIncidenceMatrixSE(
   *OmegaT = Omega;
 }
 
-SparseMatrix constructConnectionLaplacianSE(
-    const std::vector<RelativePosePoseMeasurement> &measurements) {
+SparseMatrix
+constructConnectionLaplacianSE(const RelativeMeasurements &measurements) {
   SparseMatrix AT;
   DiagonalMatrix OmegaT;
   constructOrientedConnectionIncidenceMatrixSE(measurements, &AT, &OmegaT);

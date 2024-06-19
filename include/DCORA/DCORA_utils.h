@@ -146,16 +146,16 @@ void getGraphDimensionsFromLocalMeasurements(
  * @param OmegaT
  */
 void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativePosePoseMeasurement> &measurements,
-    SparseMatrix *AT, DiagonalMatrix *OmegaT);
+    const RelativeMeasurements &measurements, SparseMatrix *AT,
+    DiagonalMatrix *OmegaT);
 
 /**
  * @brief Helper function to construct connection laplacian matrix in SE(d)
  * @param measurements
  * @return
  */
-SparseMatrix constructConnectionLaplacianSE(
-    const std::vector<RelativePosePoseMeasurement> &measurements);
+SparseMatrix
+constructConnectionLaplacianSE(const RelativeMeasurements &measurements);
 
 /**
  * @brief Given a vector of relative pose measurements, this function computes

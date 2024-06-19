@@ -522,16 +522,11 @@ void Graph::clearDataMatrices() {
 }
 
 bool Graph::constructQ() {
-  timer_.tic();
   if (!isPGOCompatible())
     LOG(FATAL) << "Error: graph is not PGO compatible! Q must be constructed "
                   "for RA-SLAM domain!";
-  std::vector<RelativePosePoseMeasurement> privateMeasurements = odometry_;
-  std::vector<RelativePosePoseMeasurement> private_lcs_pose_pose =
-      private_lcs_.GetRelativePosePoseMeasurements();
-  privateMeasurements.insert(privateMeasurements.end(),
-                             private_lcs_pose_pose.begin(),
-                             private_lcs_pose_pose.end());
+  timer_.tic();
+  RelativeMeasurements privateMeasurements = localMeasurements();
 
   // Initialize Q with private measurements
   SparseMatrix QLocal = constructConnectionLaplacianSE(privateMeasurements);
@@ -547,26 +542,28 @@ bool Graph::constructQ() {
   QDiagRow.setZero();
 
   // Go through shared loop closures
-  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
+  for (const auto &m : shared_lcs_.vec) {
+    const RelativePosePoseMeasurement &m_pose_pose =
+        std::get<RelativePosePoseMeasurement>(m);
     // Set relative SE matrix (homogeneous form)
-    T.block(0, 0, d_, d_) = m.R;
-    T.block(0, d_, d_, 1) = m.t;
+    T.block(0, 0, d_, d_) = m_pose_pose.R;
+    T.block(0, d_, d_, 1) = m_pose_pose.t;
     T(d_, d_) = 1;
 
     // Set aggregate weight matrix
     for (unsigned row = 0; row < d_; ++row) {
-      Omega(row, row) = m.weight * m.kappa;
+      Omega(row, row) = m_pose_pose.weight * m_pose_pose.kappa;
     }
-    Omega(d_, d_) = m.weight * m.tau;
+    Omega(d_, d_) = m_pose_pose.weight * m_pose_pose.tau;
 
-    if (m.r1 == id_) {
+    if (m_pose_pose.r1 == id_) {
       // First pose belongs to this robot
       // Hence, this is an outgoing edge in the pose graph
-      CHECK(m.r2 != id_);
-      const PoseID nID(m.r2, m.p2);
+      CHECK(m_pose_pose.r2 != id_);
+      const PoseID nID(m_pose_pose.r2, m_pose_pose.p2);
       bool has_neighbor_pose =
           (neighbor_poses_.find(nID) != neighbor_poses_.end());
-      if (isNeighborActive(m.r2)) {
+      if (isNeighborActive(m_pose_pose.r2)) {
         // Measurement with active neighbor
         if (!has_neighbor_pose) {
           LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
@@ -580,18 +577,18 @@ bool Graph::constructQ() {
         }
       }
       // Modify quadratic cost
-      int idx = static_cast<int>(m.p1);
+      int idx = static_cast<int>(m_pose_pose.p1);
       Matrix W = T * Omega * T.transpose();
       QDiagRow.block(0, idx * (d_ + 1), d_ + 1, d_ + 1) += W;
 
     } else {
       // Second pose belongs to this robot
       // Hence, this is an incoming edge in the pose graph
-      CHECK(m.r2 == id_);
-      const PoseID nID(m.r1, m.p1);
+      CHECK(m_pose_pose.r2 == id_);
+      const PoseID nID(m_pose_pose.r1, m_pose_pose.p1);
       bool has_neighbor_pose =
           (neighbor_poses_.find(nID) != neighbor_poses_.end());
-      if (isNeighborActive(m.r1)) {
+      if (isNeighborActive(m_pose_pose.r1)) {
         // Measurement with active neighbor
         if (!has_neighbor_pose) {
           LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
@@ -605,7 +602,7 @@ bool Graph::constructQ() {
         }
       }
       // Modify quadratic cost
-      int idx = static_cast<int>(m.p2);
+      int idx = static_cast<int>(m_pose_pose.p2);
       QDiagRow.block(0, idx * (d_ + 1), d_ + 1, d_ + 1) += Omega;
     }
   }
@@ -643,6 +640,9 @@ bool Graph::constructQ() {
 }
 
 bool Graph::constructG() {
+  if (!isPGOCompatible())
+    LOG(FATAL) << "Error: graph is not PGO compatible! G must be constructed "
+                  "for RA-SLAM domain!";
   timer_.tic();
   unsigned d = d_;
   Matrix G(r_, (d_ + 1) * n_);
@@ -650,26 +650,28 @@ bool Graph::constructG() {
   Matrix T = Matrix::Zero(d + 1, d + 1);
   Matrix Omega = Matrix::Zero(d + 1, d + 1);
   // Go through shared measurements
-  for (const auto &m : shared_lcs_.GetRelativePosePoseMeasurements()) {
+  for (const auto &m : shared_lcs_.vec) {
+    const RelativePosePoseMeasurement &m_pose_pose =
+        std::get<RelativePosePoseMeasurement>(m);
     // Construct relative SE matrix in homogeneous form
-    T.block(0, 0, d, d) = m.R;
-    T.block(0, d, d, 1) = m.t;
+    T.block(0, 0, d, d) = m_pose_pose.R;
+    T.block(0, d, d, 1) = m_pose_pose.t;
     T(d, d) = 1;
 
     // Construct aggregate weight matrix
     for (unsigned row = 0; row < d; ++row) {
-      Omega(row, row) = m.weight * m.kappa;
+      Omega(row, row) = m_pose_pose.weight * m_pose_pose.kappa;
     }
-    Omega(d, d) = m.weight * m.tau;
+    Omega(d, d) = m_pose_pose.weight * m_pose_pose.tau;
 
-    if (m.r1 == id_) {
+    if (m_pose_pose.r1 == id_) {
       // First pose belongs to this robot
       // Hence, this is an outgoing edge in the pose graph
-      CHECK(m.r2 != id_);
-      const PoseID nID(m.r2, m.p2);
+      CHECK(m_pose_pose.r2 != id_);
+      const PoseID nID(m_pose_pose.r2, m_pose_pose.p2);
       auto pair = neighbor_poses_.find(nID);
       bool has_neighbor_pose = (pair != neighbor_poses_.end());
-      if (isNeighborActive(m.r2)) {
+      if (isNeighborActive(m_pose_pose.r2)) {
         // Measurement with active neighbor
         if (!has_neighbor_pose) {
           LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
@@ -683,18 +685,18 @@ bool Graph::constructG() {
         }
       }
       Matrix Xj = pair->second.pose();
-      int idx = static_cast<int>(m.p1);
+      int idx = static_cast<int>(m_pose_pose.p1);
       // Modify linear cost
       Matrix L = -Xj * Omega * T.transpose();
       G.block(0, idx * (d_ + 1), r_, d_ + 1) += L;
     } else {
       // Second pose belongs to this robot
       // Hence, this is an incoming edge in the pose graph
-      CHECK(m.r2 == id_);
-      const PoseID nID(m.r1, m.p1);
+      CHECK(m_pose_pose.r2 == id_);
+      const PoseID nID(m_pose_pose.r1, m_pose_pose.p1);
       auto pair = neighbor_poses_.find(nID);
       bool has_neighbor_pose = (pair != neighbor_poses_.end());
-      if (isNeighborActive(m.r1)) {
+      if (isNeighborActive(m_pose_pose.r1)) {
         // Measurement with active neighbor
         if (!has_neighbor_pose) {
           LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
@@ -708,7 +710,7 @@ bool Graph::constructG() {
         }
       }
       Matrix Xi = pair->second.pose();
-      int idx = static_cast<int>(m.p2);
+      int idx = static_cast<int>(m_pose_pose.p2);
       // Modify linear cost
       Matrix L = -Xi * T * Omega;
       G.block(0, idx * (d_ + 1), r_, d_ + 1) += L;
