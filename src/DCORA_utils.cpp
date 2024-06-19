@@ -941,7 +941,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   return pyfg_dataset;
 }
 
-RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset) {
+RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
   RobotMeasurements robot_measurements;
   std::map<unsigned int, unsigned int> robot_first_pose_id;
   std::map<unsigned int, unsigned int> robot_first_point_id;

@@ -103,7 +103,7 @@ PyFGDataset read_pyfg_file(const std::string &filename);
  * @param pyfg_dataset
  * @return
  */
-RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset);
+RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset);
 
 /**
  * @brief Execute functionals based on state type

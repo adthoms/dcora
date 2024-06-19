@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
 
   DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(argv[1]);
   DCORA::RobotMeasurements robot_measurements =
-      DCORA::GetRobotMeasurements(dataset);
+      DCORA::getRobotMeasurements(dataset);
 
   unsigned int n, d, r;
   d = dataset.dim;
