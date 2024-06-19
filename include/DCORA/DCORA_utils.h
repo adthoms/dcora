@@ -127,6 +127,19 @@ void get_dimension_and_num_poses(
     size_t *dimension, size_t *num_poses);
 
 /**
+ * @brief Calculate graph dimensions from a set of local relative measurements
+ * @param measurements
+ * @param dimension
+ * @param num_poses
+ * @param num_unit_sphere_vars
+ * @param num_landmarks
+ */
+void getGraphDimensionsFromLocalMeasurements(
+    const RelativeMeasurements &measurements, unsigned int *dimension,
+    unsigned int *num_poses, unsigned int *num_unit_sphere_vars = nullptr,
+    unsigned int *num_landmarks = nullptr);
+
+/**
  * @brief Helper function to construct connection laplacian matrix in SE(d)
  * @param measurements
  * @param AT

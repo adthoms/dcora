@@ -1058,6 +1058,7 @@ void executeStateDependantFunctionals(std::function<void()> poseFunction,
 void get_dimension_and_num_poses(
     const std::vector<RelativePosePoseMeasurement> &measurements,
     size_t *dimension, size_t *num_poses) {
+  // TODO(AT): deprecate for getGraphDimensionsFromLocalMeasurements
   CHECK(!measurements.empty());
   *dimension = measurements[0].t.size();
   CHECK(*dimension == 2 || *dimension == 3);
@@ -1066,6 +1067,82 @@ void get_dimension_and_num_poses(
     *num_poses = std::max(*num_poses, meas.p1 + 1);
     *num_poses = std::max(*num_poses, meas.p2 + 1);
   }
+}
+
+void getGraphDimensionsFromLocalMeasurements(
+    const RelativeMeasurements &measurements, unsigned int *dimension,
+    unsigned int *num_poses, unsigned int *num_unit_sphere_vars,
+    unsigned int *num_landmarks) {
+  // Check for empty measurements
+  if (measurements.vec.empty()) {
+    LOG(WARNING) << "Warning: local measurements are empty. Setting all "
+                    "dimensions to zero";
+    *dimension = 0;
+    *num_poses = 0;
+    if (num_unit_sphere_vars)
+      *num_unit_sphere_vars = 0;
+    if (num_landmarks)
+      *num_landmarks = 0;
+    return;
+  }
+
+  // Get dimension of Euclidean space.
+  unsigned int d = 0;
+  for (const auto &m : measurements.vec) {
+    if (std::holds_alternative<RelativePosePoseMeasurement>(m)) {
+      d = std::get<RelativePosePoseMeasurement>(m).t.size();
+      break;
+    }
+    if (std::holds_alternative<RelativePosePointMeasurement>(m)) {
+      d = std::get<RelativePosePointMeasurement>(m).t.size();
+      break;
+    }
+  }
+  if (d == 0)
+    LOG(WARNING)
+        << "Warning: Local measurements only contain range measurements, which "
+           "cannot determine dimension of Euclidean space from measurements.";
+
+  // Get number of poses, unit sphere variables, and landmarks
+  unsigned int n = 0;
+  unsigned int l = 0;
+  unsigned int b = 0;
+  for (const auto &m : measurements.vec) {
+    if (std::holds_alternative<RelativePosePoseMeasurement>(m)) {
+      const auto &m_pose_pose = std::get<RelativePosePoseMeasurement>(m);
+      CHECK_EQ(m_pose_pose.r1, m_pose_pose.r2);
+      n = std::max(n, static_cast<unsigned int>(m_pose_pose.p1 + 1));
+      n = std::max(n, static_cast<unsigned int>(m_pose_pose.p2 + 1));
+    }
+    if (std::holds_alternative<RelativePosePointMeasurement>(m)) {
+      const auto &m_pose_point = std::get<RelativePosePointMeasurement>(m);
+      CHECK_EQ(m_pose_point.r1, m_pose_point.r2);
+      n = std::max(n, static_cast<unsigned int>(m_pose_point.p1 + 1));
+      b = std::max(b, static_cast<unsigned int>(m_pose_point.p2 + 1));
+    }
+    if (std::holds_alternative<RangeMeasurement>(m)) {
+      const auto &m_range = std::get<RangeMeasurement>(m);
+      CHECK_EQ(m_range.r1, m_range.r2);
+      executeStateDependantFunctionals(
+          [&]() { n = std::max(n, static_cast<unsigned int>(m_range.p1 + 1)); },
+          [&]() { b = std::max(b, static_cast<unsigned int>(m_range.p1 + 1)); },
+          m_range.stateType1);
+      executeStateDependantFunctionals(
+          [&]() { n = std::max(n, static_cast<unsigned int>(m_range.p2 + 1)); },
+          [&]() { b = std::max(b, static_cast<unsigned int>(m_range.p2 + 1)); },
+          m_range.stateType2);
+      l++; // all measurements are assumed unique. See setMeasurements in Graph
+           // class for details.
+    }
+  }
+
+  // Get dimensions
+  *dimension = d;
+  *num_poses = n;
+  if (num_unit_sphere_vars)
+    *num_unit_sphere_vars = l;
+  if (num_landmarks)
+    *num_landmarks = b;
 }
 
 void constructOrientedConnectionIncidenceMatrixSE(
