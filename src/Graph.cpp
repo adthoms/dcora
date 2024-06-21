@@ -529,7 +529,7 @@ bool Graph::constructQ() {
   RelativeMeasurements privateMeasurements = localMeasurements();
 
   // Initialize Q with private measurements
-  SparseMatrix QLocal = constructConnectionLaplacianSE(privateMeasurements);
+  SparseMatrix QLocal = constructPGODataMatrix(privateMeasurements);
 
   // Initialize relative SE matrix in homogeneous form
   Matrix T = Matrix::Zero(d_ + 1, d_ + 1);

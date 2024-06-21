@@ -1145,75 +1145,65 @@ void getGraphDimensionsFromLocalMeasurements(
     *num_landmarks = b;
 }
 
-void constructOrientedConnectionIncidenceMatrixSE(
-    const RelativeMeasurements &measurements, SparseMatrix *AT,
-    DiagonalMatrix *OmegaT) {
+SparseMatrix constructPGODataMatrix(const RelativeMeasurements &measurements) {
   // Deduce graph dimensions from measurements
-  size_t d;
-  size_t n;
+  unsigned int d, n;
   getGraphDimensionsFromLocalMeasurements(measurements, &d, &n);
-  size_t m = measurements.vec.size();
-  unsigned int dh = d + 1;
+  const size_t m = measurements.vec.size();
+  const unsigned int dh = d + 1;
 
   // Define connection incidence matrix dimensions
   // This is a [n x m] (dh x dh)-block matrix
-  size_t rows = (d + 1) * n;
-  size_t cols = (d + 1) * m;
+  const size_t rows = dh * n;
+  const size_t cols = dh * m;
 
   // We use faster ordered insertion, as suggested in
   // https://eigen.tuxfamily.org/dox/group__TutorialSparse.html#TutorialSparseFilling
-  Eigen::SparseMatrix<double, Eigen::ColMajor> A(rows, cols);
-  A.reserve(Eigen::VectorXi::Constant(cols, 8));
-  DiagonalMatrix Omega(cols); // One block per measurement: (d+1)*m
+  SparseMatrix AT(rows, cols);
+  AT.reserve(Eigen::VectorXi::Constant(cols, 8));
+  DiagonalMatrix Omega(cols); // One block per measurement: dh*m
   DiagonalMatrix::DiagonalVectorType &diagonal = Omega.diagonal();
 
   // Insert actual measurement values
-  size_t i, j;
   for (size_t k = 0; k < m; k++) {
+    const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
+    CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
+    CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
-        std::get<RelativePosePoseMeasurement>(measurements.vec[k]);
-    i = meas.p1;
-    j = meas.p2;
+        std::get<RelativePosePoseMeasurement>(measVariant);
+    CHECK_EQ(meas.r1, meas.r2);
+    size_t i = meas.p1;
+    size_t j = meas.p2;
 
     /// Assign SE(d) matrix to block leaving node i
-    /// AT(i,k) = -Tij (NOTE: NEGATIVE)
-    // Do it column-wise for speed
-    // Elements of rotation
+    // AT(i,k) = -Tij (NOTE: NEGATIVE)
     for (size_t c = 0; c < d; c++)
       for (size_t r = 0; r < d; r++)
-        A.insert(i * dh + r, k * dh + c) = -meas.R(r, c);
+        AT.insert(i * dh + r, k * dh + c) = -meas.R(r, c);
 
     // Elements of translation
     for (size_t r = 0; r < d; r++)
-      A.insert(i * dh + r, k * dh + d) = -meas.t(r);
+      AT.insert(i * dh + r, k * dh + d) = -meas.t(r);
 
     // Additional 1 for homogeneization
-    A.insert(i * dh + d, k * dh + d) = -1;
+    AT.insert(i * dh + d, k * dh + d) = -1;
 
     /// Assign (d+1)-identity matrix to block leaving node j
-    /// AT(j,k) = +I (NOTE: POSITIVE)
-    for (size_t r = 0; r < d + 1; r++)
-      A.insert(j * dh + r, k * dh + r) = +1;
+    // AT(j,k) = +I (NOTE: POSITIVE)
+    for (size_t r = 0; r < dh; r++)
+      AT.insert(j * dh + r, k * dh + r) = +1;
 
-    /// Assign isotropic weights in diagonal matrix
+    // Assign isotropic weights in diagonal matrix
     for (size_t r = 0; r < d; r++)
       diagonal[k * dh + r] = meas.weight * meas.kappa;
 
     diagonal[k * dh + d] = meas.weight * meas.tau;
   }
 
-  A.makeCompressed();
+  // Compress sparse matrix
+  AT.makeCompressed();
 
-  *AT = A;
-  *OmegaT = Omega;
-}
-
-SparseMatrix
-constructConnectionLaplacianSE(const RelativeMeasurements &measurements) {
-  SparseMatrix AT;
-  DiagonalMatrix OmegaT;
-  constructOrientedConnectionIncidenceMatrixSE(measurements, &AT, &OmegaT);
-  return AT * OmegaT * AT.transpose();
+  return AT * Omega * AT.transpose();
 }
 
 void constructBMatrices(

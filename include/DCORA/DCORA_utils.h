@@ -140,22 +140,12 @@ void getGraphDimensionsFromLocalMeasurements(
     unsigned int *num_landmarks = nullptr);
 
 /**
- * @brief Helper function to construct connection laplacian matrix in SE(d)
- * @param measurements
- * @param AT
- * @param OmegaT
- */
-void constructOrientedConnectionIncidenceMatrixSE(
-    const RelativeMeasurements &measurements, SparseMatrix *AT,
-    DiagonalMatrix *OmegaT);
-
-/**
- * @brief Helper function to construct connection laplacian matrix in SE(d)
+ * @brief Helper function to construct the data matrix for the PGO quadratic
+ * cost term from local relative measurements
  * @param measurements
  * @return
  */
-SparseMatrix
-constructConnectionLaplacianSE(const RelativeMeasurements &measurements);
+SparseMatrix constructPGODataMatrix(const RelativeMeasurements &measurements);
 
 /**
  * @brief Given a vector of relative pose measurements, this function computes
