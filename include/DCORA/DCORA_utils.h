@@ -140,6 +140,24 @@ void getGraphDimensionsFromLocalMeasurements(
     unsigned int *num_landmarks = nullptr);
 
 /**
+ * @brief Helper function to construct data submatrices for the RA-SLAM
+ * quadratic cost term from local relative measurements
+ * @param measurements
+ * @return
+ */
+RASLAMDataSubmatrices
+constructRASLAMDataSubmatrices(const RelativeMeasurements &measurements);
+
+/**
+ * @brief Helper function to construct the data matrix for the RA-SLAM quadratic
+ * cost term from local relative measurements
+ * @param measurements
+ * @return
+ */
+SparseMatrix
+constructRASLAMDataMatrix(const RelativeMeasurements &measurements);
+
+/**
  * @brief Helper function to construct the data matrix for the PGO quadratic
  * cost term from local relative measurements
  * @param measurements
