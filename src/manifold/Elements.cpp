@@ -30,6 +30,8 @@ void LiftedArray::setData(const Matrix &X) {
   X_ = X;
 }
 
+void LiftedArray::setDataToZero() { X_.setZero(); }
+
 Eigen::Ref<Vector> LiftedArray::translation(unsigned int index) {
   CHECK_LT(index, n_);
   auto Xi = X_.block(0, index * dim_, r_, dim_);

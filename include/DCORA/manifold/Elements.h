@@ -63,6 +63,10 @@ public:
    */
   void setData(const Matrix &X);
   /**
+   * @brief Set the underlying Eigen matrix to zero
+   */
+  void setDataToZero();
+  /**
    * @brief Obtain the writable translation at the specified index, expressed as
    * an r dimensional vector
    * @param index
