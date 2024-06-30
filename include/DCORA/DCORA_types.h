@@ -17,6 +17,7 @@
 #include <Eigen/CholmodSupport>
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
+#include <glog/logging.h>
 
 #include <map>
 #include <memory>
@@ -240,12 +241,30 @@ class PoseID : public StateID {
 public:
   explicit PoseID(unsigned int rid = 0, unsigned int fid = 0)
       : StateID(StateType::Pose, rid, fid) {}
+
+  explicit PoseID(const StateID &state) {
+    if (!state.isPose())
+      LOG(FATAL) << "Error: Cannot construct PoseID from StateID: State is not "
+                    "of type Pose!";
+    state_type = state.state_type;
+    robot_id = state.robot_id;
+    frame_id = state.frame_id;
+  }
 };
 
 class PointID : public StateID {
 public:
   explicit PointID(unsigned int rid = 0, unsigned int fid = 0)
       : StateID(StateType::Point, rid, fid) {}
+
+  explicit PointID(const StateID &state) {
+    if (!state.isPoint())
+      LOG(FATAL) << "Error: Cannot construct PointID from StateID: State is "
+                    "not of type Point!";
+    state_type = state.state_type;
+    robot_id = state.robot_id;
+    frame_id = state.frame_id;
+  }
 };
 
 // Comparator for StateID
