@@ -264,7 +264,7 @@ Graph::sharedLoopClosuresWithRobot(unsigned int neighbor_id) const {
   return result;
 }
 
-RelativeMeasurements Graph::measurements() const {
+RelativeMeasurements Graph::allMeasurements() const {
   RelativeMeasurements measurements(localMeasurements());
   measurements.vec.insert(measurements.vec.end(), shared_lcs_.vec.begin(),
                           shared_lcs_.vec.end());

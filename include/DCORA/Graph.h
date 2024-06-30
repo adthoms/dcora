@@ -183,7 +183,7 @@ public:
    * @brief Return a copy of all measurements
    * @return
    */
-  RelativeMeasurements measurements() const;
+  RelativeMeasurements allMeasurements() const;
   /**
    * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot
    * loop closures)

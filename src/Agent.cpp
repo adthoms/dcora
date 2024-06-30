@@ -478,7 +478,7 @@ void PGOAgent::reset() {
     // Save measurements (including final weights)
     // TODO(JV): update for all measurements
     std::vector<RelativePosePoseMeasurement> m =
-        mPoseGraph->measurements().GetRelativePosePoseMeasurements();
+        mPoseGraph->allMeasurements().GetRelativePosePoseMeasurements();
     mLogger.logMeasurements(&m, "measurements.csv");
 
     // Save trajectory estimates after rounding
