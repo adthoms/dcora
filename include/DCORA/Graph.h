@@ -16,6 +16,7 @@
 #include <DCORA/Measurements.h>
 #include <DCORA/manifold/Elements.h>
 
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -431,6 +432,9 @@ protected:
   // Preconditioner
   std::optional<CholmodSolverPtr> precon_;
 
+  // Invalid index when populating quadratic terms
+  static constexpr size_t IDX_NOT_SET = std::numeric_limits<size_t>::max();
+
   // Timing
   SimpleTimer timer_;
   double ms_construct_Q_{};
@@ -463,6 +467,45 @@ protected:
    * @return
    */
   bool constructG();
+  /**
+   * @brief Helper function to construct the quadratic cost term for PGO
+   * @return
+   */
+  bool constructQuadraticCostTermPGO();
+  /**
+   * @brief Helper function to construct the linear cost term for PGO
+   * @return
+   */
+  bool constructLinearCostTermPGO();
+  /**
+   * @brief Helper function to construct the quadratic cost term for RA-SLAM
+   * @return
+   */
+  bool constructQuadraticCostTermRASLAM();
+  /**
+   * @brief Helper function to construct the linear cost term for RA-SLAM
+   * @return
+   */
+  bool constructLinearCostTermRASLAM();
+  /**
+   * @brief Helper function to determine if a state is owned by an inactive
+   * neighbor. Returns true of the neighbor is inactive and if the query
+   * neighborStateID belongs to the neighbor. If the neighbor is active, returns
+   * false. If the neighbor is inactive but the query neighborStateID does not
+   * belong to the neighbor, returns std::nullopt
+   * @param neighborStateID
+   * @return
+   */
+  std::optional<bool>
+  isStateOwnedByInactiveNeighbor(const StateID &neighborStateID);
+  /**
+   * @brief Helper function to return the lifted data matrix of the fixed public
+   * variable (associated with neighborStateID) owned by a neighbor of this
+   * agent
+   * @param neighborStateID
+   * @return
+   */
+  Matrix getNeighborFixedVariableLiftedData(const StateID &neighborStateID);
   /**
    * @brief Construct the preconditioner for this graph
    * @return

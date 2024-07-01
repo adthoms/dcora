@@ -522,201 +522,277 @@ void Graph::clearDataMatrices() {
 }
 
 bool Graph::constructQ() {
-  if (!isPGOCompatible())
-    LOG(FATAL) << "Error: graph is not PGO compatible! Q must be constructed "
-                  "for RA-SLAM domain!";
   timer_.tic();
-  RelativeMeasurements privateMeasurements = localMeasurements();
-
-  // Initialize Q with private measurements
-  SparseMatrix QLocal = constructPGODataMatrix(privateMeasurements);
-
-  // Initialize relative SE matrix in homogeneous form
-  Matrix T = Matrix::Zero(d_ + 1, d_ + 1);
-
-  // Initialize aggregate weight matrix
-  Matrix Omega = Matrix::Zero(d_ + 1, d_ + 1);
-
-  // Shared (inter-robot) measurements only affect the diagonal blocks
-  Matrix QDiagRow(d_ + 1, (d_ + 1) * n_);
-  QDiagRow.setZero();
-
-  // Go through shared loop closures
-  for (const auto &m : shared_lcs_.vec) {
-    const RelativePosePoseMeasurement &m_pose_pose =
-        std::get<RelativePosePoseMeasurement>(m);
-    // Set relative SE matrix (homogeneous form)
-    T.block(0, 0, d_, d_) = m_pose_pose.R;
-    T.block(0, d_, d_, 1) = m_pose_pose.t;
-    T(d_, d_) = 1;
-
-    // Set aggregate weight matrix
-    for (unsigned row = 0; row < d_; ++row) {
-      Omega(row, row) = m_pose_pose.weight * m_pose_pose.kappa;
-    }
-    Omega(d_, d_) = m_pose_pose.weight * m_pose_pose.tau;
-
-    if (m_pose_pose.r1 == id_) {
-      // First pose belongs to this robot
-      // Hence, this is an outgoing edge in the pose graph
-      CHECK(m_pose_pose.r2 != id_);
-      const PoseID nID(m_pose_pose.r2, m_pose_pose.p2);
-      bool has_neighbor_pose =
-          (neighbor_poses_.find(nID) != neighbor_poses_.end());
-      if (isNeighborActive(m_pose_pose.r2)) {
-        // Measurement with active neighbor
-        if (!has_neighbor_pose) {
-          LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
-                       << ", " << nID.frame_id;
-          return false;
-        }
-      } else {
-        // Measurement with inactive neighbor
-        if (!use_inactive_neighbors_ || !has_neighbor_pose) {
-          continue;
-        }
-      }
-      // Modify quadratic cost
-      int idx = static_cast<int>(m_pose_pose.p1);
-      Matrix W = T * Omega * T.transpose();
-      QDiagRow.block(0, idx * (d_ + 1), d_ + 1, d_ + 1) += W;
-
-    } else {
-      // Second pose belongs to this robot
-      // Hence, this is an incoming edge in the pose graph
-      CHECK(m_pose_pose.r2 == id_);
-      const PoseID nID(m_pose_pose.r1, m_pose_pose.p1);
-      bool has_neighbor_pose =
-          (neighbor_poses_.find(nID) != neighbor_poses_.end());
-      if (isNeighborActive(m_pose_pose.r1)) {
-        // Measurement with active neighbor
-        if (!has_neighbor_pose) {
-          LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
-                       << ", " << nID.frame_id;
-          return false;
-        }
-      } else {
-        // Measurement with inactive neighbor
-        if (!use_inactive_neighbors_ || !has_neighbor_pose) {
-          continue;
-        }
-      }
-      // Modify quadratic cost
-      int idx = static_cast<int>(m_pose_pose.p2);
-      QDiagRow.block(0, idx * (d_ + 1), d_ + 1, d_ + 1) += Omega;
-    }
-  }
-
-  // Go through priors
-  for (const auto &it : pose_priors_) {
-    unsigned idx = it.first;
-    for (unsigned row = 0; row < d_; ++row) {
-      Omega(row, row) = prior_kappa_;
-    }
-    Omega(d_, d_) = prior_tau_;
-    QDiagRow.block(0, idx * (d_ + 1), d_ + 1, d_ + 1) += Omega;
-  }
-
-  // Convert to a sparse matrix
-  std::vector<Eigen::Triplet<double>> tripletList;
-  tripletList.reserve((d_ + 1) * (d_ + 1) * n_);
-  for (unsigned idx = 0; idx < n_; ++idx) {
-    unsigned row_base = idx * (d_ + 1);
-    unsigned col_base = row_base;
-    for (unsigned r = 0; r < d_ + 1; ++r) {
-      for (unsigned c = 0; c < d_ + 1; ++c) {
-        double val = QDiagRow(r, col_base + c);
-        tripletList.emplace_back(row_base + r, col_base + c, val);
-      }
-    }
-  }
-  SparseMatrix QDiag(QLocal.rows(), QLocal.cols());
-  QDiag.setFromTriplets(tripletList.begin(), tripletList.end());
-
-  Q_.emplace(QLocal + QDiag);
+  bool Q_constructed = false;
+  if (isPGOCompatible())
+    Q_constructed = constructQuadraticCostTermPGO();
+  else
+    Q_constructed = constructQuadraticCostTermRASLAM();
   ms_construct_Q_ = timer_.toc();
-  // LOG(INFO) << "Robot " << id_ << " construct Q ms: " << ms_construct_Q_;
-  return true;
+  return Q_constructed;
 }
 
 bool Graph::constructG() {
-  if (!isPGOCompatible())
-    LOG(FATAL) << "Error: graph is not PGO compatible! G must be constructed "
-                  "for RA-SLAM domain!";
   timer_.tic();
-  unsigned d = d_;
-  Matrix G(r_, (d_ + 1) * n_);
-  G.setZero();
-  Matrix T = Matrix::Zero(d + 1, d + 1);
-  Matrix Omega = Matrix::Zero(d + 1, d + 1);
-  // Go through shared measurements
-  for (const auto &m : shared_lcs_.vec) {
-    const RelativePosePoseMeasurement &m_pose_pose =
-        std::get<RelativePosePoseMeasurement>(m);
-    // Construct relative SE matrix in homogeneous form
-    T.block(0, 0, d, d) = m_pose_pose.R;
-    T.block(0, d, d, 1) = m_pose_pose.t;
-    T(d, d) = 1;
+  bool G_constructed = false;
+  if (isPGOCompatible())
+    G_constructed = constructLinearCostTermPGO();
+  else
+    G_constructed = constructLinearCostTermRASLAM();
+  ms_construct_G_ = timer_.toc();
+  return G_constructed;
+}
 
-    // Construct aggregate weight matrix
-    for (unsigned row = 0; row < d; ++row) {
-      Omega(row, row) = m_pose_pose.weight * m_pose_pose.kappa;
-    }
-    Omega(d, d) = m_pose_pose.weight * m_pose_pose.tau;
+bool Graph::constructQuadraticCostTermPGO() {
+  // Set measurements
+  const RelativeMeasurements &measurements = allMeasurements();
 
-    if (m_pose_pose.r1 == id_) {
-      // First pose belongs to this robot
-      // Hence, this is an outgoing edge in the pose graph
-      CHECK(m_pose_pose.r2 != id_);
-      const PoseID nID(m_pose_pose.r2, m_pose_pose.p2);
-      auto pair = neighbor_poses_.find(nID);
-      bool has_neighbor_pose = (pair != neighbor_poses_.end());
-      if (isNeighborActive(m_pose_pose.r2)) {
-        // Measurement with active neighbor
-        if (!has_neighbor_pose) {
-          LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
-                       << ", " << nID.frame_id;
-          return false;
-        }
-      } else {
-        // Measurement with inactive neighbor
-        if (!use_inactive_neighbors_ || !has_neighbor_pose) {
-          continue;
-        }
-      }
-      Matrix Xj = pair->second.pose();
-      int idx = static_cast<int>(m_pose_pose.p1);
-      // Modify linear cost
-      Matrix L = -Xj * Omega * T.transpose();
-      G.block(0, idx * (d_ + 1), r_, d_ + 1) += L;
+  // Set dimensions
+  const size_t m = measurements.vec.size();
+  const unsigned int dh = d_ + 1;
+
+  /**
+   * @brief Constructing the quadratic cost term for PGO
+   *
+   * The quadratic cost term Q is a [(d + 1) × (d + 1)](n_b x n_b) matrix of the
+   * form:
+   *
+   *   Q = Ab^T * Omega * Ab
+   *     = AbT * Omega * AbT.transpose()
+   *
+   * where:
+   *   n_b is the number of poses owned by this agent (i.e. agent b)
+   *   AbT is the incidence matrix of this agent (i.e. agent b)
+   *   Omega is a block diagonal matrix of measurement weights
+   *
+   * Dimensions: [rows x cols]
+   *   AbT: [n_b x m][(d + 1) × (d + 1)] - block matrix
+   *   Omega: [m × m][(d + 1) × (d + 1)] - block diagonal matrix
+   *
+   * For book keeping, we we use a matrix-centric approach and update Q for all
+   * measurements, indexing the contribution of each measurement using agent b's
+   * posed IDs
+   */
+  const size_t rowsAbT = dh * n_;
+  const size_t colsAbT = dh * m;
+
+  // We use faster ordered insertion, as suggested in
+  // https://eigen.tuxfamily.org/dox/group__TutorialSparse.html#TutorialSparseFilling
+  SparseMatrix AbT(rowsAbT, colsAbT);
+  AbT.reserve(Eigen::VectorXi::Constant(colsAbT, 8));
+  DiagonalMatrix Omega(colsAbT); // One block per measurement: dh*m
+  DiagonalMatrix::DiagonalVectorType &diagonalOmega = Omega.diagonal();
+
+  // Iterate over all local measurements
+  for (size_t k = 0; k < m; k++) {
+    const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
+    CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
+    CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
+    const RelativePosePoseMeasurement &meas =
+        std::get<RelativePosePoseMeasurement>(measVariant);
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Assign isotropic weights in diagonal matrix
+    for (size_t r = 0; r < d_; r++)
+      diagonalOmega[k * dh + r] = meas.weight * meas.kappa;
+
+    diagonalOmega[k * dh + d_] = meas.weight * meas.tau;
+
+    // Set indices according to pose ownership
+    if (meas.r1 == id_ && meas.r2 != id_) {
+      // Measurement is an outgoing shared-loop closure. Check if the
+      // measurement destination state belongs to this agent's neighbor and is
+      // inactive
+      const StateID &neighborDstStateID = meas.getDstID();
+      if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == true)
+        i = meas.p1;
+      else if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == false)
+        return false;
+      else
+        continue;
+
+    } else if (meas.r1 != id_ && meas.r2 == id_) {
+      // Measurement is an incoming shared-loop closure. Check if the
+      // measurement source state belongs to this agent's neighbor and is
+      // inactive
+      const StateID &neighborSrcStateID = meas.getSrcID();
+      if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == true)
+        j = meas.p2;
+      else if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == false)
+        return false;
+      else
+        continue;
+
     } else {
-      // Second pose belongs to this robot
-      // Hence, this is an incoming edge in the pose graph
-      CHECK(m_pose_pose.r2 == id_);
-      const PoseID nID(m_pose_pose.r1, m_pose_pose.p1);
-      auto pair = neighbor_poses_.find(nID);
-      bool has_neighbor_pose = (pair != neighbor_poses_.end());
-      if (isNeighborActive(m_pose_pose.r1)) {
-        // Measurement with active neighbor
-        if (!has_neighbor_pose) {
-          LOG(WARNING) << "Missing active neighbor pose " << nID.robot_id
-                       << ", " << nID.frame_id;
-          return false;
-        }
-      } else {
-        // Measurement with inactive neighbor
-        if (!use_inactive_neighbors_ || !has_neighbor_pose) {
-          continue;
-        }
-      }
-      Matrix Xi = pair->second.pose();
-      int idx = static_cast<int>(m_pose_pose.p2);
-      // Modify linear cost
-      Matrix L = -Xi * T * Omega;
-      G.block(0, idx * (d_ + 1), r_, d_ + 1) += L;
+      // Measurement is local to the agent's graph
+      CHECK(meas.r1 == id_ && meas.r2 == id_);
+      i = meas.p1;
+      j = meas.p2;
+    }
+
+    // Populate incidence matrix
+    if (i != IDX_NOT_SET) {
+      /// Assign SE(d) matrix to block leaving node i
+      // AT(i,k) = -Tij (NOTE: NEGATIVE)
+      for (size_t c = 0; c < d_; c++)
+        for (size_t r = 0; r < d_; r++)
+          AbT.insert(i * dh + r, k * dh + c) = -meas.R(r, c);
+
+      // Elements of translation
+      for (size_t r = 0; r < d_; r++)
+        AbT.insert(i * dh + r, k * dh + d_) = -meas.t(r);
+
+      // Additional 1 for homogeneization
+      AbT.insert(i * dh + d_, k * dh + d_) = -1;
+    }
+    if (j != IDX_NOT_SET) {
+      /// Assign (d+1)-identity matrix to block leaving node j
+      // AT(j,k) = +I (NOTE: POSITIVE)
+      for (size_t r = 0; r < dh; r++)
+        AbT.insert(j * dh + r, k * dh + r) = +1;
     }
   }
-  // Go through priors
+
+  // Compress sparse matrix
+  AbT.makeCompressed();
+
+  // Set quadratic cost matrix
+  const SparseMatrix Q = AbT * Omega * AbT.transpose();
+  Q_.emplace(Q);
+
+  return true;
+}
+
+bool Graph::constructLinearCostTermPGO() {
+  // Set measurements
+  const RelativeMeasurements &measurements = sharedLoopClosures();
+
+  // Set dimensions
+  const size_t m = measurements.vec.size();
+  const unsigned int dh = d_ + 1;
+
+  /**
+   * @brief Constructing the linear cost term for PGO
+   *
+   * The linear cost term G is a [r x ((d+1) * n_b)] matrix of the form:
+   *
+   *   G = Xc^T * Ac^T * Omega * Ab
+   *     = XcT * AcT * Omega * AbT.transpose()
+   *
+   * where:
+   *   n_b is the number of poses owned by this agent (i.e. agent b)
+   *   XcT is a matrix of fixed public variables (i.e. poses) of the neighbor
+   *       agent (i.e agent c)
+   *   AcT is the incidence matrix of the neighbor agent (i.e agent c)
+   *   AbT is the incidence matrix of this agent (i.e. agent b)
+   *   Omega is a block diagonal matrix of measurement weights
+   *
+   * Dimensions: [rows x cols]
+   *   XcT: [r x ((d + 1) * n_c)]
+   *   AcT: [n_c x m][(d + 1) × (d + 1)] - block matrix
+   *   AbT: [n_b x m][(d + 1) × (d + 1)] - block matrix
+   *   Omega: [m × m][(d + 1) × (d + 1)] - block diagonal matrix
+   *
+   * For book keeping, we look at the contribution of each measurement and
+   * update G via the addition of this contribution:
+   *
+   *   G(1:r, idx:idx+d) += L_i; for all m_i in the set of shared loop closures
+   *                     += Xc_i^T * Ac_i^T * Omega_i * Ab_i
+   *                     += XcT_i * AcT_i * Omega_i * AbT_i.transpose()
+   *
+   * where:
+   *   L_i is the linear cost associated with measurement m_i
+   *   idx is the index of the state (i.e. pose) associated with agent b in
+   *       measurement m_i
+   *
+   * Dimensions: [rows x cols]
+   *   L_i : [r x (d + 1)]
+   *   XcT_i: [r x (d + 1)]
+   *   AcT_i: [(d + 1) × (d + 1)]
+   *   AbT_i: [(d + 1) × (d + 1)]
+   *   Omega_i: [(d + 1) × (d + 1)]
+   *
+   * For brevity, we drop subscript i when constructing L_i and its submatrices
+   */
+  Matrix XcT = Matrix::Zero(r_, dh);
+  Matrix AcT = Matrix::Zero(dh, dh);
+  Matrix AbT = Matrix::Zero(dh, dh);
+  Matrix Omega = Matrix::Zero(dh, dh);
+
+  // Initialize entries of incidence matrices
+  Matrix T = Matrix::Identity(dh, dh);
+  Matrix I = Matrix::Identity(dh, dh);
+
+  // Initialize linear cost
+  LiftedPoseArray G(r_, d_, n_);
+  G.setDataToZero();
+
+  // Iterate over all shared loop closures
+  for (size_t k = 0; k < m; k++) {
+    const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
+    CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
+    CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
+    const RelativePosePoseMeasurement &meas =
+        std::get<RelativePosePoseMeasurement>(measVariant);
+
+    // Update measurement transformation matrix
+    T.block(0, 0, d_, d_) = meas.R;
+    T.block(0, d_, d_, 1) = meas.t;
+
+    // Update measurement weight matrix
+    for (unsigned i = 0; i < d_; ++i)
+      Omega(i, i) = meas.weight * meas.kappa;
+
+    Omega(d_, d_) = meas.weight * meas.tau;
+
+    // Update linear cost
+    if (meas.r1 == id_) {
+      CHECK(meas.r2 != id_);
+      // Measurement is an outgoing shared-loop closure. Check if the
+      // measurement destination state belongs to this agent's neighbor and is
+      // inactive
+      const StateID &neighborDstStateID = meas.getDstID();
+      if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == true) {
+        size_t i = meas.p1;
+        AbT = -T; // leaving node i of agent b
+        AcT = I;  // entering node j of agent c
+        XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
+
+        // add measurement contribution to linear cost
+        G.pose(i) += XcT * AcT * Omega * AbT.transpose();
+
+      } else if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == false) {
+        return false;
+      } else {
+        continue;
+      }
+
+    } else {
+      CHECK(meas.r1 != id_);
+      // Measurement is an incoming shared-loop closure. Check if the
+      // measurement source state belongs to this agent's neighbor and is
+      // inactive
+      const StateID &neighborSrcStateID = meas.getSrcID();
+      if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == true) {
+        size_t j = meas.p2;
+        AbT = I;  // entering node j of agent b
+        AcT = -T; // leaving node i of agent c
+        XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
+
+        // add measurement contribution to linear cost
+        G.pose(j) += XcT * AcT * Omega * AbT.transpose();
+
+      } else if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == false) {
+        return false;
+      } else {
+        continue;
+      }
+    }
+  }
+
+  // Maintain legacy support for pose priors
+  // TODO(AT): Treat priors as relative measurements
   for (const auto &it : pose_priors_) {
     unsigned idx = it.first;
     const Matrix &P = it.second.getData();
@@ -725,12 +801,89 @@ bool Graph::constructG() {
     }
     Omega(d_, d_) = prior_tau_;
     Matrix L = -P * Omega;
-    G.block(0, idx * (d_ + 1), r_, d_ + 1) += L;
+    G.pose(idx) += L;
   }
-  G_.emplace(G);
-  ms_construct_G_ = timer_.toc();
-  // LOG(INFO) << "Robot " << id_ << " construct G ms: " << ms_construct_G_;
+
+  // Set linear cost matrix
+  G_.emplace(G.getData());
+
   return true;
+}
+
+bool Graph::constructQuadraticCostTermRASLAM() {
+  // TODO(AT): implement
+  LOG(FATAL)
+      << "Error: constructQuadraticCostTermRASLAM() not implemented yet!";
+  return true;
+}
+
+bool Graph::constructLinearCostTermRASLAM() {
+  // TODO(AT): implement
+  LOG(FATAL) << "Error: constructLinearCostTermRASLAM() not implemented yet!";
+  return true;
+}
+
+std::optional<bool>
+Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
+  // Check for neighbor state
+  bool has_neighbor_state;
+  executeStateDependantFunctionals(
+      [&, this]() {
+        const PoseID neighborPoseID(neighborStateID);
+        has_neighbor_state =
+            (neighbor_poses_.find(neighborPoseID) != neighbor_poses_.end());
+      },
+      [&, this]() {
+        const PointID neighborPointID(neighborStateID);
+        has_neighbor_state =
+            (neighbor_points_.find(neighborPointID) != neighbor_points_.end());
+      },
+      neighborStateID.state_type);
+
+  // Check if neighbor is inactive
+  if (isNeighborActive(neighborStateID.robot_id)) {
+    // Measurement with active neighbor
+    if (!has_neighbor_state) {
+      LOG(WARNING) << "Missing active neighbor state "
+                   << neighborStateID.robot_id << ", "
+                   << neighborStateID.frame_id;
+      return false;
+    }
+  } else {
+    // Measurement with inactive neighbor
+    if (!use_inactive_neighbors_ || !has_neighbor_state)
+      return std::nullopt;
+  }
+
+  return true;
+}
+
+Matrix
+Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
+  // Set neighbor state fixed variable to contain its lifted data
+  Matrix X;
+  executeStateDependantFunctionals(
+      [&, this]() {
+        const PoseID neighborPoseID(neighborStateID);
+        const auto neighborPoseItr = neighbor_poses_.find(neighborPoseID);
+        if (neighborPoseItr == neighbor_poses_.end())
+          LOG(FATAL) << "Fixed pose variable of agent's neighbor "
+                     << neighborStateID.robot_id << " not found!";
+
+        X = neighborPoseItr->second.pose();
+      },
+      [&, this]() {
+        const PointID neighborPointID(neighborStateID);
+        const auto neighborPointItr = neighbor_points_.find(neighborPointID);
+        if (neighborPointItr == neighbor_points_.end())
+          LOG(FATAL) << "Fixed point variable of agent's neighbor "
+                     << neighborStateID.robot_id << " not found!";
+
+        X = neighborPointItr->second.translation();
+      },
+      neighborStateID.state_type);
+
+  return X;
 }
 
 bool Graph::hasPreconditioner() {
