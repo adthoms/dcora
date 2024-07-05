@@ -443,7 +443,6 @@ Graph::Statistics Graph::statistics() const {
   for (const auto &m : private_lcs_.vec) {
     std::visit(
         [&](auto &&m) {
-          // if (m.fixedWeight) continue;
           if (m.weight == 1) {
             acceptCount += 1;
           } else if (m.weight == 0) {
@@ -492,7 +491,7 @@ const SparseMatrix &Graph::quadraticMatrix() {
 
 void Graph::clearQuadraticMatrix() {
   Q_.reset();
-  precon_.reset(); // Also clear the preconditioner since it depends on Q
+  precon_.reset(); // Clear preconditioner since it depends on Q
 }
 
 const Matrix &Graph::linearMatrix() {
@@ -550,36 +549,47 @@ bool Graph::constructQuadraticCostTermPGO() {
   /**
    * @brief Constructing the quadratic cost term for PGO
    *
-   * The quadratic cost term Q is a [(d + 1) × (d + 1)](n_b x n_b) matrix of the
+   * The quadratic cost term Q is a [(d + 1) × (d + 1)](n_b × n_b) matrix of the
    * form:
    *
-   *   Q = Ab^T * Omega * Ab
-   *     = AbT * Omega * AbT.transpose()
+   *   Q = Ab^T × Omega × Ab
+   *     = AbT × Omega × AbT^T
    *
    * where:
    *   n_b is the number of poses owned by this agent (i.e. agent b)
-   *   AbT is the incidence matrix of this agent (i.e. agent b)
+   *   AbT is the incidence matrix of this agent
    *   Omega is a block diagonal matrix of measurement weights
    *
-   * Dimensions: [rows x cols]
-   *   AbT: [n_b x m][(d + 1) × (d + 1)] - block matrix
-   *   Omega: [m × m][(d + 1) × (d + 1)] - block diagonal matrix
+   * Dimensions: [rows × cols]
+   *   Incidence Matrix:
+   *     AbT: [n_b × m][(d + 1) × (d + 1)] - block matrix
+   *   Weight Matrix:
+   *     Omega: [m × m][(d + 1) × (d + 1)] - block diagonal matrix
+   *
+   * Indexing: The following table illustrates edge direction e=(i,j) based on
+   * local and shared measurements:
+   *
+   *     |  local   | shared (r1=id) | shared (r2=id) |
+   *   ------------------------------------------------
+   *   i | leaving  |     leaving    |       ***      |
+   *   j | entering |       ***      |     leaving    |
    *
    * For book keeping, we we use a matrix-centric approach and update Q for all
    * measurements, indexing the contribution of each measurement using agent b's
-   * posed IDs
+   * posed IDs.
    */
   const size_t rowsAbT = dh * n_;
   const size_t colsAbT = dh * m;
 
-  // We use faster ordered insertion, as suggested in
-  // https://eigen.tuxfamily.org/dox/group__TutorialSparse.html#TutorialSparseFilling
+  // Initialize incidence matrix
   SparseMatrix AbT(rowsAbT, colsAbT);
   AbT.reserve(Eigen::VectorXi::Constant(colsAbT, 8));
-  DiagonalMatrix Omega(colsAbT); // One block per measurement: dh*m
+
+  // Initialize weight matrix
+  DiagonalMatrix Omega(colsAbT); // One block per measurement
   DiagonalMatrix::DiagonalVectorType &diagonalOmega = Omega.diagonal();
 
-  // Iterate over all local measurements
+  // Populate AbT and Omega
   for (size_t k = 0; k < m; k++) {
     const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
     CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
@@ -605,21 +615,17 @@ bool Graph::constructQuadraticCostTermPGO() {
 
     // Populate incidence matrix
     if (i != IDX_NOT_SET) {
-      /// Assign SE(d) matrix to block leaving node i
       // AT(i,k) = -Tij (NOTE: NEGATIVE)
       for (size_t c = 0; c < d_; c++)
         for (size_t r = 0; r < d_; r++)
           AbT.insert(i * dh + r, k * dh + c) = -meas.R(r, c);
 
-      // Elements of translation
       for (size_t r = 0; r < d_; r++)
         AbT.insert(i * dh + r, k * dh + d_) = -meas.t(r);
 
-      // Additional 1 for homogeneization
       AbT.insert(i * dh + d_, k * dh + d_) = -1;
     }
     if (j != IDX_NOT_SET) {
-      /// Assign (d+1)-identity matrix to block leaving node j
       // AT(j,k) = +I (NOTE: POSITIVE)
       for (size_t r = 0; r < dh; r++)
         AbT.insert(j * dh + r, k * dh + r) = +1;
@@ -647,40 +653,43 @@ bool Graph::constructLinearCostTermPGO() {
   /**
    * @brief Constructing the linear cost term for PGO
    *
-   * The linear cost term G is a [r x ((d+1) * n_b)] matrix of the form:
+   * The linear cost term G is a [r × ((d+1) × n_b)] matrix of the form:
    *
-   *   G = Xc^T * Ac^T * Omega * Ab
-   *     = XcT * AcT * Omega * AbT.transpose()
+   *   G = Xc^T × Ac^T × Omega × Ab
+   *     = XcT × AcT × Omega × AbT^T
    *
    * where:
    *   n_b is the number of poses owned by this agent (i.e. agent b)
-   *   XcT is a matrix of fixed public variables (i.e. poses) of the neighbor
-   *       agent (i.e agent c)
-   *   AcT is the incidence matrix of the neighbor agent (i.e agent c)
-   *   AbT is the incidence matrix of this agent (i.e. agent b)
+   *   XcT is a matrix of fixed public poses of the neighbor agent (i.e agent c)
+   *   AcT is the incidence matrix of the neighbor agent
+   *   AbT is the incidence matrix of this agent
    *   Omega is a block diagonal matrix of measurement weights
    *
-   * Dimensions: [rows x cols]
-   *   XcT: [r x ((d + 1) * n_c)]
-   *   AcT: [n_c x m][(d + 1) × (d + 1)] - block matrix
-   *   AbT: [n_b x m][(d + 1) × (d + 1)] - block matrix
+   * Note: neighbor agent c is viewed as a meta agent including all agents that
+   * are not agent b such that:
+   *
+   *   c:= [N]/{b}; where N is the total number of agents
+   *
+   * Dimensions: [rows × cols]
+   *   XcT: [r × ((d + 1) × n_c)]
+   *   AcT: [n_c × m][(d + 1) × (d + 1)] - block matrix
+   *   AbT: [n_b × m][(d + 1) × (d + 1)] - block matrix
    *   Omega: [m × m][(d + 1) × (d + 1)] - block diagonal matrix
    *
    * For book keeping, we look at the contribution of each measurement and
    * update G via the addition of this contribution:
    *
    *   G(1:r, idx:idx+d) += L_i; for all m_i in the set of shared loop closures
-   *                     += Xc_i^T * Ac_i^T * Omega_i * Ab_i
-   *                     += XcT_i * AcT_i * Omega_i * AbT_i.transpose()
+   *                     += Xc_i^T × Ac_i^T × Omega_i × Ab_i
+   *                     += XcT_i × AcT_i × Omega_i × AbT_i^T
    *
    * where:
    *   L_i is the linear cost associated with measurement m_i
-   *   idx is the index of the state (i.e. pose) associated with agent b in
-   *       measurement m_i
+   *   idx is the index of the pose associated with agent b in measurement m_i
    *
-   * Dimensions: [rows x cols]
-   *   L_i : [r x (d + 1)]
-   *   XcT_i: [r x (d + 1)]
+   * Dimensions: [rows × cols]
+   *   L_i : [r × (d + 1)]
+   *   XcT_i: [r × (d + 1)]
    *   AcT_i: [(d + 1) × (d + 1)]
    *   AbT_i: [(d + 1) × (d + 1)]
    *   Omega_i: [(d + 1) × (d + 1)]
@@ -700,7 +709,7 @@ bool Graph::constructLinearCostTermPGO() {
   LiftedPoseArray G(r_, d_, n_);
   G.setDataToZero();
 
-  // Iterate over all shared loop closures
+  // Iterate over all shared pose-pose loop closures
   for (size_t k = 0; k < m; k++) {
     const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
     CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
@@ -730,21 +739,21 @@ bool Graph::constructLinearCostTermPGO() {
 
     // Update linear cost
     if (i != IDX_NOT_SET) {
-      AbT = -T; // leaving node i of agent b
-      AcT = I;  // entering node j of agent c
+      AbT = -T; // Leaving node i of agent b
+      AcT = I;  // Entering node j of agent c
       const StateID &neighborDstStateID = meas.getDstID();
       XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
 
-      // add measurement contribution to linear cost
+      // Add measurement contribution to linear cost
       G.pose(i) += XcT * AcT * Omega * AbT.transpose();
     }
     if (j != IDX_NOT_SET) {
-      AbT = I;  // entering node j of agent b
-      AcT = -T; // leaving node i of agent c
+      AbT = I;  // Entering node j of agent b
+      AcT = -T; // Leaving node i of agent c
       const StateID &neighborSrcStateID = meas.getSrcID();
       XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
 
-      // add measurement contribution to linear cost
+      // Add measurement contribution to linear cost
       G.pose(j) += XcT * AcT * Omega * AbT.transpose();
     }
   }
@@ -789,9 +798,9 @@ bool Graph::constructQuadraticCostTermRASLAM() {
   /**
    * @brief Constructing the quadratic cost term for RA-SLAM
    *
-   * The quadratic cost term Q is a [k x k] block symmetric matrix of the form:
+   * The quadratic cost term Q is a [k × k] block symmetric matrix of the form:
    *
-   *   Q = Q_p + Q_r; k = (d + 1)n_b + l_b + b_b
+   *   Q = Q_p + Q_r; k = (d + 1) × n_b + l_b + b_b
    *
    *   <-----------col------------>
    *
@@ -806,6 +815,14 @@ bool Graph::constructQuadraticCostTermRASLAM() {
    *   n_b is the number of poses owned by this agent (i.e. agent b)
    *   l_b is the number of unit sphere variables owned by this agent
    *   b_b is the number of landmarks owned by this agent
+   *
+   * Indexing: The following table illustrates edge direction e=(i,j) based on
+   * local and shared measurements:
+   *
+   *     |  local   | shared (r1=id) | shared (r2=id) |
+   *   ------------------------------------------------
+   *   i | leaving  |     leaving    |       ***      |
+   *   j | entering |       ***      |     leaving    |
    *
    * In our implementation, we calculate the submatrices of Q_p and Q_r
    * separately and then combine them to form Q. For book keeping, we we use a
@@ -830,26 +847,26 @@ bool Graph::constructQuadraticCostTermRASLAM() {
    *   ----------------------------           v
    *
    *   Q_p_11 = L(G^rho) + Sigma
-   *          = ARho^T * OmegaRho * ARho + T^T * OmegaTau * T
-   *          = ARhoT * OmegaRho * ARhoT^T + TT * OmegaTau * TT^T
+   *          = ARho^T × OmegaRho × ARho + T^T × OmegaTau × T
+   *          = ARhoT × OmegaRho × ARhoT^T + TT × OmegaTau × TT^T
    *
    *   Q_p_13 = V
-   *          = T^T * OmegaTau * ATau
-   *          = TT * OmegaTau * ATauT^T
+   *          = T^T × OmegaTau × ATau
+   *          = TT × OmegaTau × ATauT^T
    *
    *   Q_p_33 = L(G^tau)
-   *          = ATau^T * OmegaTau * ATau
-   *          = ATauT * OmegaTau * ATauT^T
+   *          = ATau^T × OmegaTau × ATau
+   *          = ATauT × OmegaTau × ATauT^T
    *
-   *  Dimensions: [rows x cols]
+   *  Dimensions: [rows × cols]
    *    Incidence Matrices:
-   *      ARhoT: [n x mPosePose](d x d) - block matrix
-   *      ATauT: [(n + b) x mPose] matrix
+   *      ARhoT: [n × mPosePose](d × d) - block matrix
+   *      ATauT: [(n + b) × mPose] matrix
    *    Weight Matrices:
-   *      OmegaRhoT: [mPosePose x mPosePose] (d x d) - block diagonal matrix
-   *      OmegaTauT: [mPose x mPose] diagonal matrix
+   *      OmegaRhoT: [mPosePose × mPosePose] (d × d) - block diagonal matrix
+   *      OmegaTauT: [mPose × mPose] diagonal matrix
    *    Data Matrix:
-   *      TT: [dn x mPose] matrix
+   *      TT: [dn × mPose] matrix
    */
   const size_t rowsARhoT = d_ * n_;
   const size_t colsARhoT = d_ * mPosePose;
@@ -858,23 +875,23 @@ bool Graph::constructQuadraticCostTermRASLAM() {
   const size_t rowsTT = d_ * n_;
   const size_t colsTT = mPose;
 
-  // Define incidence matrices
+  // Initialize incidence matrices
   SparseMatrix ARhoT(rowsARhoT, colsARhoT);
   ARhoT.reserve(Eigen::VectorXi::Constant(colsARhoT, 8));
   SparseMatrix ATauT(rowsATauT, colsATauT);
   ATauT.reserve(Eigen::VectorXi::Constant(colsATauT, 8));
 
-  // Define weight matrices
+  // Initialize weight matrices
   DiagonalMatrix OmegaRho(colsARhoT); // One block per measurement
   DiagonalMatrix::DiagonalVectorType &diagonalOmegaRho = OmegaRho.diagonal();
   DiagonalMatrix OmegaTau(colsATauT); // One entry per measurement
   DiagonalMatrix::DiagonalVectorType &diagonalOmegaTau = OmegaTau.diagonal();
 
-  // Define data matrix
+  // Initialize data matrix
   SparseMatrix TT(rowsTT, colsTT);
   TT.reserve(Eigen::VectorXi::Constant(colsTT, 8));
 
-  // Populate ARhoT, OmegaRhoT, ATauT, OmegaTauT, and TT
+  // Populate ARhoT, OmegaRho, ATauT, OmegaTau, and TT
   for (size_t k = 0; k < mPosePose; k++) {
     const RelativePosePoseMeasurement &meas = pose_pose_measurements.at(k);
     size_t i = IDX_NOT_SET;
@@ -894,9 +911,8 @@ bool Graph::constructQuadraticCostTermRASLAM() {
     else if (are_indices_set == std::nullopt)
       continue;
 
-    // Populate incidence matrix
+    // Populate incidence and data matrices
     if (i != IDX_NOT_SET) {
-      /// Assign SO(d) matrix to block leaving node i
       // AT(i,k) = -Rij (NOTE: NEGATIVE)
       for (size_t c = 0; c < d_; c++)
         for (size_t r = 0; r < d_; r++)
@@ -910,7 +926,6 @@ bool Graph::constructQuadraticCostTermRASLAM() {
       ATauT.insert(i, k) = -1;
     }
     if (j != IDX_NOT_SET) {
-      /// Assign d-identity matrix to block leaving node j
       // AT(j,k) = +I (NOTE: POSITIVE)
       for (size_t r = 0; r < d_; r++)
         ARhoT.insert(j * d_ + r, k * d_ + r) = +1;
@@ -928,7 +943,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
     // Assign isotropic weights in diagonal matrix
     diagonalOmegaTau[k] = meas.weight * meas.tau;
 
-    // Set indices according to pose ownership
+    // Set indices according to pose/landmark ownership
     std::optional<bool> are_indices_set =
         setIndicesFromStateOwnership(meas, &i, &j);
     if (are_indices_set == false)
@@ -936,7 +951,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
     else if (are_indices_set == std::nullopt)
       continue;
 
-    // Populate incidence matrix
+    // Populate incidence and data matrices
     if (i != IDX_NOT_SET) {
       // Populate with landmark translation data
       for (size_t r = 0; r < d_; r++)
@@ -969,24 +984,24 @@ bool Graph::constructQuadraticCostTermRASLAM() {
    *   ----------------------------           v
    *
    *   where:
-   *     Q_r_22 = P^T * OmegaRange * D^2 * P
-   *            = PT * OmegaRange * DT^T * DT^T * PT^T
+   *     Q_r_22 = P^T × OmegaRange × D^2 × P
+   *            = PT × OmegaRange × DT^T × DT^T × PT^T
    *
-   *     Q_r_23 = P^T * D * OmegaRange * C
-   *            = PT * DT^T * OmegaRange * CT^T
+   *     Q_r_23 = P^T × D × OmegaRange × C
+   *            = PT × DT^T × OmegaRange × CT^T
    *
-   *     Q_r_33 = C^T * OmegaRange * C
-   *            = CT * OmegaRange * CT^T
+   *     Q_r_33 = C^T × OmegaRange × C
+   *            = CT × OmegaRange × CT^T
    *
-   *  Dimensions: [rows x cols]
+   *  Dimensions: [rows × cols]
    *    Incidence Matrix:
-   *      CT: [(n + b) x mRange] matrix
+   *      CT: [(n + b) × mRange] matrix
    *    Weight Matrix:
-   *      OmegaRange: [mRange x mRange] diagonal matrix
+   *      OmegaRange: [mRange × mRange] diagonal matrix
    *    Data Matrix:
-   *      DT: [mRange x mRange] matrix
+   *      DT: [mRange × mRange] matrix
    *    Selection Matrix:
-   *      PT: [l x mRange]
+   *      PT: [l × mRange]
    */
   const size_t rowsCT = n_ + b_;
   const size_t colsCT = mRange;
@@ -995,20 +1010,20 @@ bool Graph::constructQuadraticCostTermRASLAM() {
   const size_t rowsPT = l_;
   const size_t colsPT = mRange;
 
-  // Define incidence matrix
+  // Initialize incidence matrix
   SparseMatrix CT(rowsCT, colsCT);
   CT.reserve(Eigen::VectorXi::Constant(colsCT, 8));
 
-  // Define weight matrix
+  // Initialize weight matrix
   DiagonalMatrix OmegaRange(colsCT); // One entry per measurement
   DiagonalMatrix::DiagonalVectorType &diagonalOmegaRange =
       OmegaRange.diagonal();
 
-  // Define data matrix
+  // Initialize data matrix
   SparseMatrix DT(rowsDT, colsDT);
   DT.reserve(Eigen::VectorXi::Constant(colsDT, 8));
 
-  // Define selection matrix
+  // Initialize selection matrix
   SparseMatrix PT(rowsPT, colsPT);
   PT.setZero();
 
@@ -1021,14 +1036,14 @@ bool Graph::constructQuadraticCostTermRASLAM() {
     // Assign isotropic weights in diagonal matrix
     diagonalOmegaRange[k] = meas.weight * meas.precision;
 
-    // Populate with range data
+    // Populate data matrix with range data
     DT.insert(k, k) = meas.range;
 
-    // Populate selection matrix
+    // Populate selection matrix based on unit sphere variable ownership
     if (meas.r1 == id_)
       PT.insert(meas.l, k) = 1;
 
-    // Set indices according to pose ownership
+    // Set indices according to pose/landmark ownership
     std::optional<bool> are_indices_set =
         setIndicesFromStateOwnership(meas, &i, &j);
     if (are_indices_set == false)
@@ -1036,23 +1051,18 @@ bool Graph::constructQuadraticCostTermRASLAM() {
     else if (are_indices_set == std::nullopt)
       continue;
 
-    // Populate incidence matrix
+    // Populate incidence matrix with range incidences that connect to pose
+    // and/or landmark translations
     if (i != IDX_NOT_SET) {
-      // offset landmark indices by the number of poses
+      // Offset landmark indices by the number of poses
       executeStateDependantFunctionals([&]() { /*No offset for pose indices*/ },
                                        [&]() { i += n_; }, meas.stateType1);
-
-      // Populate with range incidences that connect to pose and/or landmark
-      // translations
       CT.insert(i, k) = -1;
     }
     if (j != IDX_NOT_SET) {
-      // offset landmark indices by the number of poses
+      // Offset landmark indices by the number of poses
       executeStateDependantFunctionals([&]() { /*No offset for pose indices*/ },
                                        [&]() { j += n_; }, meas.stateType2);
-
-      // Populate with range incidences that connect to pose and/or landmark
-      // translations
       CT.insert(j, k) = +1;
     }
   }
@@ -1136,7 +1146,7 @@ Graph::setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
                                     size_t *i, size_t *j) {
   std::optional<bool> is_state_owned_by_inactive_neighbor;
   if (measurement.r1 == id_ && measurement.r2 != id_) {
-    // Measurement is an outgoing shared-loop closure. Check if the
+    // Measurement is an outgoing shared loop closure. Check if the
     // measurement destination state belongs to this agent's neighbor and is
     // inactive
     const StateID &neighborDstStateID = measurement.getDstID();
@@ -1150,7 +1160,7 @@ Graph::setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
       return std::nullopt;
 
   } else if (measurement.r1 != id_ && measurement.r2 == id_) {
-    // Measurement is an incoming shared-loop closure. Check if the
+    // Measurement is an incoming shared loop closure. Check if the
     // measurement source state belongs to this agent's neighbor and is
     // inactive
     const StateID &neighborSrcStateID = measurement.getSrcID();

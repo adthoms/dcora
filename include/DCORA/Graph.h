@@ -28,7 +28,7 @@ namespace DCORA {
 
 /**
  * @brief A graph class representing the local optimization problem in
- * distributed PGO and/or RA-SLAM.
+ * distributed PGO or RA-SLAM.
  */
 class Graph {
 public:
@@ -74,7 +74,7 @@ public:
    */
   unsigned int n() const { return n_; }
   /**
-   * @brief Get number of ranges
+   * @brief Get number of unit sphere variables
    * @return
    */
   unsigned int l() const { return l_; }
@@ -127,13 +127,11 @@ public:
   /**
    * @brief Update the number of poses and landmarks
    * @param stateID
-   * @return
    */
   void updateNumStates(const StateID &stateID);
   /**
    * @brief Update the number of unit sphere variables
    * @param measurement
-   * @return
    */
   void updateNumRanges(const RelativeMeasurement &measurements);
   /**
@@ -171,7 +169,7 @@ public:
    */
   RelativeMeasurements sharedLoopClosures() const { return shared_lcs_; }
   /**
-   * @brief Return a copy of all inter-robot loop closures with the specified
+   * @brief Return a copy of all shared loop closures with the specified
    * neighbor
    * @param neighbor_id
    * @return
@@ -183,8 +181,8 @@ public:
    */
   RelativeMeasurements allMeasurements() const;
   /**
-   * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot
-   * loop closures)
+   * @brief Return a copy of all LOCAL measurements (i.e., without shared loop
+   * closures)
    * @return
    */
   RelativeMeasurements localMeasurements() const;
@@ -222,7 +220,7 @@ public:
    */
   void setNeighborPoints(const PointDict &point_dict);
   /**
-   * @brief Get quadratic cost matrix.
+   * @brief Get quadratic cost matrix
    * @return
    */
   const SparseMatrix &quadraticMatrix();
@@ -231,7 +229,7 @@ public:
    */
   void clearQuadraticMatrix();
   /**
-   * @brief Get linear cost matrix.
+   * @brief Get linear cost matrix
    * @return
    */
   const Matrix &linearMatrix();
@@ -241,8 +239,8 @@ public:
   void clearLinearMatrix();
   /**
    * @brief Construct data matrices that are needed for optimization, if they do
-   * not yet exist
-   * @return true if construction is successful
+   * not yet exist. Return true if construction is successful
+   * @return
    */
   bool constructDataMatrices();
   /**
@@ -283,17 +281,19 @@ public:
    * @brief Get the set of Pose IDs that active neighbors need to share with me.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
+   * @return
    */
   PoseSet activeNeighborPublicPoseIDs() const;
   /**
    * @brief Get the set of Point IDs that active neighbors need to share with
    * me. A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
+   * @return
    */
   PointSet activeNeighborPublicPointIDs() const;
   /**
-   * @brief Get the set of neighbor robot IDs that share inter-robot loop
-   * closures with me
+   * @brief Get the set of neighbor robot IDs that share shared loop closures
+   * with me
    * @return
    */
   std::set<unsigned> neighborIDs() const { return nbr_robot_ids_; }
@@ -317,15 +317,15 @@ public:
    */
   size_t numActiveNeighbors() const;
   /**
-   * @brief Return true if the input robot is a neighbor (i.e., share
-   * inter-robot loop closure)
+   * @brief Return true if the input robot is a neighbor (i.e., shared loop
+   * closure)
    * @param robot_id
    * @return
    */
   bool hasNeighbor(unsigned int robot_id) const;
   /**
-   * @brief Check if the input neighbor is active
-   * @return false if the input robot is not a neighbor or is ignored
+   * @brief Check if the input neighbor is active. Return false if the input
+   * robot is not a neighbor or is ignored
    * @param neighbor_id
    * @return
    */
@@ -364,12 +364,10 @@ public:
   bool hasMeasurement(const StateID &srcID, const StateID &dstID) const;
   /**
    * @brief Find and return a writable pointer to the specified measurement
-   * within this graph
-   * @param measurements
+   * within this graph. If the measurement does not exist, return nullptr.
    * @param srcID
    * @param dstID
-   * @return writable pointer to the desired measurement (nullptr if measurement
-   * does not exists)
+   * @return
    */
   RelativeMeasurement *findMeasurement(const StateID &srcID,
                                        const StateID &dstID);
@@ -429,7 +427,7 @@ protected:
   // Preconditioner
   std::optional<CholmodSolverPtr> precon_;
 
-  // Invalid index when populating quadratic terms
+  // Invalid index when populating cost terms
   static constexpr size_t IDX_NOT_SET = std::numeric_limits<size_t>::max();
 
   // Timing
@@ -485,9 +483,8 @@ protected:
    */
   bool constructLinearCostTermRASLAM();
   /**
-   * @brief Helper function to set indices i and j when constructing incidence
-   * matrices for the quadratic cost term. See Eq (7) of the SE-Sync paper for
-   * details
+   * @brief Helper function to set indices i and j when constructing cost term.
+   * See Eq (7) of the SE-Sync paper for details
    * @return
    */
   std::optional<bool>
@@ -495,10 +492,10 @@ protected:
                                size_t *i, size_t *j);
   /**
    * @brief Helper function to determine if a state is owned by an inactive
-   * neighbor. Returns true of the neighbor is inactive and if the query
-   * neighborStateID belongs to the neighbor. If the neighbor is active, returns
+   * neighbor. Return true of the neighbor is inactive and if the query
+   * neighborStateID belongs to the neighbor. If the neighbor is active, return
    * false. If the neighbor is inactive but the query neighborStateID does not
-   * belong to the neighbor, returns std::nullopt
+   * belong to the neighbor, return std::nullopt
    * @param neighborStateID
    * @return
    */
@@ -520,7 +517,7 @@ protected:
 
 private:
   // Mapping Edge ID to the corresponding index in the vector of measurements
-  // (either odometry, private loop closures, or public loop closures)
+  // (either odometry, private loop closures, or shared loop closures)
   EdgeIDMap edge_id_to_index_;
 
   // Use measurements with inactive neighbors when constructing data matrices
