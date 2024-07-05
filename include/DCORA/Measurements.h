@@ -469,9 +469,6 @@ struct RangeMeasurement : RelativeMeasurement {
   }
 };
 
-// Robot and state ID pairing
-typedef std::pair<size_t, size_t> RobotStateIDPair;
-
 // Type-safe unions of relative measurements
 typedef std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,
                      RangeMeasurement>
