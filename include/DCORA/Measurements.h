@@ -401,6 +401,9 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
  * (robot, state) pairs: (robot1, state1) to (robot2, state2).
  */
 struct RangeMeasurement : RelativeMeasurement {
+  // Unit sphere variable index
+  size_t l;
+
   // Range measurement
   double range;
 
@@ -414,13 +417,14 @@ struct RangeMeasurement : RelativeMeasurement {
 
   // Basic constructor
   RangeMeasurement(size_t firstRobot, size_t secondRobot, size_t firstState,
-                   size_t secondState, const double rangeMeasurement,
-                   double rangePrecision, StateType stateType1,
-                   StateType stateType2, bool fixedWeight = false,
-                   double weight = 1.0)
+                   size_t secondState, size_t unitSphereVarIdx,
+                   const double rangeMeasurement, double rangePrecision,
+                   StateType stateType1, StateType stateType2,
+                   bool fixedWeight = false, double weight = 1.0)
       : RelativeMeasurement(MeasurementType::Range, firstRobot, secondRobot,
                             firstState, secondState, stateType1, stateType2,
                             fixedWeight, weight),
+        l(unitSphereVarIdx),
         range(rangeMeasurement),
         precision(rangePrecision) {}
 
@@ -429,15 +433,16 @@ struct RangeMeasurement : RelativeMeasurement {
       : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
                             other.p2, other.stateType1, other.stateType2,
                             other.fixedWeight, other.weight),
+        l(other.l),
         range(other.range),
         precision(other.precision) {}
 
   // Equality operator
   bool operator==(const RangeMeasurement &other) const {
     return std::tie(r1, r2, p1, p2, stateType1, stateType2, fixedWeight, weight,
-                    range, precision) ==
+                    l, range, precision) ==
            std::tie(other.r1, other.r2, other.p1, other.p2, other.stateType1,
-                    other.stateType2, other.fixedWeight, other.weight,
+                    other.stateType2, other.fixedWeight, other.weight, other.l,
                     other.range, other.precision);
   }
 
@@ -464,6 +469,7 @@ struct RangeMeasurement : RelativeMeasurement {
   }
 
   void print(std::ostream &os) const override {
+    os << "l: " << l << std::endl;
     os << "range: " << range << std::endl;
     os << "precision: " << precision << std::endl;
   }
