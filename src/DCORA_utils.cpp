@@ -970,17 +970,18 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
     for (const auto &m : pyfg_dataset.measurements.relative_measurements.vec) {
       std::visit(
           [&](auto &&m) {
-            if (m.r1 == robot_id) {
-              // measurement belongs to this agent
+            if (m.r1 == robot_id || m.r2 == robot_id) {
               measurements.relative_measurements.vec.push_back(m);
-              executeStateDependantFunctionals(
-                  [&]() { pose_ids.insert(m.p1); },
-                  [&]() { point_ids.insert(m.p1); }, m.stateType1);
-            }
-            if (m.r2 == robot_id) {
-              executeStateDependantFunctionals(
-                  [&]() { pose_ids.insert(m.p2); },
-                  [&]() { point_ids.insert(m.p2); }, m.stateType2);
+              if (m.r1 == robot_id) {
+                executeStateDependantFunctionals(
+                    [&]() { pose_ids.insert(m.p1); },
+                    [&]() { point_ids.insert(m.p1); }, m.stateType1);
+              }
+              if (m.r2 == robot_id) {
+                executeStateDependantFunctionals(
+                    [&]() { pose_ids.insert(m.p2); },
+                    [&]() { point_ids.insert(m.p2); }, m.stateType2);
+              }
             }
           },
           m);

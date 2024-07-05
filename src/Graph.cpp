@@ -213,10 +213,6 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     neighbor_active_[factor.r2] = true;
   } else {
     CHECK(factor.r2 == id_);
-    // Note: In DCORA, agent measurements are those who's source robot ID
-    // matches with the ID of the agent. As such, this block will not be
-    // entered. We leave this block to maintain backward compatibility with
-    // DPGO while adapting DCORA's logic to suite.
 
     // Update number of poses and landmarks
     updateNumStates(dst_id);
