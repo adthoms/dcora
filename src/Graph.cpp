@@ -600,36 +600,12 @@ bool Graph::constructQuadraticCostTermPGO() {
     diagonalOmega[k * dh + d_] = meas.weight * meas.tau;
 
     // Set indices according to pose ownership
-    if (meas.r1 == id_ && meas.r2 != id_) {
-      // Measurement is an outgoing shared-loop closure. Check if the
-      // measurement destination state belongs to this agent's neighbor and is
-      // inactive
-      const StateID &neighborDstStateID = meas.getDstID();
-      if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == true)
-        i = meas.p1;
-      else if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == false)
-        return false;
-      else
-        continue;
-
-    } else if (meas.r1 != id_ && meas.r2 == id_) {
-      // Measurement is an incoming shared-loop closure. Check if the
-      // measurement source state belongs to this agent's neighbor and is
-      // inactive
-      const StateID &neighborSrcStateID = meas.getSrcID();
-      if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == true)
-        j = meas.p2;
-      else if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == false)
-        return false;
-      else
-        continue;
-
-    } else {
-      // Measurement is local to the agent's graph
-      CHECK(meas.r1 == id_ && meas.r2 == id_);
-      i = meas.p1;
-      j = meas.p2;
-    }
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
 
     // Populate incidence matrix
     if (i != IDX_NOT_SET) {
@@ -820,6 +796,48 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 bool Graph::constructLinearCostTermRASLAM() {
   // TODO(AT): implement
   LOG(FATAL) << "Error: constructLinearCostTermRASLAM() not implemented yet!";
+  return true;
+}
+
+std::optional<bool>
+Graph::setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
+                                    size_t *i, size_t *j) {
+  std::optional<bool> is_state_owned_by_inactive_neighbor;
+  if (measurement.r1 == id_ && measurement.r2 != id_) {
+    // Measurement is an outgoing shared-loop closure. Check if the
+    // measurement destination state belongs to this agent's neighbor and is
+    // inactive
+    const StateID &neighborDstStateID = measurement.getDstID();
+    is_state_owned_by_inactive_neighbor =
+        isStateOwnedByInactiveNeighbor(neighborDstStateID);
+    if (is_state_owned_by_inactive_neighbor == true)
+      *i = measurement.p1;
+    else if (is_state_owned_by_inactive_neighbor == false)
+      return false;
+    else
+      return std::nullopt;
+
+  } else if (measurement.r1 != id_ && measurement.r2 == id_) {
+    // Measurement is an incoming shared-loop closure. Check if the
+    // measurement source state belongs to this agent's neighbor and is
+    // inactive
+    const StateID &neighborSrcStateID = measurement.getSrcID();
+    is_state_owned_by_inactive_neighbor =
+        isStateOwnedByInactiveNeighbor(neighborSrcStateID);
+    if (is_state_owned_by_inactive_neighbor == true)
+      *j = measurement.p2;
+    else if (is_state_owned_by_inactive_neighbor == false)
+      return false;
+    else
+      return std::nullopt;
+
+  } else {
+    // Measurement is local to the agent's graph
+    CHECK(measurement.r1 == id_ && measurement.r2 == id_);
+    *i = measurement.p1;
+    *j = measurement.p2;
+  }
+
   return true;
 }
 

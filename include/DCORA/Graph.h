@@ -488,6 +488,15 @@ protected:
    */
   bool constructLinearCostTermRASLAM();
   /**
+   * @brief Helper function to set indices i and j when constructing incidence
+   * matrices for the quadratic cost term. See Eq (7) of the SE-Sync paper for
+   * details
+   * @return
+   */
+  std::optional<bool>
+  setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
+                               size_t *i, size_t *j);
+  /**
    * @brief Helper function to determine if a state is owned by an inactive
    * neighbor. Returns true of the neighbor is inactive and if the query
    * neighborStateID belongs to the neighbor. If the neighbor is active, returns
