@@ -783,9 +783,359 @@ bool Graph::constructLinearCostTermPGO() {
 }
 
 bool Graph::constructQuadraticCostTermRASLAM() {
-  // TODO(AT): implement
-  LOG(FATAL)
-      << "Error: constructQuadraticCostTermRASLAM() not implemented yet!";
+  // Set measurements
+  const RelativeMeasurements &measurements = allMeasurements();
+  const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
+      measurements.GetRelativePosePoseMeasurements();
+  const std::vector<RelativePosePointMeasurement> &pose_point_measurements =
+      measurements.GetRelativePosePointMeasurements();
+  const std::vector<RangeMeasurement> &range_measurements =
+      measurements.GetRangeMeasurements();
+
+  // Set dimensions
+  const size_t mPosePose = pose_pose_measurements.size();
+  const size_t mPosePoint = pose_point_measurements.size();
+  const size_t mRange = range_measurements.size();
+  const size_t mPose = mPosePose + mPosePoint;
+  CHECK_EQ(mPose + mRange, numMeasurements());
+  CHECK_LE(l_, mRange);
+
+  /**
+   * @brief Constructing the quadratic cost term for RA-SLAM
+   *
+   * The quadratic cost term Q is a [k x k] block symmetric matrix of the form:
+   *
+   *   Q = Q_p + Q_r; k = (d + 1)n_b + l_b + b_b
+   *
+   *   <-----------col------------>
+   *
+   *      dn_b     l_b    n_b + b_b
+   *   ----------------------------             ^
+   *   |  Q_11  |   0    |  Q_13  |  dn_b       |
+   *   |  ****  |  Q_22  |  Q_23  |  l_b       row
+   *   |  ****  |  ****  |  Q_33  |  n_b + b_b  |
+   *   ----------------------------             v
+   *
+   * where:
+   *   n_b is the number of poses owned by this agent (i.e. agent b)
+   *   l_b is the number of unit sphere variables owned by this agent
+   *   b_b is the number of landmarks owned by this agent
+   *
+   * In our implementation, we calculate the submatrices of Q_p and Q_r
+   * separately and then combine them to form Q. For book keeping, we we use a
+   * matrix-centric approach and update Q_p and Q_r for all measurements,
+   * indexing the contribution of each measurement using agent b's state and
+   * unit sphere IDs. For convenience, we drop subscript b for remaining
+   * formalisms.
+   */
+
+  /**
+   * @brief Constructing Q_p submatrices
+   *
+   * Data matrix Q_p is a block symmetric matrix of the form:
+   *
+   *   <-----------col------------>
+   *
+   *       dn       l      n + b
+   *   ----------------------------           ^
+   *   | Q_p_11 |   0    | Q_p_13 |  dn       |
+   *   |  ****  |   0    |   0    |  l       row
+   *   |  ****  |  ****  | Q_p_33 |  n + b    |
+   *   ----------------------------           v
+   *
+   *   Q_p_11 = L(G^rho) + Sigma
+   *          = ARho^T * OmegaRho * ARho + T^T * OmegaTau * T
+   *          = ARhoT * OmegaRho * ARhoT^T + TT * OmegaTau * TT^T
+   *
+   *   Q_p_13 = V
+   *          = T^T * OmegaTau * ATau
+   *          = TT * OmegaTau * ATauT^T
+   *
+   *   Q_p_33 = L(G^tau)
+   *          = ATau^T * OmegaTau * ATau
+   *          = ATauT * OmegaTau * ATauT^T
+   *
+   *  Dimensions: [rows x cols]
+   *    Incidence Matrices:
+   *      ARhoT: [n x mPosePose](d x d) - block matrix
+   *      ATauT: [(n + b) x mPose] matrix
+   *    Weight Matrices:
+   *      OmegaRhoT: [mPosePose x mPosePose] (d x d) - block diagonal matrix
+   *      OmegaTauT: [mPose x mPose] diagonal matrix
+   *    Data Matrix:
+   *      TT: [dn x mPose] matrix
+   */
+  const size_t rowsARhoT = d_ * n_;
+  const size_t colsARhoT = d_ * mPosePose;
+  const size_t rowsATauT = n_ + b_;
+  const size_t colsATauT = mPose;
+  const size_t rowsTT = d_ * n_;
+  const size_t colsTT = mPose;
+
+  // Define incidence matrices
+  SparseMatrix ARhoT(rowsARhoT, colsARhoT);
+  ARhoT.reserve(Eigen::VectorXi::Constant(colsARhoT, 8));
+  SparseMatrix ATauT(rowsATauT, colsATauT);
+  ATauT.reserve(Eigen::VectorXi::Constant(colsATauT, 8));
+
+  // Define weight matrices
+  DiagonalMatrix OmegaRho(colsARhoT); // One block per measurement
+  DiagonalMatrix::DiagonalVectorType &diagonalOmegaRho = OmegaRho.diagonal();
+  DiagonalMatrix OmegaTau(colsATauT); // One entry per measurement
+  DiagonalMatrix::DiagonalVectorType &diagonalOmegaTau = OmegaTau.diagonal();
+
+  // Define data matrix
+  SparseMatrix TT(rowsTT, colsTT);
+  TT.reserve(Eigen::VectorXi::Constant(colsTT, 8));
+
+  // Populate ARhoT, OmegaRhoT, ATauT, OmegaTauT, and TT
+  for (size_t k = 0; k < mPosePose; k++) {
+    const RelativePosePoseMeasurement &meas = pose_pose_measurements.at(k);
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Assign isotropic weights in diagonal matrices
+    for (size_t r = 0; r < d_; r++)
+      diagonalOmegaRho[k * d_ + r] = meas.weight * meas.kappa;
+
+    diagonalOmegaTau[k] = meas.weight * meas.tau;
+
+    // Set indices according to pose ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
+    // Populate incidence matrix
+    if (i != IDX_NOT_SET) {
+      /// Assign SO(d) matrix to block leaving node i
+      // AT(i,k) = -Rij (NOTE: NEGATIVE)
+      for (size_t c = 0; c < d_; c++)
+        for (size_t r = 0; r < d_; r++)
+          ARhoT.insert(i * d_ + r, k * d_ + c) = -meas.R(r, c);
+
+      // Populate with pose translation data
+      for (size_t r = 0; r < d_; r++)
+        TT.insert(i * d_ + r, k) = -meas.t(r);
+
+      // Populate with pose translation incidences
+      ATauT.insert(i, k) = -1;
+    }
+    if (j != IDX_NOT_SET) {
+      /// Assign d-identity matrix to block leaving node j
+      // AT(j,k) = +I (NOTE: POSITIVE)
+      for (size_t r = 0; r < d_; r++)
+        ARhoT.insert(j * d_ + r, k * d_ + r) = +1;
+
+      // Populate with pose translation incidences
+      ATauT.insert(j, k) = +1;
+    }
+  }
+  for (size_t k = mPosePose; k < mPose; k++) {
+    const RelativePosePointMeasurement &meas =
+        pose_point_measurements.at(k - mPosePose);
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Assign isotropic weights in diagonal matrix
+    diagonalOmegaTau[k] = meas.weight * meas.tau;
+
+    // Set indices according to pose ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
+    // Populate incidence matrix
+    if (i != IDX_NOT_SET) {
+      // Populate with landmark translation data
+      for (size_t r = 0; r < d_; r++)
+        TT.insert(i * d_ + r, k) = -meas.t(r);
+
+      // Populate with landmark translation incidences
+      ATauT.insert(i, k) = -1;
+    }
+    if (j != IDX_NOT_SET) {
+      // Offset landmark indices by the number of poses
+      j += n_;
+
+      // Populate with landmark translation incidences
+      ATauT.insert(j, k) = +1;
+    }
+  }
+
+  /**
+   * @brief Constructing Q_r submatrices
+   *
+   * Data matrix Q_r is a block symmetric matrix of the form:
+   *
+   *   <-----------col------------>
+   *
+   *       dn       l      n + b
+   *   ----------------------------           ^
+   *   |   0    |   0    |   0    |  dn       |
+   *   |  ****  | Q_r_22 | Q_r_23 |  l       row
+   *   |  ****  |  ****  | Q_r_33 |  n + b    |
+   *   ----------------------------           v
+   *
+   *   where:
+   *     Q_r_22 = P^T * OmegaRange * D^2 * P
+   *            = PT * OmegaRange * DT^T * DT^T * PT^T
+   *
+   *     Q_r_23 = P^T * D * OmegaRange * C
+   *            = PT * DT^T * OmegaRange * CT^T
+   *
+   *     Q_r_33 = C^T * OmegaRange * C
+   *            = CT * OmegaRange * CT^T
+   *
+   *  Dimensions: [rows x cols]
+   *    Incidence Matrix:
+   *      CT: [(n + b) x mRange] matrix
+   *    Weight Matrix:
+   *      OmegaRange: [mRange x mRange] diagonal matrix
+   *    Data Matrix:
+   *      DT: [mRange x mRange] matrix
+   *    Selection Matrix:
+   *      PT: [l x mRange]
+   */
+  const size_t rowsCT = n_ + b_;
+  const size_t colsCT = mRange;
+  const size_t rowsDT = mRange;
+  const size_t colsDT = mRange;
+  const size_t rowsPT = l_;
+  const size_t colsPT = mRange;
+
+  // Define incidence matrix
+  SparseMatrix CT(rowsCT, colsCT);
+  CT.reserve(Eigen::VectorXi::Constant(colsCT, 8));
+
+  // Define weight matrix
+  DiagonalMatrix OmegaRange(colsCT); // One entry per measurement
+  DiagonalMatrix::DiagonalVectorType &diagonalOmegaRange =
+      OmegaRange.diagonal();
+
+  // Define data matrix
+  SparseMatrix DT(rowsDT, colsDT);
+  DT.reserve(Eigen::VectorXi::Constant(colsDT, 8));
+
+  // Define selection matrix
+  SparseMatrix PT(rowsPT, colsPT);
+  PT.setZero();
+
+  // Populate CT, OmegaRange, DT, and PT
+  for (size_t k = 0; k < mRange; k++) {
+    const RangeMeasurement &meas = range_measurements.at(k);
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Assign isotropic weights in diagonal matrix
+    diagonalOmegaRange[k] = meas.weight * meas.precision;
+
+    // Populate with range data
+    DT.insert(k, k) = meas.range;
+
+    // Populate selection matrix
+    if (meas.r1 == id_)
+      PT.insert(meas.l, k) = 1;
+
+    // Set indices according to pose ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
+    // Populate incidence matrix
+    if (i != IDX_NOT_SET) {
+      // offset landmark indices by the number of poses
+      executeStateDependantFunctionals([&]() { /*No offset for pose indices*/ },
+                                       [&]() { i += n_; }, meas.stateType1);
+
+      // Populate with range incidences that connect to pose and/or landmark
+      // translations
+      CT.insert(i, k) = -1;
+    }
+    if (j != IDX_NOT_SET) {
+      // offset landmark indices by the number of poses
+      executeStateDependantFunctionals([&]() { /*No offset for pose indices*/ },
+                                       [&]() { j += n_; }, meas.stateType2);
+
+      // Populate with range incidences that connect to pose and/or landmark
+      // translations
+      CT.insert(j, k) = +1;
+    }
+  }
+
+  // Compress sparse matrices
+  ARhoT.makeCompressed();
+  ATauT.makeCompressed();
+  TT.makeCompressed();
+  CT.makeCompressed();
+  DT.makeCompressed();
+  PT.makeCompressed();
+
+  // Set Q_p and Q_r submatrices
+  const SparseMatrix &ARho = ARhoT.transpose();
+  const SparseMatrix &ATau = ATauT.transpose();
+  const SparseMatrix &T = TT.transpose();
+  const SparseMatrix &C = CT.transpose();
+  const SparseMatrix &D = DT.transpose();
+  const SparseMatrix &P = PT.transpose();
+
+  /**
+   * @brief Constructing Q from Q_p and Q_r
+   *
+   * The following implementation is adapted from:
+   * CORA: https://github.com/MarineRoboticsGroup/cora
+   */
+  SparseMatrix Q11 = ARhoT * OmegaRho * ARho + TT * OmegaTau * T;
+  SparseMatrix Q13 = TT * OmegaTau * ATau;
+  SparseMatrix Q22 = PT * OmegaRange * D * D * P;
+  SparseMatrix Q23 = PT * D * OmegaRange * C;
+  SparseMatrix Q33 = ATauT * OmegaTau * ATau + CT * OmegaRange * C;
+
+  // Combine block matrices
+  std::vector<Eigen::Triplet<double>> combinedTriplets;
+  combinedTriplets.reserve(Q11.nonZeros() + Q13.nonZeros() + Q22.nonZeros() +
+                           Q23.nonZeros() + Q33.nonZeros());
+
+  // Lambda function to add triplets to the combined triplets vector
+  auto addTriplets = [&combinedTriplets](const SparseMatrix &matrix,
+                                         size_t rowOffset, size_t colOffset) {
+    for (int k = 0; k < matrix.outerSize(); ++k) {
+      for (SparseMatrix::InnerIterator it(matrix, k); it; ++it) {
+        combinedTriplets.emplace_back(it.row() + rowOffset,
+                                      it.col() + colOffset, it.value());
+      }
+    }
+  };
+
+  // Set matrix dimensions
+  const size_t rotMatSize = d_ * n_;
+  const size_t rotRangeMatSize = rotMatSize + l_;
+  const size_t dataMatSize = rotRangeMatSize + n_ + b_;
+
+  // Q11, Q13, Q22, Q23, Q33
+  addTriplets(Q11, 0, 0);
+  addTriplets(Q13, 0, rotRangeMatSize);
+  addTriplets(Q22, rotMatSize, rotMatSize);
+  addTriplets(Q23, rotMatSize, rotRangeMatSize);
+  addTriplets(Q33, rotRangeMatSize, rotRangeMatSize);
+
+  // Add Q13 and Q23 transposed to the triplets
+  addTriplets(Q13.transpose(), rotRangeMatSize, 0);
+  addTriplets(Q23.transpose(), rotRangeMatSize, rotMatSize);
+
+  // Construct the data matrix
+  SparseMatrix Q(dataMatSize, dataMatSize);
+  Q.setFromTriplets(combinedTriplets.begin(), combinedTriplets.end());
+  Q_.emplace(Q);
+
   return true;
 }
 
