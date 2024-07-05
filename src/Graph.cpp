@@ -707,6 +707,8 @@ bool Graph::constructLinearCostTermPGO() {
     CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
         std::get<RelativePosePoseMeasurement>(measVariant);
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
 
     // Update measurement transformation matrix
     T.block(0, 0, d_, d_) = meas.R;
@@ -718,48 +720,32 @@ bool Graph::constructLinearCostTermPGO() {
 
     Omega(d_, d_) = meas.weight * meas.tau;
 
+    // Set indices according to pose ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
     // Update linear cost
-    if (meas.r1 == id_) {
-      CHECK(meas.r2 != id_);
-      // Measurement is an outgoing shared-loop closure. Check if the
-      // measurement destination state belongs to this agent's neighbor and is
-      // inactive
+    if (i != IDX_NOT_SET) {
+      AbT = -T; // leaving node i of agent b
+      AcT = I;  // entering node j of agent c
       const StateID &neighborDstStateID = meas.getDstID();
-      if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == true) {
-        size_t i = meas.p1;
-        AbT = -T; // leaving node i of agent b
-        AcT = I;  // entering node j of agent c
-        XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
+      XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
 
-        // add measurement contribution to linear cost
-        G.pose(i) += XcT * AcT * Omega * AbT.transpose();
-
-      } else if (isStateOwnedByInactiveNeighbor(neighborDstStateID) == false) {
-        return false;
-      } else {
-        continue;
-      }
-
-    } else {
-      CHECK(meas.r1 != id_);
-      // Measurement is an incoming shared-loop closure. Check if the
-      // measurement source state belongs to this agent's neighbor and is
-      // inactive
+      // add measurement contribution to linear cost
+      G.pose(i) += XcT * AcT * Omega * AbT.transpose();
+    }
+    if (j != IDX_NOT_SET) {
+      AbT = I;  // entering node j of agent b
+      AcT = -T; // leaving node i of agent c
       const StateID &neighborSrcStateID = meas.getSrcID();
-      if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == true) {
-        size_t j = meas.p2;
-        AbT = I;  // entering node j of agent b
-        AcT = -T; // leaving node i of agent c
-        XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
+      XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
 
-        // add measurement contribution to linear cost
-        G.pose(j) += XcT * AcT * Omega * AbT.transpose();
-
-      } else if (isStateOwnedByInactiveNeighbor(neighborSrcStateID) == false) {
-        return false;
-      } else {
-        continue;
-      }
+      // add measurement contribution to linear cost
+      G.pose(j) += XcT * AcT * Omega * AbT.transpose();
     }
   }
 
