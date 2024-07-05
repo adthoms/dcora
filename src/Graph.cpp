@@ -75,15 +75,16 @@ void Graph::updateNumStates(const StateID &stateID) {
     b_ = std::max(b_, static_cast<unsigned int>(stateID.frame_id + 1));
 }
 
-void Graph::updateNumRanges(const RelativeMeasurement &measurement,
-                            bool useSourceIDforOwnership) {
-  // unit sphere variables belong to agent that took range measurement
-  const unsigned int robotOwnershipID =
-      useSourceIDforOwnership ? measurement.r1 : measurement.r2;
-  if (!hasMeasurement(measurement.getSrcID(), measurement.getDstID()) &&
-      robotOwnershipID == id_ &&
-      measurement.measurementType == MeasurementType::Range)
-    l_++;
+void Graph::updateNumRanges(const RelativeMeasurement &measurement) {
+  if (measurement.measurementType != MeasurementType::Range)
+    return;
+
+  if (measurement.r1 == id_) {
+    // range measurement's unit sphere variable belongs to this agent
+    const RangeMeasurement &range_measurement =
+        dynamic_cast<const RangeMeasurement &>(measurement);
+    l_ = std::max(l_, static_cast<unsigned int>(range_measurement.l + 1));
+  }
 }
 
 void Graph::setMeasurements(
@@ -185,14 +186,15 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   // Check that this is a valid measurement
   factor.checkDim(d_);
 
+  // Update number of unit sphere variables
+  updateNumRanges(factor);
+
   // Update local and neighbor shared state IDs. Set active neighbor.
   if (factor.r1 == id_) {
     CHECK(factor.r2 != id_);
 
     // Update number of poses and landmarks
     updateNumStates(src_id);
-    // Update number of unit sphere variables
-    updateNumRanges(factor, true);
 
     // Add local shared state to graph
     executeStateDependantFunctionals(
@@ -216,8 +218,6 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
 
     // Update number of poses and landmarks
     updateNumStates(dst_id);
-    // Update number of unit sphere variables
-    updateNumRanges(factor, false);
 
     // Add local shared state to graph
     executeStateDependantFunctionals(
