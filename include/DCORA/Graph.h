@@ -524,7 +524,7 @@ protected:
 private:
   // Mapping Edge ID to the corresponding index in the vector of measurements
   // (either odometry, private loop closures, or public loop closures)
-  std::unordered_map<EdgeID, size_t, HashEdgeID> edge_id_to_index_;
+  EdgeIDMap edge_id_to_index_;
 
   // Use measurements with inactive neighbors when constructing data matrices
   bool use_inactive_neighbors_;

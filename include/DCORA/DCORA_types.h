@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 
 #include <boost/functional/hash.hpp>
@@ -341,5 +342,8 @@ struct HashEdgeID {
     return seed;
   }
 };
+
+// Map from edge ID to edge index
+typedef std::unordered_map<EdgeID, size_t, HashEdgeID> EdgeIDMap;
 
 } // namespace DCORA
