@@ -542,6 +542,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   RelativePosePointMeasurement pose_point_measurement;
   RangeMeasurement range_measurement;
 
+  // Initialize map for indexing unit sphere variables according to robot ID
+  std::map<unsigned int, unsigned int> robot_id_to_unit_sphere_idx = {};
+
+  // Initialize map to maintain unique range edges
+  EdgeIDMap range_edge_id_to_index;
+  size_t range_edge_index = 0;
+
   // Initialize ground truth pose and point matrices
   std::vector<Matrix> GroundTruthPoseRotationMatrices;
   std::vector<Vector> GroundTruthPoseTranslationVectors;
@@ -897,6 +904,21 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         range_measurement.stateType2 = getStateTypeFromSymbol(sym2);
         range_measurement.range = range;
         range_measurement.precision = 1.0 / cov;
+
+        // Ensure unique range measurements for correct unit sphere indexing
+        const EdgeID range_edge_id(range_measurement.getSrcID(),
+                                   range_measurement.getDstID());
+        if (range_edge_id_to_index.find(range_edge_id) !=
+            range_edge_id_to_index.end())
+          continue;
+
+        // Add edge to map
+        range_edge_id_to_index.emplace(range_edge_id, range_edge_index);
+        range_edge_index++;
+
+        // Update unit sphere index assuming the source robot takes ownership
+        range_measurement.l = robot_id_to_unit_sphere_idx[robot1ID];
+        robot_id_to_unit_sphere_idx[robot1ID]++;
 
         // Add measurement
         pyfg_dataset.measurements.relative_measurements.vec.push_back(
