@@ -190,33 +190,6 @@ struct ROPTResult {
                                    // (only used by trust region solver)
 };
 
-/**
- * @brief Submatrices used to construct RA-SLAM data matrix Q, where:
- *        Q = Q_p + Q_r
- *        See helper function constructRASLAMDataSubmatrices for details
- */
-struct RASLAMDataSubmatrices {
-  // Q_p
-  // Incidence matrices
-  SparseMatrix ARho;
-  SparseMatrix ATau;
-  // Weight matrices
-  DiagonalMatrix OmegaRho;
-  DiagonalMatrix OmegaTau;
-  // Data matrices
-  SparseMatrix T;
-
-  // Q_r
-  SparseMatrix C;            // incidence matrix
-  DiagonalMatrix OmegaRange; // weight matrix
-  SparseMatrix D;            // data matrix
-
-  // Problem dimensions
-  unsigned int d, n, l, b;
-
-  RASLAMDataSubmatrices() = default;
-};
-
 // Each state is uniquely determined by the robot ID and frame ID
 class StateID {
 public:
