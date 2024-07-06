@@ -39,10 +39,10 @@ void Graph::empty() {
   odometry_.clear();
   private_lcs_.vec.clear();
   shared_lcs_.vec.clear();
-  local_shared_pose_ids_.clear();
-  local_shared_point_ids_.clear();
+  loc_shared_pose_ids_.clear();
+  loc_shared_landmark_ids_.clear();
   nbr_shared_pose_ids_.clear();
-  nbr_shared_point_ids_.clear();
+  nbr_shared_landmark_ids_.clear();
   nbr_robot_ids_.clear();
   neighbor_active_.clear();
   clearNeighborStates();
@@ -61,7 +61,7 @@ void Graph::reset() {
 
 void Graph::clearNeighborStates() {
   neighbor_poses_.clear();
-  neighbor_points_.clear();
+  neighbor_landmarks_.clear();
   G_.reset(); // Clearing neighbor poses requires re-computing linear matrix
 }
 
@@ -198,14 +198,14 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
 
     // Add local shared state to graph
     executeStateDependantFunctionals(
-        [&, this]() { local_shared_pose_ids_.emplace(factor.r1, factor.p1); },
-        [&, this]() { local_shared_point_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { loc_shared_pose_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { loc_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
         factor.stateType1);
 
     // Add neighbor shared state to graph
     executeStateDependantFunctionals(
         [&, this]() { nbr_shared_pose_ids_.emplace(factor.r2, factor.p2); },
-        [&, this]() { nbr_shared_point_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
         factor.stateType2);
 
     // Update neighbor robot IDs
@@ -221,14 +221,14 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
 
     // Add local shared state to graph
     executeStateDependantFunctionals(
-        [&, this]() { local_shared_pose_ids_.emplace(factor.r2, factor.p2); },
-        [&, this]() { local_shared_point_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { loc_shared_pose_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { loc_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
         factor.stateType2);
 
     // Add neighbor shared state to graph
     executeStateDependantFunctionals(
         [&, this]() { nbr_shared_pose_ids_.emplace(factor.r1, factor.p1); },
-        [&, this]() { nbr_shared_point_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
         factor.stateType1);
 
     // Update neighbor robot IDs
@@ -279,7 +279,7 @@ RelativeMeasurements Graph::localMeasurements() const {
 
 void Graph::clearPriors() {
   pose_priors_.clear();
-  point_priors_.clear();
+  landmark_priors_.clear();
 }
 
 void Graph::setPrior(unsigned index, const LiftedPose &Xi) {
@@ -293,13 +293,13 @@ void Graph::setPrior(unsigned index, const LiftedPoint &ti) {
   CHECK_LT(index, b());
   CHECK_EQ(d(), ti.d());
   CHECK_EQ(r(), ti.r());
-  point_priors_[index] = ti;
+  landmark_priors_[index] = ti;
 }
 
 void Graph::setNeighborStates(const PoseDict &pose_dict,
-                              const PointDict &point_dict) {
+                              const PointDict &landmark_dict) {
   neighbor_poses_ = pose_dict;
-  neighbor_points_ = point_dict;
+  neighbor_landmarks_ = landmark_dict;
   G_.reset(); // Setting neighbor states requires re-computing linear matrix
 }
 
@@ -308,9 +308,9 @@ void Graph::setNeighborPoses(const PoseDict &pose_dict) {
   G_.reset(); // Setting neighbor poses requires re-computing linear matrix
 }
 
-void Graph::setNeighborPoints(const PointDict &point_dict) {
-  neighbor_points_ = point_dict;
-  G_.reset(); // Setting neighbor points requires re-computing linear matrix
+void Graph::setNeighborLandmarks(const PointDict &landmark_dict) {
+  neighbor_landmarks_ = landmark_dict;
+  G_.reset(); // Setting neighbor landmarks requires re-computing linear matrix
 }
 
 bool Graph::hasNeighbor(unsigned int robot_id) const {
@@ -338,8 +338,9 @@ bool Graph::requireNeighborPose(const PoseID &pose_id) const {
   return nbr_shared_pose_ids_.find(pose_id) != nbr_shared_pose_ids_.end();
 }
 
-bool Graph::requireNeighborPoint(const PointID &point_id) const {
-  return nbr_shared_point_ids_.find(point_id) != nbr_shared_point_ids_.end();
+bool Graph::requireNeighborLandmark(const PointID &landmark_id) const {
+  return nbr_shared_landmark_ids_.find(landmark_id) !=
+         nbr_shared_landmark_ids_.end();
 }
 
 bool Graph::hasMeasurement(const StateID &srcID, const StateID &dstID) const {
@@ -405,9 +406,9 @@ PoseSet Graph::activeNeighborPublicPoseIDs() const {
   return output;
 }
 
-PointSet Graph::activeNeighborPublicPointIDs() const {
+PointSet Graph::activeNeighborPublicLandmarkIDs() const {
   PointSet output;
-  for (const auto &point_id : nbr_shared_point_ids_) {
+  for (const auto &point_id : nbr_shared_landmark_ids_) {
     if (isNeighborActive(point_id.robot_id)) {
       output.emplace(point_id);
     }
@@ -583,7 +584,7 @@ bool Graph::constructQuadraticCostTermPGO() {
 
   // Initialize incidence matrix
   SparseMatrix AbT(rowsAbT, colsAbT);
-  AbT.reserve(Eigen::VectorXi::Constant(colsAbT, 8));
+  AbT.reserve(Eigen::VectorXi::Constant(colsAbT, SPARSE_ENTRIES));
 
   // Initialize weight matrix
   DiagonalMatrix Omega(colsAbT); // One block per measurement
@@ -792,7 +793,6 @@ bool Graph::constructQuadraticCostTermRASLAM() {
   const size_t mPosePoint = pose_point_measurements.size();
   const size_t mRange = range_measurements.size();
   const size_t mPose = mPosePose + mPosePoint;
-  CHECK_EQ(mPose + mRange, numMeasurements());
   CHECK_LE(l_, mRange);
 
   /**
@@ -877,9 +877,9 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 
   // Initialize incidence matrices
   SparseMatrix ARhoT(rowsARhoT, colsARhoT);
-  ARhoT.reserve(Eigen::VectorXi::Constant(colsARhoT, 8));
+  ARhoT.reserve(Eigen::VectorXi::Constant(colsARhoT, SPARSE_ENTRIES));
   SparseMatrix ATauT(rowsATauT, colsATauT);
-  ATauT.reserve(Eigen::VectorXi::Constant(colsATauT, 8));
+  ATauT.reserve(Eigen::VectorXi::Constant(colsATauT, SPARSE_ENTRIES));
 
   // Initialize weight matrices
   DiagonalMatrix OmegaRho(colsARhoT); // One block per measurement
@@ -889,7 +889,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 
   // Initialize data matrix
   SparseMatrix TT(rowsTT, colsTT);
-  TT.reserve(Eigen::VectorXi::Constant(colsTT, 8));
+  TT.reserve(Eigen::VectorXi::Constant(colsTT, SPARSE_ENTRIES));
 
   // Populate ARhoT, OmegaRho, ATauT, OmegaTau, and TT
   for (size_t k = 0; k < mPosePose; k++) {
@@ -1012,7 +1012,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 
   // Initialize incidence matrix
   SparseMatrix CT(rowsCT, colsCT);
-  CT.reserve(Eigen::VectorXi::Constant(colsCT, 8));
+  CT.reserve(Eigen::VectorXi::Constant(colsCT, SPARSE_ENTRIES));
 
   // Initialize weight matrix
   DiagonalMatrix OmegaRange(colsCT); // One entry per measurement
@@ -1021,7 +1021,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 
   // Initialize data matrix
   SparseMatrix DT(rowsDT, colsDT);
-  DT.reserve(Eigen::VectorXi::Constant(colsDT, 8));
+  DT.reserve(Eigen::VectorXi::Constant(colsDT, SPARSE_ENTRIES));
 
   // Initialize selection matrix
   SparseMatrix PT(rowsPT, colsPT);
@@ -1082,6 +1082,11 @@ bool Graph::constructQuadraticCostTermRASLAM() {
   const SparseMatrix &C = CT.transpose();
   const SparseMatrix &D = DT.transpose();
   const SparseMatrix &P = PT.transpose();
+  SparseMatrix Q11 = ARhoT * OmegaRho * ARho + TT * OmegaTau * T;
+  SparseMatrix Q13 = TT * OmegaTau * ATau;
+  SparseMatrix Q22 = PT * OmegaRange * D * D * P;
+  SparseMatrix Q23 = PT * D * OmegaRange * C;
+  SparseMatrix Q33 = ATauT * OmegaTau * ATau + CT * OmegaRange * C;
 
   /**
    * @brief Constructing Q from Q_p and Q_r
@@ -1089,11 +1094,6 @@ bool Graph::constructQuadraticCostTermRASLAM() {
    * The following implementation is adapted from:
    * CORA: https://github.com/MarineRoboticsGroup/cora
    */
-  SparseMatrix Q11 = ARhoT * OmegaRho * ARho + TT * OmegaTau * T;
-  SparseMatrix Q13 = TT * OmegaTau * ATau;
-  SparseMatrix Q22 = PT * OmegaRange * D * D * P;
-  SparseMatrix Q23 = PT * D * OmegaRange * C;
-  SparseMatrix Q33 = ATauT * OmegaTau * ATau + CT * OmegaRange * C;
 
   // Combine block matrices
   std::vector<Eigen::Triplet<double>> combinedTriplets;
@@ -1194,9 +1194,9 @@ Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
             (neighbor_poses_.find(neighborPoseID) != neighbor_poses_.end());
       },
       [&, this]() {
-        const PointID neighborPointID(neighborStateID);
-        has_neighbor_state =
-            (neighbor_points_.find(neighborPointID) != neighbor_points_.end());
+        const PointID neighborLandmarkID(neighborStateID);
+        has_neighbor_state = (neighbor_landmarks_.find(neighborLandmarkID) !=
+                              neighbor_landmarks_.end());
       },
       neighborStateID.state_type);
 
@@ -1226,18 +1226,19 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
       [&, this]() {
         const PoseID neighborPoseID(neighborStateID);
         const auto neighborPoseItr = neighbor_poses_.find(neighborPoseID);
-        if (neighborPoseItr == neighbor_poses_.end())
-          LOG(FATAL) << "Fixed pose variable of agent's neighbor "
-                     << neighborStateID.robot_id << " not found!";
+        CHECK(neighborPoseItr != neighbor_poses_.end())
+            << "Fixed pose variable of agent's neighbor "
+            << neighborStateID.robot_id << " not found!";
 
         X = neighborPoseItr->second.pose();
       },
       [&, this]() {
-        const PointID neighborPointID(neighborStateID);
-        const auto neighborPointItr = neighbor_points_.find(neighborPointID);
-        if (neighborPointItr == neighbor_points_.end())
-          LOG(FATAL) << "Fixed point variable of agent's neighbor "
-                     << neighborStateID.robot_id << " not found!";
+        const PointID neighborLandmarkID(neighborStateID);
+        const auto neighborPointItr =
+            neighbor_landmarks_.find(neighborLandmarkID);
+        CHECK(neighborPointItr != neighbor_landmarks_.end())
+            << "Fixed landmark variable of agent's neighbor "
+            << neighborStateID.robot_id << " not found!";
 
         X = neighborPointItr->second.translation();
       },

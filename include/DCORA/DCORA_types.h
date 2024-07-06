@@ -217,9 +217,9 @@ public:
       : StateID(StateType::Pose, rid, fid) {}
 
   explicit PoseID(const StateID &state) {
-    if (!state.isPose())
-      LOG(FATAL) << "Error: Cannot construct PoseID from StateID: State is not "
-                    "of type Pose!";
+    CHECK(state.isPose())
+        << "Error: Cannot construct PoseID from StateID: State is not "
+           "of type Pose!";
     state_type = state.state_type;
     robot_id = state.robot_id;
     frame_id = state.frame_id;
@@ -232,9 +232,9 @@ public:
       : StateID(StateType::Point, rid, fid) {}
 
   explicit PointID(const StateID &state) {
-    if (!state.isPoint())
-      LOG(FATAL) << "Error: Cannot construct PointID from StateID: State is "
-                    "not of type Point!";
+    CHECK(state.isPoint())
+        << "Error: Cannot construct PointID from StateID: State is "
+           "not of type Point!";
     state_type = state.state_type;
     robot_id = state.robot_id;
     frame_id = state.frame_id;

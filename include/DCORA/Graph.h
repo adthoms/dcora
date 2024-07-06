@@ -89,7 +89,7 @@ public:
    */
   unsigned int numOdometry() const { return odometry_.size(); }
   /**
-   * @brief Return number of private loop closures;
+   * @brief Return number of private loop closures
    * @return
    */
   unsigned int numPrivateLoopClosures() const {
@@ -100,13 +100,6 @@ public:
    * @return
    */
   unsigned int numSharedLoopClosures() const { return shared_lcs_.vec.size(); }
-  /**
-   * @brief Return the number of all measurements
-   * @return
-   */
-  unsigned int numMeasurements() const {
-    return numOdometry() + numPrivateLoopClosures() + numSharedLoopClosures();
-  }
   /**
    * @brief Return true if the graph is compatible with PGO
    * @return
@@ -197,28 +190,28 @@ public:
    */
   void setPrior(unsigned index, const LiftedPose &Xi);
   /**
-   * @brief Add a point prior term
+   * @brief Add a landmark prior term
    * @param index The index of the local variable
-   * @param ti Corresponding point prior term
+   * @param ti Corresponding landmark prior term
    */
   void setPrior(unsigned index, const LiftedPoint &ti);
   /**
    * @brief Set neighbor state
    * @param pose_dict
-   * @param point_dict
+   * @param landmark_dict
    */
   void setNeighborStates(const PoseDict &pose_dict,
-                         const PointDict &point_dict);
+                         const PointDict &landmark_dict);
   /**
    * @brief Set neighbor poses
    * @param pose_dict
    */
   void setNeighborPoses(const PoseDict &pose_dict);
   /**
-   * @brief Set neighbor points
-   * @param point_dict
+   * @brief Set neighbor landmarks
+   * @param landmark_dict
    */
-  void setNeighborPoints(const PointDict &point_dict);
+  void setNeighborLandmarks(const PointDict &landmark_dict);
   /**
    * @brief Get quadratic cost matrix
    * @return
@@ -261,36 +254,38 @@ public:
    * @brief Get the set of my pose IDs that are shared with other robots
    * @return
    */
-  PoseSet myPublicPoseIDs() const { return local_shared_pose_ids_; }
+  PoseSet myPublicPoseIDs() const { return loc_shared_pose_ids_; }
   /**
-   * @brief Get the set of my point IDs that are shared with other robots
+   * @brief Get the set of my landmark IDs that are shared with other robots
    * @return
    */
-  PointSet myPublicPointIDs() const { return local_shared_point_ids_; }
+  PointSet myPublicLandmarkIDs() const { return loc_shared_landmark_ids_; }
   /**
-   * @brief Get the set of Pose IDs that ALL neighbors need to share with me
+   * @brief Get the set of pose IDs that ALL neighbors need to share with me
    * @return
    */
   PoseSet neighborPublicPoseIDs() const { return nbr_shared_pose_ids_; }
   /**
-   * @brief Get the set of Point IDs that ALL neighbors need to share with me
+   * @brief Get the set of landmark IDs that ALL neighbors need to share with me
    * @return
    */
-  PointSet neighborPublicPointIDs() const { return nbr_shared_point_ids_; }
+  PointSet neighborPublicLandmarkIDs() const {
+    return nbr_shared_landmark_ids_;
+  }
   /**
-   * @brief Get the set of Pose IDs that active neighbors need to share with me.
+   * @brief Get the set of pose IDs that active neighbors need to share with me.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
    * @return
    */
   PoseSet activeNeighborPublicPoseIDs() const;
   /**
-   * @brief Get the set of Point IDs that active neighbors need to share with
+   * @brief Get the set of landmark IDs that active neighbors need to share with
    * me. A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
    * @return
    */
-  PointSet activeNeighborPublicPointIDs() const;
+  PointSet activeNeighborPublicLandmarkIDs() const;
   /**
    * @brief Get the set of neighbor robot IDs that share shared loop closures
    * with me
@@ -344,11 +339,11 @@ public:
    */
   bool requireNeighborPose(const PoseID &pose_id) const;
   /**
-   * @brief Return true if the given neighbor point ID is required by me
-   * @param point_id
+   * @brief Return true if the given neighbor landmark ID is required by me
+   * @param landmark_id
    * @return
    */
-  bool requireNeighborPoint(const PointID &point_id) const;
+  bool requireNeighborLandmark(const PointID &landmark_id) const;
   /**
    * @brief Compute number of accepted, rejected, and undecided loop closures
    * Note that loop closures with inactive neighbors are not included
@@ -395,16 +390,16 @@ protected:
   RelativeMeasurements shared_lcs_;
 
   // Store the set of public poses that need to be sent to other robots
-  PoseSet local_shared_pose_ids_;
+  PoseSet loc_shared_pose_ids_;
 
-  // Store the set of public points that need to be sent to other robots
-  PointSet local_shared_point_ids_;
+  // Store the set of public landmarks that need to be sent to other robots
+  PointSet loc_shared_landmark_ids_;
 
   // Store the set of public poses needed from other robots
   PoseSet nbr_shared_pose_ids_;
 
-  // Store the set of public points needed from other robots
-  PointSet nbr_shared_point_ids_;
+  // Store the set of public landmarks needed from other robots
+  PointSet nbr_shared_landmark_ids_;
 
   // Store the set of neighboring agents
   std::set<unsigned> nbr_robot_ids_;
@@ -415,8 +410,8 @@ protected:
   // Store public poses from neighbors
   PoseDict neighbor_poses_;
 
-  // Store public points from neighbors
-  PointDict neighbor_points_;
+  // Store public landmarks from neighbors
+  PointDict neighbor_landmarks_;
 
   // Quadratic matrix in cost function
   std::optional<SparseMatrix> Q_;
@@ -429,6 +424,9 @@ protected:
 
   // Invalid index when populating cost terms
   static constexpr size_t IDX_NOT_SET = std::numeric_limits<size_t>::max();
+
+  // Expected number of non-zero elements per column in sparse matrices
+  static constexpr unsigned int SPARSE_ENTRIES = 8;
 
   // Timing
   SimpleTimer timer_;
@@ -483,7 +481,7 @@ protected:
    */
   bool constructLinearCostTermRASLAM();
   /**
-   * @brief Helper function to set indices i and j when constructing cost term.
+   * @brief Helper function to set indices i and j when constructing cost terms.
    * See Eq (7) of the SE-Sync paper for details
    * @return
    */
@@ -529,7 +527,7 @@ private:
 
   // Priors
   std::map<unsigned, LiftedPose> pose_priors_;
-  std::map<unsigned, LiftedPoint> point_priors_;
+  std::map<unsigned, LiftedPoint> landmark_priors_;
 };
 
 } // namespace DCORA
