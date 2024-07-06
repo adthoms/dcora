@@ -119,9 +119,10 @@ void Graph::addMeasurement(const RelativeMeasurement &m) {
 
 void Graph::addOdometry(const RelativeMeasurement &factor) {
   // Check for duplicate odometry
-  const StateID src_id = factor.getSrcID();
-  const StateID dst_id = factor.getDstID();
-  if (hasMeasurement(src_id, dst_id))
+  const StateID &src_id = factor.getSrcID();
+  const StateID &dst_id = factor.getDstID();
+  const MeasurementType &meas_type = factor.measurementType;
+  if (hasMeasurement(src_id, dst_id, meas_type))
     return;
 
   // Check that this is a valid measurement
@@ -144,15 +145,16 @@ void Graph::addOdometry(const RelativeMeasurement &factor) {
   odometry_.push_back(odom_factor);
 
   // Update edges
-  const EdgeID edge_id(src_id, dst_id);
+  const EdgeID edge_id(src_id, dst_id, meas_type);
   edge_id_to_index_.emplace(edge_id, odometry_.size() - 1);
 }
 
 void Graph::addPrivateLoopClosure(const RelativeMeasurement &factor) {
   // Check for duplicate private loop closure
-  const StateID src_id = factor.getSrcID();
-  const StateID dst_id = factor.getDstID();
-  if (hasMeasurement(src_id, dst_id))
+  const StateID &src_id = factor.getSrcID();
+  const StateID &dst_id = factor.getDstID();
+  const MeasurementType &meas_type = factor.measurementType;
+  if (hasMeasurement(src_id, dst_id, meas_type))
     return;
 
   // Check that this is a valid measurement
@@ -172,15 +174,16 @@ void Graph::addPrivateLoopClosure(const RelativeMeasurement &factor) {
   private_lcs_.push_back(factor);
 
   // Update edges
-  const EdgeID edge_id(src_id, dst_id);
+  const EdgeID edge_id(src_id, dst_id, meas_type);
   edge_id_to_index_.emplace(edge_id, private_lcs_.vec.size() - 1);
 }
 
 void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   // Check for duplicate shared loop closure
-  const StateID src_id = factor.getSrcID();
-  const StateID dst_id = factor.getDstID();
-  if (hasMeasurement(src_id, dst_id))
+  const StateID &src_id = factor.getSrcID();
+  const StateID &dst_id = factor.getDstID();
+  const MeasurementType &meas_type = factor.measurementType;
+  if (hasMeasurement(src_id, dst_id, meas_type))
     return;
 
   // Check that this is a valid measurement
@@ -242,7 +245,7 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   shared_lcs_.push_back(factor);
 
   // Update edges
-  const EdgeID edge_id(src_id, dst_id);
+  const EdgeID edge_id(src_id, dst_id, meas_type);
   edge_id_to_index_.emplace(edge_id, shared_lcs_.vec.size() - 1);
 }
 
@@ -343,13 +346,15 @@ bool Graph::requireNeighborLandmark(const PointID &landmark_id) const {
          nbr_shared_landmark_ids_.end();
 }
 
-bool Graph::hasMeasurement(const StateID &srcID, const StateID &dstID) const {
-  const EdgeID edge_id(srcID, dstID);
+bool Graph::hasMeasurement(const StateID &srcID, const StateID &dstID,
+                           const MeasurementType &measType) const {
+  const EdgeID edge_id(srcID, dstID, measType);
   return edge_id_to_index_.find(edge_id) != edge_id_to_index_.end();
 }
 
 RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
-                                            const StateID &dstID) {
+                                            const StateID &dstID,
+                                            const MeasurementType &measType) {
   RelativeMeasurement *edge = nullptr;
   auto getEdgePointerFromRelativeMeasurementVariant = [](auto &&arg) {
     using T = std::decay_t<decltype(arg)>;
@@ -359,8 +364,8 @@ RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
       LOG(FATAL) << "Error: cannot dynamically cast RelativeMeasurement!";
     return static_cast<RelativeMeasurement *>(nullptr);
   };
-  if (hasMeasurement(srcID, dstID)) {
-    const EdgeID edge_id(srcID, dstID);
+  if (hasMeasurement(srcID, dstID, measType)) {
+    const EdgeID edge_id(srcID, dstID, measType);
     size_t index = edge_id_to_index_.at(edge_id);
     if (edge_id.isOdometry()) {
       edge = &odometry_[index];
@@ -374,6 +379,7 @@ RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
   }
   if (edge) {
     // Sanity check
+    CHECK(edge->measurementType == measType);
     CHECK(edge->stateType1 == srcID.state_type);
     CHECK(edge->stateType2 == dstID.state_type);
     CHECK_EQ(edge->r1, srcID.robot_id);

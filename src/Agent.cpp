@@ -286,7 +286,7 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
         if (m.weight < 1e-8) {
           PoseID srcID(m.r1, m.p1);
           PoseID dstID(m.r2, m.p2);
-          setMeasurementWeight(srcID, dstID, 0);
+          setMeasurementWeight(srcID, dstID, m.measurementType, 0);
           reject_count++;
         }
       }
@@ -1261,8 +1261,10 @@ void PGOAgent::updateMeasurementWeights() {
 }
 
 bool PGOAgent::setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
+                                    const MeasurementType &meas_type,
                                     double weight, bool fixed_weight) {
-  RelativeMeasurement *m = mPoseGraph->findMeasurement(src_ID, dst_ID);
+  RelativeMeasurement *m =
+      mPoseGraph->findMeasurement(src_ID, dst_ID, meas_type);
   if (m) {
     std::unique_lock<std::mutex> lock(mMeasurementsMutex);
     m->weight = weight;

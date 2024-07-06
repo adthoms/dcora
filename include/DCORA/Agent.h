@@ -762,13 +762,15 @@ protected:
    * specified public measurement does not exist
    * @param src_ID
    * @param dst_ID
+   * @param meas_type
    * @param weight
    * @param fixed_weight True if the weight is fixed (i.e. cannot be changed by
    * GNC)
    * @return
    */
   bool setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
-                            double weight, bool fixed_weight = false);
+                            const MeasurementType &meas_type, double weight,
+                            bool fixed_weight = false);
 
   /**
    * @brief Return true if the robot is initialized in global frame

@@ -907,7 +907,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 
         // Ensure unique range measurements for correct unit sphere indexing
         const EdgeID range_edge_id(range_measurement.getSrcID(),
-                                   range_measurement.getDstID());
+                                   range_measurement.getDstID(),
+                                   range_measurement.measurementType);
         if (range_edge_id_to_index.find(range_edge_id) !=
             range_edge_id_to_index.end())
           continue;

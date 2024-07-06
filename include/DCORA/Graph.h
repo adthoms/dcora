@@ -354,18 +354,22 @@ public:
    * @brief Check if a measurement exists in the graph
    * @param srcID
    * @param dstID
+   * @param measType
    * @return
    */
-  bool hasMeasurement(const StateID &srcID, const StateID &dstID) const;
+  bool hasMeasurement(const StateID &srcID, const StateID &dstID,
+                      const MeasurementType &measType) const;
   /**
    * @brief Find and return a writable pointer to the specified measurement
    * within this graph. If the measurement does not exist, return nullptr.
    * @param srcID
    * @param dstID
+   * @param measType
    * @return
    */
   RelativeMeasurement *findMeasurement(const StateID &srcID,
-                                       const StateID &dstID);
+                                       const StateID &dstID,
+                                       const MeasurementType &measType);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
    * graph (contains both private and inter-robot loop closures)
