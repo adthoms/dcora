@@ -241,6 +241,9 @@ struct RelativeMeasurement {
   // Get the destination state ID
   virtual StateID getDstID() const = 0;
 
+  // Get the edge ID
+  virtual EdgeID getEdgeID() const = 0;
+
   // Print relative measurement information
   virtual void print(std::ostream &os) const = 0;
 
@@ -330,6 +333,10 @@ struct RelativePosePoseMeasurement : RelativeMeasurement {
 
   StateID getDstID() const override { return PoseID(r2, p2); }
 
+  EdgeID getEdgeID() const override {
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::PosePose);
+  }
+
   void print(std::ostream &os) const override {
     os << "R: " << std::endl << R << std::endl;
     os << "t: " << std::endl << t << std::endl;
@@ -389,6 +396,10 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
   StateID getSrcID() const override { return PoseID(r1, p1); }
 
   StateID getDstID() const override { return PointID(r2, p2); }
+
+  EdgeID getEdgeID() const override {
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::PosePoint);
+  }
 
   void print(std::ostream &os) const override {
     os << "t: " << std::endl << t << std::endl;
@@ -466,6 +477,10 @@ struct RangeMeasurement : RelativeMeasurement {
     else
       LOG(FATAL) << "StateType2 is " << StateTypeToString(stateType2) << " in "
                  << MeasurementTypeToString(measurementType) << "!";
+  }
+
+  EdgeID getEdgeID() const override {
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::Range);
   }
 
   void print(std::ostream &os) const override {

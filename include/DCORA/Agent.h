@@ -760,16 +760,13 @@ protected:
   /**
    * @brief Set weight for measurement in the pose graph. Return false if the
    * specified public measurement does not exist
-   * @param src_ID
-   * @param dst_ID
-   * @param meas_type
+   * @param edgeID
    * @param weight
    * @param fixed_weight True if the weight is fixed (i.e. cannot be changed by
    * GNC)
    * @return
    */
-  bool setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
-                            const MeasurementType &meas_type, double weight,
+  bool setMeasurementWeight(const EdgeID &edgeID, double weight,
                             bool fixed_weight = false);
 
   /**

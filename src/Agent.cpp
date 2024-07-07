@@ -110,6 +110,7 @@ bool PGOAgent::getSharedPoseDict(PoseDict *map) {
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
@@ -122,7 +123,7 @@ bool PGOAgent::getSharedPoseDict(PoseDict *map) {
 
 bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
                                              unsigned neighborID) {
-  // TODO(AT): update function for PointDict
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
@@ -150,6 +151,7 @@ bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
@@ -162,7 +164,7 @@ bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
 
 bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
                                                 unsigned neighborID) {
-  // TODO(AT): update function for PointDict
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
@@ -284,9 +286,7 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       int reject_count = 0;
       for (const auto &m : mutable_local_measurements) {
         if (m.weight < 1e-8) {
-          PoseID srcID(m.r1, m.p1);
-          PoseID dstID(m.r2, m.p2);
-          setMeasurementWeight(srcID, dstID, m.measurementType, 0);
+          setMeasurementWeight(m.getEdgeID(), 0);
           reject_count++;
         }
       }
@@ -603,7 +603,7 @@ Pose PGOAgent::computeNeighborTransform(
 bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
                                                       const PoseDict &poseDict,
                                                       Pose *T_world_robot) {
-  // TODO(AT): update function for PointDict
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
@@ -665,7 +665,7 @@ bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
 bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
                                               const PoseDict &poseDict,
                                               Pose *T_world_robot) {
-  // TODO(AT): update function for PointDict
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
@@ -719,7 +719,7 @@ bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
 
 void PGOAgent::updateNeighborPoses(unsigned neighborID,
                                    const PoseDict &poseDict) {
-  // TODO(AT): update function for PointDict
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   CHECK(neighborID != mID);
   if (!YLift)
     return;
@@ -752,7 +752,7 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID,
 
 void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
                                       const PoseDict &poseDict) {
-  // TODO(AT): update function for PointDict
+  // TODO(AT): update function for LandmarkDict and UnitSphereDict
   CHECK(mParams.acceleration);
   CHECK(neighborID != mID);
   if (!YLift)
@@ -777,14 +777,14 @@ void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
 }
 
 void PGOAgent::clearNeighborStates() {
-  // TODO(AT): update for point dicts
+  // TODO(AT): update for landmark and unit sphere dicts
   std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   neighborPoseDict.clear();
   neighborAuxPoseDict.clear();
 }
 
 void PGOAgent::clearActiveNeighborPoses() {
-  // TODO(AT): update for point dicts
+  // TODO(AT): update for landmark and unit sphere dicts
   std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   for (const auto &pose_id : mPoseGraph->activeNeighborPublicPoseIDs()) {
     neighborPoseDict.erase(pose_id);
@@ -1260,11 +1260,9 @@ void PGOAgent::updateMeasurementWeights() {
   }
 }
 
-bool PGOAgent::setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
-                                    const MeasurementType &meas_type,
-                                    double weight, bool fixed_weight) {
-  RelativeMeasurement *m =
-      mPoseGraph->findMeasurement(src_ID, dst_ID, meas_type);
+bool PGOAgent::setMeasurementWeight(const EdgeID &edgeID, double weight,
+                                    bool fixed_weight) {
+  RelativeMeasurement *m = mPoseGraph->findMeasurement(edgeID);
   if (m) {
     std::unique_lock<std::mutex> lock(mMeasurementsMutex);
     m->weight = weight;

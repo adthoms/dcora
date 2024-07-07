@@ -84,8 +84,9 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
     for (int i = 0; i < l; ++i) {
       // ranges
       auto ri = DCORA::randomObliqueVariable(r);
-      var.GetLiftedRangeArray()->translation(i) = ri;
-      ASSERT_LE((ri - var.GetLiftedRangeArray()->translation(i)).norm(), 1e-6);
+      var.GetLiftedUnitSphereArray()->translation(i) = ri;
+      ASSERT_LE((ri - var.GetLiftedUnitSphereArray()->translation(i)).norm(),
+                1e-6);
     }
     for (int i = 0; i < b; ++i) {
       // landmarks

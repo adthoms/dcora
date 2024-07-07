@@ -74,7 +74,7 @@ public:
    */
   unsigned int n() const { return n_; }
   /**
-   * @brief Get number of unit sphere variables
+   * @brief Get number of unit spheres
    * @return
    */
   unsigned int l() const { return l_; }
@@ -121,12 +121,12 @@ public:
    * @brief Update the number of poses and landmarks
    * @param stateID
    */
-  void updateNumStates(const StateID &stateID);
+  void updateNumPosesAndLandmarks(const StateID &stateID);
   /**
-   * @brief Update the number of unit sphere variables
+   * @brief Update the number of unit spheres
    * @param measurement
    */
-  void updateNumRanges(const RelativeMeasurement &measurements);
+  void updateNumUnitSpheres(const RelativeMeasurement &measurements);
   /**
    * @brief Set measurements for this graph
    * @param measurements
@@ -196,12 +196,14 @@ public:
    */
   void setPrior(unsigned index, const LiftedPoint &ti);
   /**
-   * @brief Set neighbor state
+   * @brief Set neighbor states
    * @param pose_dict
    * @param landmark_dict
+   * @param unit_sphere_dict
    */
   void setNeighborStates(const PoseDict &pose_dict,
-                         const PointDict &landmark_dict);
+                         const LandmarkDict &landmark_dict,
+                         const UnitSphereDict &unit_sphere_dict);
   /**
    * @brief Set neighbor poses
    * @param pose_dict
@@ -211,7 +213,12 @@ public:
    * @brief Set neighbor landmarks
    * @param landmark_dict
    */
-  void setNeighborLandmarks(const PointDict &landmark_dict);
+  void setNeighborLandmarks(const LandmarkDict &landmark_dict);
+  /**
+   * @brief Set neighbor unit spheres
+   * @param unit_sphere_dict
+   */
+  void setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict);
   /**
    * @brief Get quadratic cost matrix
    * @return
@@ -259,7 +266,14 @@ public:
    * @brief Get the set of my landmark IDs that are shared with other robots
    * @return
    */
-  PointSet myPublicLandmarkIDs() const { return loc_shared_landmark_ids_; }
+  LandmarkSet myPublicLandmarkIDs() const { return loc_shared_landmark_ids_; }
+  /**
+   * @brief Get the set of my unit sphere IDs that are shared with other robots
+   * @return
+   */
+  UnitSphereSet myPublicUnitSphereIDs() const {
+    return loc_shared_unit_sphere_ids_;
+  }
   /**
    * @brief Get the set of pose IDs that ALL neighbors need to share with me
    * @return
@@ -269,8 +283,16 @@ public:
    * @brief Get the set of landmark IDs that ALL neighbors need to share with me
    * @return
    */
-  PointSet neighborPublicLandmarkIDs() const {
+  LandmarkSet neighborPublicLandmarkIDs() const {
     return nbr_shared_landmark_ids_;
+  }
+  /**
+   * @brief Get the set of unit sphere IDs that ALL neighbors need to share with
+   * me
+   * @return
+   */
+  UnitSphereSet neighborPublicUnitSphereIDs() const {
+    return nbr_shared_unit_sphere_ids_;
   }
   /**
    * @brief Get the set of pose IDs that active neighbors need to share with me.
@@ -285,7 +307,14 @@ public:
    * optimization with this robot.
    * @return
    */
-  PointSet activeNeighborPublicLandmarkIDs() const;
+  LandmarkSet activeNeighborPublicLandmarkIDs() const;
+  /**
+   * @brief Get the set of unit sphere IDs that active neighbors need to share
+   * with me. A neighbor is active if it is actively participating in
+   * distributed optimization with this robot.
+   * @return
+   */
+  UnitSphereSet activeNeighborPublicUnitSphereIDs() const;
   /**
    * @brief Get the set of neighbor robot IDs that share shared loop closures
    * with me
@@ -345,6 +374,12 @@ public:
    */
   bool requireNeighborLandmark(const PointID &landmark_id) const;
   /**
+   * @brief Return true if the given neighbor unit sphere ID is required by me
+   * @param unit_sphere_id
+   * @return
+   */
+  bool requireNeighborUnitSphere(const EdgeID &unit_sphere_id) const;
+  /**
    * @brief Compute number of accepted, rejected, and undecided loop closures
    * Note that loop closures with inactive neighbors are not included
    * @return
@@ -352,24 +387,17 @@ public:
   Statistics statistics() const;
   /**
    * @brief Check if a measurement exists in the graph
-   * @param srcID
-   * @param dstID
-   * @param measType
+   * @param edgeID
    * @return
    */
-  bool hasMeasurement(const StateID &srcID, const StateID &dstID,
-                      const MeasurementType &measType) const;
+  bool hasMeasurement(const EdgeID &edgeID) const;
   /**
    * @brief Find and return a writable pointer to the specified measurement
    * within this graph. If the measurement does not exist, return nullptr.
-   * @param srcID
-   * @param dstID
-   * @param measType
+   * @param edgeID
    * @return
    */
-  RelativeMeasurement *findMeasurement(const StateID &srcID,
-                                       const StateID &dstID,
-                                       const MeasurementType &measType);
+  RelativeMeasurement *findMeasurement(const EdgeID &edgeID);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
    * graph (contains both private and inter-robot loop closures)
@@ -397,13 +425,19 @@ protected:
   PoseSet loc_shared_pose_ids_;
 
   // Store the set of public landmarks that need to be sent to other robots
-  PointSet loc_shared_landmark_ids_;
+  LandmarkSet loc_shared_landmark_ids_;
+
+  // Store the set of public unit spheres that need to be sent to other robots
+  UnitSphereSet loc_shared_unit_sphere_ids_;
 
   // Store the set of public poses needed from other robots
   PoseSet nbr_shared_pose_ids_;
 
   // Store the set of public landmarks needed from other robots
-  PointSet nbr_shared_landmark_ids_;
+  LandmarkSet nbr_shared_landmark_ids_;
+
+  // Store the set of public unit spheres needed from other robots
+  UnitSphereSet nbr_shared_unit_sphere_ids_;
 
   // Store the set of neighboring agents
   std::set<unsigned> nbr_robot_ids_;
@@ -415,7 +449,10 @@ protected:
   PoseDict neighbor_poses_;
 
   // Store public landmarks from neighbors
-  PointDict neighbor_landmarks_;
+  LandmarkDict neighbor_landmarks_;
+
+  // Store public unit spheres from neighbors
+  UnitSphereDict neighbor_unit_spheres_;
 
   // Quadratic matrix in cost function
   std::optional<SparseMatrix> Q_;
@@ -494,7 +531,7 @@ protected:
                                size_t *i, size_t *j);
   /**
    * @brief Helper function to determine if a state is owned by an inactive
-   * neighbor. Return true of the neighbor is inactive and if the query
+   * neighbor. Return true if the neighbor is inactive and if the query
    * neighborStateID belongs to the neighbor. If the neighbor is active, return
    * false. If the neighbor is inactive but the query neighborStateID does not
    * belong to the neighbor, return std::nullopt
@@ -506,11 +543,19 @@ protected:
   /**
    * @brief Helper function to return the lifted data matrix of the fixed public
    * variable (associated with neighborStateID) owned by a neighbor of this
-   * agent
+   * agent. Supported fixed variables include lifted poses and lifted landmarks
    * @param neighborStateID
    * @return
    */
   Matrix getNeighborFixedVariableLiftedData(const StateID &neighborStateID);
+  /**
+   * @brief Helper function to return the lifted data matrix of the fixed public
+   * variable (associated with neighborEdgeID) owned by a neighbor of this
+   * agent. Supported fixed variables include lifted unit spheres
+   * @param neighborEdgeID
+   * @return
+   */
+  Matrix getNeighborFixedVariableLiftedData(const EdgeID &neighborEdgeID);
   /**
    * @brief Construct the preconditioner for this graph
    * @return

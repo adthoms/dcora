@@ -41,8 +41,10 @@ void Graph::empty() {
   shared_lcs_.vec.clear();
   loc_shared_pose_ids_.clear();
   loc_shared_landmark_ids_.clear();
+  loc_shared_unit_sphere_ids_.clear();
   nbr_shared_pose_ids_.clear();
   nbr_shared_landmark_ids_.clear();
+  nbr_shared_unit_sphere_ids_.clear();
   nbr_robot_ids_.clear();
   neighbor_active_.clear();
   clearNeighborStates();
@@ -62,10 +64,11 @@ void Graph::reset() {
 void Graph::clearNeighborStates() {
   neighbor_poses_.clear();
   neighbor_landmarks_.clear();
-  G_.reset(); // Clearing neighbor poses requires re-computing linear matrix
+  neighbor_unit_spheres_.clear();
+  G_.reset(); // Clearing neighbor states requires re-computing linear matrix
 }
 
-void Graph::updateNumStates(const StateID &stateID) {
+void Graph::updateNumPosesAndLandmarks(const StateID &stateID) {
   CHECK_EQ(stateID.robot_id, id_);
   // Update num poses
   if (stateID.isPose())
@@ -75,7 +78,7 @@ void Graph::updateNumStates(const StateID &stateID) {
     b_ = std::max(b_, static_cast<unsigned int>(stateID.frame_id + 1));
 }
 
-void Graph::updateNumRanges(const RelativeMeasurement &measurement) {
+void Graph::updateNumUnitSpheres(const RelativeMeasurement &measurement) {
   if (measurement.measurementType != MeasurementType::Range)
     return;
 
@@ -118,86 +121,88 @@ void Graph::addMeasurement(const RelativeMeasurement &m) {
 }
 
 void Graph::addOdometry(const RelativeMeasurement &factor) {
-  // Check for duplicate odometry
-  const StateID &src_id = factor.getSrcID();
-  const StateID &dst_id = factor.getDstID();
-  const MeasurementType &meas_type = factor.measurementType;
-  if (hasMeasurement(src_id, dst_id, meas_type))
-    return;
-
-  // Check that this is a valid measurement
-  factor.checkDim(d_);
-
   // Check that this is an odometry measurement
   CHECK(factor.measurementType == MeasurementType::PosePose);
   CHECK(factor.r1 == id_);
   CHECK(factor.r2 == id_);
   CHECK(factor.p1 + 1 == factor.p2);
 
+  // Check that this is a valid measurement
+  factor.checkDim(d_);
+
+  // Check for duplicate odometry
+  const EdgeID &edge_id = factor.getEdgeID();
+  if (hasMeasurement(edge_id))
+    return;
+
+  // Update number of poses (landmarks remain the same)
+  updateNumPosesAndLandmarks(factor.getDstID()); // dst_id > src_id
+
   // Dynamically cast to odometry measurement
   const RelativePosePoseMeasurement &odom_factor =
       dynamic_cast<const RelativePosePoseMeasurement &>(factor);
-
-  // Update states
-  updateNumStates(dst_id); // dst_id > src_id
 
   // Add relative measurement factor to odometry
   odometry_.push_back(odom_factor);
 
   // Update edges
-  const EdgeID edge_id(src_id, dst_id, meas_type);
   edge_id_to_index_.emplace(edge_id, odometry_.size() - 1);
 }
 
 void Graph::addPrivateLoopClosure(const RelativeMeasurement &factor) {
-  // Check for duplicate private loop closure
-  const StateID &src_id = factor.getSrcID();
-  const StateID &dst_id = factor.getDstID();
-  const MeasurementType &meas_type = factor.measurementType;
-  if (hasMeasurement(src_id, dst_id, meas_type))
-    return;
-
-  // Check that this is a valid measurement
-  factor.checkDim(d_);
-
   // Check that this is a private loop closure
   CHECK(factor.r1 == id_);
   CHECK(factor.r2 == id_);
 
+  // Check that this is a valid measurement
+  factor.checkDim(d_);
+
+  // Check for duplicate private loop closure
+  const EdgeID &edge_id = factor.getEdgeID();
+  if (hasMeasurement(edge_id)) {
+    if (factor.measurementType != MeasurementType::Range)
+      return;
+    LOG(FATAL) << "Error: Range measurements must be unique to ensure "
+                  "correct unit sphere indexing! \n"
+               << factor;
+  }
+
   // Update number of poses and landmarks
-  updateNumStates(src_id);
-  updateNumStates(dst_id);
-  // Update number of unit sphere variables
-  updateNumRanges(factor);
+  updateNumPosesAndLandmarks(factor.getSrcID());
+  updateNumPosesAndLandmarks(factor.getDstID());
+  // Update number of unit spheres
+  updateNumUnitSpheres(factor);
 
   // Add relative measurement factor to private loop closures
   private_lcs_.push_back(factor);
 
   // Update edges
-  const EdgeID edge_id(src_id, dst_id, meas_type);
   edge_id_to_index_.emplace(edge_id, private_lcs_.vec.size() - 1);
 }
 
 void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
-  // Check for duplicate shared loop closure
-  const StateID &src_id = factor.getSrcID();
-  const StateID &dst_id = factor.getDstID();
-  const MeasurementType &meas_type = factor.measurementType;
-  if (hasMeasurement(src_id, dst_id, meas_type))
-    return;
-
   // Check that this is a valid measurement
   factor.checkDim(d_);
 
-  // Update number of unit sphere variables
-  updateNumRanges(factor);
+  // Check for duplicate shared loop closure
+  const EdgeID &edge_id = factor.getEdgeID();
+  if (hasMeasurement(edge_id)) {
+    if (factor.measurementType != MeasurementType::Range)
+      return;
+    LOG(FATAL) << "Error: Range measurements must be unique to ensure "
+                  "correct unit sphere indexing! \n"
+               << factor;
+  }
 
-  // Update local and neighbor shared state IDs. Set active neighbor.
+  // Update number of unit spheres
+  updateNumUnitSpheres(factor);
+
+  // Update local and neighbor shared state and edge IDs. Set active neighbor.
   if (factor.r1 == id_) {
     CHECK(factor.r2 != id_);
 
     // Update number of poses and landmarks
-    updateNumStates(src_id);
+    updateNumPosesAndLandmarks(factor.getSrcID());
 
     // Add local shared state to graph
     executeStateDependantFunctionals(
@@ -211,6 +216,10 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
         [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
         factor.stateType2);
 
+    // add local shared edge to graph
+    if (factor.measurementType == MeasurementType::Range)
+      loc_shared_unit_sphere_ids_.emplace(edge_id);
+
     // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r2);
 
@@ -220,7 +229,7 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     CHECK(factor.r2 == id_);
 
     // Update number of poses and landmarks
-    updateNumStates(dst_id);
+    updateNumPosesAndLandmarks(factor.getDstID());
 
     // Add local shared state to graph
     executeStateDependantFunctionals(
@@ -234,6 +243,10 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
         [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
         factor.stateType1);
 
+    // add neighbor shared edge to graph
+    if (factor.measurementType == MeasurementType::Range)
+      nbr_shared_unit_sphere_ids_.emplace(edge_id);
+
     // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r1);
 
@@ -245,7 +258,6 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
   shared_lcs_.push_back(factor);
 
   // Update edges
-  const EdgeID edge_id(src_id, dst_id, meas_type);
   edge_id_to_index_.emplace(edge_id, shared_lcs_.vec.size() - 1);
 }
 
@@ -300,20 +312,27 @@ void Graph::setPrior(unsigned index, const LiftedPoint &ti) {
 }
 
 void Graph::setNeighborStates(const PoseDict &pose_dict,
-                              const PointDict &landmark_dict) {
+                              const LandmarkDict &landmark_dict,
+                              const UnitSphereDict &unit_sphere_dict) {
   neighbor_poses_ = pose_dict;
   neighbor_landmarks_ = landmark_dict;
+  neighbor_unit_spheres_ = unit_sphere_dict;
   G_.reset(); // Setting neighbor states requires re-computing linear matrix
 }
 
 void Graph::setNeighborPoses(const PoseDict &pose_dict) {
   neighbor_poses_ = pose_dict;
-  G_.reset(); // Setting neighbor poses requires re-computing linear matrix
+  G_.reset();
 }
 
-void Graph::setNeighborLandmarks(const PointDict &landmark_dict) {
+void Graph::setNeighborLandmarks(const LandmarkDict &landmark_dict) {
   neighbor_landmarks_ = landmark_dict;
-  G_.reset(); // Setting neighbor landmarks requires re-computing linear matrix
+  G_.reset();
+}
+
+void Graph::setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict) {
+  neighbor_unit_spheres_ = unit_sphere_dict;
+  G_.reset();
 }
 
 bool Graph::hasNeighbor(unsigned int robot_id) const {
@@ -346,15 +365,16 @@ bool Graph::requireNeighborLandmark(const PointID &landmark_id) const {
          nbr_shared_landmark_ids_.end();
 }
 
-bool Graph::hasMeasurement(const StateID &srcID, const StateID &dstID,
-                           const MeasurementType &measType) const {
-  const EdgeID edge_id(srcID, dstID, measType);
-  return edge_id_to_index_.find(edge_id) != edge_id_to_index_.end();
+bool Graph::requireNeighborUnitSphere(const EdgeID &unit_sphere_id) const {
+  return nbr_shared_unit_sphere_ids_.find(unit_sphere_id) !=
+         nbr_shared_unit_sphere_ids_.end();
 }
 
-RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
-                                            const StateID &dstID,
-                                            const MeasurementType &measType) {
+bool Graph::hasMeasurement(const EdgeID &edgeID) const {
+  return edge_id_to_index_.find(edgeID) != edge_id_to_index_.end();
+}
+
+RelativeMeasurement *Graph::findMeasurement(const EdgeID &edgeID) {
   RelativeMeasurement *edge = nullptr;
   auto getEdgePointerFromRelativeMeasurementVariant = [](auto &&arg) {
     using T = std::decay_t<decltype(arg)>;
@@ -364,12 +384,11 @@ RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
       LOG(FATAL) << "Error: cannot dynamically cast RelativeMeasurement!";
     return static_cast<RelativeMeasurement *>(nullptr);
   };
-  if (hasMeasurement(srcID, dstID, measType)) {
-    const EdgeID edge_id(srcID, dstID, measType);
-    size_t index = edge_id_to_index_.at(edge_id);
-    if (edge_id.isOdometry()) {
+  if (hasMeasurement(edgeID)) {
+    size_t index = edge_id_to_index_.at(edgeID);
+    if (edgeID.isOdometry()) {
       edge = &odometry_[index];
-    } else if (edge_id.isPrivateLoopClosure()) {
+    } else if (edgeID.isPrivateLoopClosure()) {
       edge = std::visit(getEdgePointerFromRelativeMeasurementVariant,
                         private_lcs_.vec[index]);
     } else {
@@ -379,13 +398,13 @@ RelativeMeasurement *Graph::findMeasurement(const StateID &srcID,
   }
   if (edge) {
     // Sanity check
-    CHECK(edge->measurementType == measType);
-    CHECK(edge->stateType1 == srcID.state_type);
-    CHECK(edge->stateType2 == dstID.state_type);
-    CHECK_EQ(edge->r1, srcID.robot_id);
-    CHECK_EQ(edge->p1, srcID.frame_id);
-    CHECK_EQ(edge->r2, dstID.robot_id);
-    CHECK_EQ(edge->p2, dstID.frame_id);
+    CHECK(edge->measurementType == edgeID.measurement_type);
+    CHECK(edge->stateType1 == edgeID.src_state_id.state_type);
+    CHECK(edge->stateType2 == edgeID.dst_state_id.state_type);
+    CHECK_EQ(edge->r1, edgeID.src_state_id.robot_id);
+    CHECK_EQ(edge->p1, edgeID.src_state_id.frame_id);
+    CHECK_EQ(edge->r2, edgeID.dst_state_id.robot_id);
+    CHECK_EQ(edge->p2, edgeID.dst_state_id.frame_id);
   }
   return edge;
 }
@@ -412,11 +431,21 @@ PoseSet Graph::activeNeighborPublicPoseIDs() const {
   return output;
 }
 
-PointSet Graph::activeNeighborPublicLandmarkIDs() const {
-  PointSet output;
+LandmarkSet Graph::activeNeighborPublicLandmarkIDs() const {
+  LandmarkSet output;
   for (const auto &point_id : nbr_shared_landmark_ids_) {
     if (isNeighborActive(point_id.robot_id)) {
       output.emplace(point_id);
+    }
+  }
+  return output;
+}
+
+UnitSphereSet Graph::activeNeighborPublicUnitSphereIDs() const {
+  UnitSphereSet output;
+  for (const auto &edge_id : nbr_shared_unit_sphere_ids_) {
+    if (isNeighborActive(edge_id.src_state_id.robot_id)) {
+      output.emplace(edge_id);
     }
   }
   return output;
@@ -819,7 +848,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
    *
    * where:
    *   n_b is the number of poses owned by this agent (i.e. agent b)
-   *   l_b is the number of unit sphere variables owned by this agent
+   *   l_b is the number of unit spheres owned by this agent
    *   b_b is the number of landmarks owned by this agent
    *
    * Indexing: The following table illustrates edge direction e=(i,j) based on
@@ -1233,7 +1262,7 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
         const PoseID neighborPoseID(neighborStateID);
         const auto neighborPoseItr = neighbor_poses_.find(neighborPoseID);
         CHECK(neighborPoseItr != neighbor_poses_.end())
-            << "Fixed pose variable of agent's neighbor "
+            << "Error: Fixed pose variable of agent's neighbor "
             << neighborStateID.robot_id << " not found!";
 
         X = neighborPoseItr->second.pose();
@@ -1243,13 +1272,24 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
         const auto neighborPointItr =
             neighbor_landmarks_.find(neighborLandmarkID);
         CHECK(neighborPointItr != neighbor_landmarks_.end())
-            << "Fixed landmark variable of agent's neighbor "
+            << "Error: Fixed landmark variable of agent's neighbor "
             << neighborStateID.robot_id << " not found!";
 
         X = neighborPointItr->second.translation();
       },
       neighborStateID.state_type);
 
+  return X;
+}
+
+Matrix Graph::getNeighborFixedVariableLiftedData(const EdgeID &neighborEdgeID) {
+  // Set neighbor state fixed variable to contain its lifted data
+  const auto neighborEdgeItr = neighbor_unit_spheres_.find(neighborEdgeID);
+  CHECK(neighborEdgeItr != neighbor_unit_spheres_.end())
+      << "Error: Fixed unit sphere variable of agent's neighbor "
+      << neighborEdgeID.src_state_id.robot_id << " not found!";
+  const Matrix X = neighborEdgeItr->second.translation();
+  CHECK_EQ(X.norm(), 1) << "Error: Unit sphere is not normalized!";
   return X;
 }
 

@@ -542,7 +542,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   RelativePosePointMeasurement pose_point_measurement;
   RangeMeasurement range_measurement;
 
-  // Initialize map for indexing unit sphere variables according to robot ID
+  // Initialize map for indexing unit spheres according to robot ID
   std::map<unsigned int, unsigned int> robot_id_to_unit_sphere_idx = {};
 
   // Initialize map to maintain unique range edges
@@ -906,9 +906,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         range_measurement.precision = 1.0 / cov;
 
         // Ensure unique range measurements for correct unit sphere indexing
-        const EdgeID range_edge_id(range_measurement.getSrcID(),
-                                   range_measurement.getDstID(),
-                                   range_measurement.measurementType);
+        const EdgeID &range_edge_id = range_measurement.getEdgeID();
         if (range_edge_id_to_index.find(range_edge_id) !=
             range_edge_id_to_index.end())
           continue;
@@ -1127,7 +1125,7 @@ void getGraphDimensionsFromLocalMeasurements(
         << "Warning: Local measurements only contain range measurements, which "
            "cannot determine dimension of Euclidean space from measurements.";
 
-  // Get number of poses, unit sphere variables, and landmarks
+  // Get number of poses, unit spheres, and landmarks
   unsigned int n = 0;
   unsigned int l = 0;
   unsigned int b = 0;
