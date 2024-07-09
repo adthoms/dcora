@@ -162,6 +162,12 @@ void LiftedRangeAidedArray::setData(const Matrix &X) {
   landmarks_->setData(X_E);
 }
 
+void LiftedRangeAidedArray::setDataToZero() {
+  poses_->setDataToZero();
+  unit_spheres_->setDataToZero();
+  landmarks_->setDataToZero();
+}
+
 Pose::Pose(const Matrix &T) : Pose(T.rows()) {
   CHECK_EQ(T.rows(), d_);
   CHECK_EQ(T.cols(), dim_);

@@ -82,7 +82,7 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
       ASSERT_LE((pi - var.GetLiftedPoseArray()->translation(i)).norm(), 1e-6);
     }
     for (int i = 0; i < l; ++i) {
-      // ranges
+      // unit spheres
       auto ri = DCORA::randomObliqueVariable(r);
       var.GetLiftedUnitSphereArray()->translation(i) = ri;
       ASSERT_LE((ri - var.GetLiftedUnitSphereArray()->translation(i)).norm(),

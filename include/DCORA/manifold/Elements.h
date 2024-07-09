@@ -236,6 +236,10 @@ public:
    */
   void setData(const Matrix &X);
   /**
+   * @brief Set the underlying Eigen matrices of encapsulated arrays to zero
+   */
+  void setDataToZero();
+  /**
    * @brief Get "lifted" pose array
    * @return
    */

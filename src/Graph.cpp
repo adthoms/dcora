@@ -682,10 +682,6 @@ bool Graph::constructLinearCostTermPGO() {
   // Set measurements
   const RelativeMeasurements &measurements = sharedLoopClosures();
 
-  // Set dimensions
-  const size_t m = measurements.vec.size();
-  const unsigned int dh = d_ + 1;
-
   /**
    * @brief Constructing the linear cost term for PGO
    *
@@ -732,6 +728,7 @@ bool Graph::constructLinearCostTermPGO() {
    *
    * For brevity, we drop subscript i when constructing L_i and its submatrices
    */
+  const unsigned int dh = d_ + 1;
   Matrix XcT = Matrix::Zero(r_, dh);
   Matrix AcT = Matrix::Zero(dh, dh);
   Matrix AbT = Matrix::Zero(dh, dh);
@@ -746,8 +743,7 @@ bool Graph::constructLinearCostTermPGO() {
   G.setDataToZero();
 
   // Iterate over all shared pose-pose loop closures
-  for (size_t k = 0; k < m; k++) {
-    const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
+  for (const auto &measVariant : measurements.vec) {
     CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
     CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
@@ -775,19 +771,25 @@ bool Graph::constructLinearCostTermPGO() {
 
     // Update linear cost
     if (i != IDX_NOT_SET) {
-      AbT = -T; // Leaving node i of agent b
-      AcT = I;  // Entering node j of agent c
+      // Get neighbor's fixed lifted pose
       const StateID &neighborDstStateID = meas.getDstID();
-      XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
+      XcT.noalias() = getNeighborFixedVariableLiftedData(neighborDstStateID);
+
+      // Set incidence matrices
+      AbT.noalias() = -T; // Leaving node i of agent b
+      AcT.noalias() = I;  // Entering node j of agent c
 
       // Add measurement contribution to linear cost
       G.pose(i) += XcT * AcT * Omega * AbT.transpose();
-    }
-    if (j != IDX_NOT_SET) {
-      AbT = I;  // Entering node j of agent b
-      AcT = -T; // Leaving node i of agent c
+    } else {
+      CHECK(j != IDX_NOT_SET);
+      // Get neighbor's fixed lifted pose
       const StateID &neighborSrcStateID = meas.getSrcID();
-      XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
+      XcT.noalias() = getNeighborFixedVariableLiftedData(neighborSrcStateID);
+
+      // Set incidence matrices
+      AbT.noalias() = I;  // Entering node j of agent b
+      AcT.noalias() = -T; // Leaving node i of agent c
 
       // Add measurement contribution to linear cost
       G.pose(j) += XcT * AcT * Omega * AbT.transpose();
@@ -1171,8 +1173,573 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 }
 
 bool Graph::constructLinearCostTermRASLAM() {
-  // TODO(AT): implement
-  LOG(FATAL) << "Error: constructLinearCostTermRASLAM() not implemented yet!";
+  // Set measurements
+  const RelativeMeasurements &measurements = sharedLoopClosures();
+  const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
+      measurements.GetRelativePosePoseMeasurements();
+  const std::vector<RelativePosePointMeasurement> &pose_point_measurements =
+      measurements.GetRelativePosePointMeasurements();
+  const std::vector<RangeMeasurement> &range_measurements =
+      measurements.GetRangeMeasurements();
+
+  /**
+   * @brief Constructing the linear cost term for RA-SLAM
+   *
+   * The linear cost term G is a [r × ((d+1) × n_b + l_b + b_b)] matrix of the
+   * form:
+   *
+   *   G = Xc^T × Qcb
+   *     = XcT × Qcb
+   *
+   * where:
+   *   n_b is the number of poses owned by this agent (i.e. agent b)
+   *   l_b is the number of unit sphere variables owned by this agent
+   *   b_b is the number of landmarks owned by this agent
+   *   XcT is a matrix of fixed public states (poses, unit spheres, and
+   *       landmarks) of the neighbor agent (i.e agent c)
+   *   Qcb is the bottom left block of Q after block decomposition
+   *
+   * Note: neighbor agent c is viewed as a meta agent including all agents that
+   * are not agent b such that:
+   *
+   *   c:= [N]/{b}; where N is the total number of agents
+   *
+   * When calculating the contribution to the linear cost term for each fixed
+   * neighbor variable, we consider the block structure of Qcb:
+   *
+   *   <-----------col------------>
+   *
+   *      dn_b       l_b    n_b + b_b
+   *   -------------------------------             ^
+   *   | Q_cb_11 |    0    | Q_cb_13 |  dn_c       |
+   *   |    0    | Q_cb_22 | Q_cb_23 |  l_c       row
+   *   | Q_cb_31 | Q_cb_32 | Q_cb_33 |  n_c + b_c  |
+   *   -------------------------------             v
+   *
+   * where:
+   *   Q_cb_11 = AcRho^T × OmegaRho × AbRho + Tc^T × OmegaTau × Tb
+   *           = AcRhoT × OmegaRho × AbRhoT^T + TcT × OmegaTau × TbT^T
+   *   Q_cb_12 = 0
+   *   Q_cb_13 = Tc^T × OmegaTau × AbTau
+   *           = TcT × OmegaTau × AbTauT^T
+
+   *   Q_cb_21 = 0
+   *   Q_cb_22 = Pc^T × OmegaRange × D^2 × Pb
+   *           = PcT × OmegaRange × DT^T × DT^T × PbT^T
+   *   Q_cb_23 = Pc^T × D × OmegaRange × Cb
+   *           = PcT × DT^T × OmegaRange × CbT^T
+   *
+   *   Q_cb_31 = AcTau^T × OmegaTau × Tb
+   *           = AcTauT × OmegaTau × TbT^T
+   *   Q_cb_32 = Cc^T × OmegaRange × D × Pb
+   *           = CcT × OmegaRange × DT^T × PbT^T
+   *   Q_cb_33 = AcTau^T × OmegaTau × AbTau + Cc^T × OmegaRange × Cb
+   *           = AcTauT × OmegaTau × AbTauT^T + CcT × OmegaRange × CbT^T
+   *
+   * Considering the blocks associated with a single lifted state XcT, we have:
+   *
+   * Dimensions: [rows × cols]
+   *   AcRhoT: [d × d]
+   *   AbRhoT: [d × d]
+   *   OmegaRho: [d × d] - diagonal matrix
+   *   TcT: [d × 1]
+   *   TbT: [d × 1]
+   *   AcTauT: [1 × 1]
+   *   AbTauT: [1 × 1]
+   *   OmegaTau: [1 × 1]
+   *   PcT: [1 × 1]
+   *   PbT: [1 × 1]
+   *   DT: [1 × 1]
+   *   CcT: [1 × 1]
+   *   CbT: [1 × 1]
+   *   OmegaRange: [1 × 1]
+   *
+   * where XcT is either a lifted pose, lifted unit sphere, or a lifted
+   * landmark:
+   *
+   * Dimensions: [rows × cols]
+   *   XcT_pose: [r × (d + 1)]
+   *   XcT_unit_sphere: [r × 1]
+   *   XcT_landmark: [r × 1]
+   *
+   * Explicit functions have been created to generate the following mappings
+   * from the fixed neighbor state to the lifted linear cost depending on the
+   * local state:
+   *
+   *   ------------------------------------------------
+   *   | Fixed Neighbor |    Local    |    Lifted     |
+   *   |     State      |    State    |  Linear Cost  |
+   *   ------------------------------------------------
+   *   | Pose           | Pose        | L_pose        |
+   *   | Pose           | Unit Sphere | L_unit_sphere |
+   *   | Pose           | Landmark    | L_landmark    |
+   *   | Landmark       | Pose        | L_pose        |
+   *   | Landmark       | Unit Sphere | L_unit_sphere |
+   *   | Landmark       | Landmark    | L_landmark    |
+   *   | Unit Sphere    | Pose        | L_pose        |
+   *   | Unit Sphere    | Landmark    | L_landmark    |
+   *   ------------------------------------------------
+   *
+   * For book keeping, we look at the contribution of each measurement and
+   * update G via the addition of these contributions. See Section "Lambda
+   * functions for calculating linear cost contributions for details
+   */
+  Matrix XcT_pose = Matrix::Zero(r_, d_ + 1);
+  Matrix XcT_unit_sphere = Matrix::Zero(r_, 1);
+  Matrix XcT_landmark = Matrix::Zero(r_, 1);
+  Matrix L_pose = Matrix::Zero(r_, d_ + 1);
+  Matrix L_unit_sphere = Matrix::Zero(r_, 1);
+  Matrix L_landmark = Matrix::Zero(r_, 1);
+  Matrix AcRhoT = Matrix::Zero(d_, d_);
+  Matrix AbRhoT = Matrix::Zero(d_, d_);
+  Matrix OmegaRho = Matrix::Zero(d_, d_);
+  Matrix TcT = Matrix::Zero(d_, 1);
+  Matrix TbT = Matrix::Zero(d_, 1);
+  Matrix AcTauT = Matrix::Zero(1, 1);
+  Matrix AbTauT = Matrix::Zero(1, 1);
+  Matrix OmegaTau = Matrix::Zero(1, 1);
+  Matrix PcT = Matrix::Zero(1, 1);
+  Matrix PbT = Matrix::Zero(1, 1);
+  Matrix DT = Matrix::Zero(1, 1);
+  Matrix CcT = Matrix::Zero(1, 1);
+  Matrix CbT = Matrix::Zero(1, 1);
+  Matrix OmegaRange = Matrix::Zero(1, 1);
+
+  // Initialize entries of incidence matrices
+  Matrix R = Matrix::Identity(d_, d_);
+  Matrix I_dxd = Matrix::Identity(d_, d_);
+  Matrix t = Matrix::Zero(d_, 1);
+  Matrix Zero_dx1 = Matrix::Zero(d_, 1);
+
+  // Initialize Q_cb block matrices
+  Matrix Q_cb_11 = Matrix::Zero(d_, d_);
+  Matrix Q_cb_12 = Matrix::Zero(d_, 1);
+  Matrix Q_cb_13 = Matrix::Zero(d_, 1);
+
+  Matrix Q_cb_21 = Matrix::Zero(1, d_);
+  Matrix Q_cb_22 = Matrix::Zero(1, 1);
+  Matrix Q_cb_23 = Matrix::Zero(1, 1);
+
+  Matrix Q_cb_31 = Matrix::Zero(1, d_);
+  Matrix Q_cb_32 = Matrix::Zero(1, 1);
+  Matrix Q_cb_33 = Matrix::Zero(1, 1);
+
+  // Initialize linear cost
+  LiftedRangeAidedArray G(r_, d_, n_, l_, b_);
+  G.setDataToZero();
+
+  /**
+   * @brief Lambda functions for calculating linear cost contributions
+   *
+   * The following lambda functions are used to calculate the linear cost
+   * contributions as described in the previous section.
+   */
+
+  auto updateQuadraticCostSubmatrices = [&]() -> void {
+    // Calculate transposes
+    // Note: The transpose of a 1 × 1 matrix is the matrix itself
+    const Matrix &AcRho = AcRhoT.transpose();
+    const Matrix &AbRho = AbRhoT.transpose();
+    const Matrix &Tc = TcT.transpose();
+    const Matrix &Tb = TbT.transpose();
+    const Matrix &AcTau = AcTauT;
+    const Matrix &AbTau = AbTauT;
+    const Matrix &Pc = PcT;
+    const Matrix &Pb = PbT;
+    const Matrix &D = DT;
+    const Matrix &Cc = CcT;
+    const Matrix &Cb = CbT;
+
+    // Update Q_cb block matrices for current measurement
+    Q_cb_11.noalias() = AcRhoT * OmegaRho * AbRho + TcT * OmegaTau * Tb;
+    Q_cb_13.noalias() = TcT * OmegaTau * AbTau;
+
+    Q_cb_22.noalias() = PcT * OmegaRange * D * D * Pb;
+    Q_cb_23.noalias() = PcT * D * OmegaRange * Cb;
+
+    Q_cb_31.noalias() = AcTauT * OmegaTau * Tb;
+    Q_cb_32.noalias() = CcT * OmegaRange * D * Pb;
+    Q_cb_33.noalias() = AcTauT * OmegaTau * AbTau + CcT * OmegaRange * Cb;
+  };
+
+  auto updateLinearCostFromFixedNeighborPoseToLocalPose = [&]() -> void {
+    // Partition rotation and translation components
+    auto [XcT_pose_rot, XcT_pose_trans] =
+        partitionSEMatrix(XcT_pose, r_, d_, 1);
+
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_pose.topLeftCorner(r_, d_) =
+        XcT_pose_rot * Q_cb_11 + XcT_pose_trans * Q_cb_31;
+    L_pose.topRightCorner(r_, 1) =
+        XcT_pose_rot * Q_cb_13 + XcT_pose_trans * Q_cb_33;
+  };
+
+  auto updateLinearCostFromFixedNeighborPoseToLocalLandmark = [&]() -> void {
+    // Partition rotation and translation components
+    auto [XcT_pose_rot, XcT_pose_trans] =
+        partitionSEMatrix(XcT_pose, r_, d_, 1);
+
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_landmark.noalias() = XcT_pose_rot * Q_cb_13 + XcT_pose_trans * Q_cb_33;
+  };
+
+  auto updateLinearCostFromFixedNeighborLandmarkToLocalPose = [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_pose.topLeftCorner(r_, d_) = XcT_landmark * Q_cb_31;
+    L_pose.topRightCorner(r_, 1) = XcT_landmark * Q_cb_33;
+  };
+
+  auto updateLinearCostFromFixedNeighborLandmarkToLocalLandmark =
+      [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_landmark.noalias() = XcT_landmark * Q_cb_33;
+  };
+
+  auto updateLinearCostFromFixedNeighborUnitSphereToLocalPose = [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_pose.topLeftCorner(r_, d_) = Matrix::Zero(r_, d_);
+    L_pose.topRightCorner(r_, 1) = XcT_unit_sphere * Q_cb_23;
+  };
+
+  auto updateLinearCostFromFixedNeighborUnitSphereToLocalLandmark =
+      [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_landmark.noalias() = XcT_unit_sphere * Q_cb_23;
+  };
+
+  auto updateLinearCostFromFixedNeighborPoseToLocalUnitSphere = [&]() -> void {
+    // Partition rotation and translation components
+    auto [XcT_pose_rot, XcT_pose_trans] =
+        partitionSEMatrix(XcT_pose, r_, d_, 1);
+
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_unit_sphere.noalias() = XcT_pose_trans * Q_cb_32;
+  };
+
+  auto updateLinearCostFromFixedNeighborLandmarkToLocalUnitSphere =
+      [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_unit_sphere.noalias() = XcT_landmark * Q_cb_32;
+  };
+
+  // Iterate over all shared pose-pose loop closures
+  for (const auto &meas : pose_pose_measurements) {
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Update measurement rotation and translation matrix
+    R.noalias() = meas.R;
+    t.noalias() = meas.t;
+
+    // Update measurement weight matrix
+    for (unsigned i = 0; i < d_; ++i)
+      OmegaRho(i, i) = meas.weight * meas.kappa;
+
+    OmegaTau(1, 1) = meas.weight * meas.tau;
+
+    // Set indices according to pose ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
+    // Update linear cost
+    if (i != IDX_NOT_SET) {
+      // Get neighbor's fixed lifted pose
+      const StateID &neighborDstStateID = meas.getDstID();
+      XcT_pose.noalias() =
+          getNeighborFixedVariableLiftedData(neighborDstStateID);
+
+      // Set incidence and data matrices
+      AbRhoT.noalias() = -R; // Leaving node i of agent b
+      TbT.noalias() = -t;
+      AbTauT(1, 1) = -1;
+      AcRhoT.noalias() = I_dxd; // Entering node j of agent c
+      TcT.noalias() = Zero_dx1;
+      AcTauT(1, 1) = +1;
+
+      // Add measurement contribution to linear cost
+      updateLinearCostFromFixedNeighborPoseToLocalPose();
+      G.GetLiftedPoseArray()->pose(i) += L_pose;
+    } else {
+      CHECK(j != IDX_NOT_SET);
+      // Get neighbor's fixed lifted pose
+      const StateID &neighborSrcStateID = meas.getSrcID();
+      XcT_pose.noalias() =
+          getNeighborFixedVariableLiftedData(neighborSrcStateID);
+
+      // Set incidence and data matrices
+      AbRhoT.noalias() = I_dxd; // Entering node j of agent b
+      TbT.noalias() = Zero_dx1;
+      AbTauT(1, 1) = +1;
+      AcRhoT.noalias() = -R; // Leaving node i of agent c
+      TcT.noalias() = -t;
+      AcTauT(1, 1) = -1;
+
+      // Add measurement contribution to linear cost
+      updateLinearCostFromFixedNeighborPoseToLocalPose();
+      G.GetLiftedPoseArray()->pose(j) += L_pose;
+    }
+  }
+
+  // Reset rotation weight matrix to zero
+  OmegaRho.setZero();
+
+  // Iterate over all shared pose-point loop closures
+  for (const auto &meas : pose_point_measurements) {
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Update measurement translation matrix
+    t.noalias() = meas.t;
+
+    // Update measurement weight matrix
+    OmegaTau(1, 1) = meas.weight * meas.tau;
+
+    // Set indices according to pose/landmark ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
+    // Update linear cost
+    if (i != IDX_NOT_SET) {
+      // Get neighbor's fixed lifted landmark
+      const StateID &neighborDstStateID = meas.getDstID();
+      XcT_landmark.noalias() =
+          getNeighborFixedVariableLiftedData(neighborDstStateID);
+
+      // Set incidence and data matrices
+      TbT.noalias() = -t; // Leaving node i of agent b
+      AbTauT(1, 1) = -1;
+      TcT.noalias() = Zero_dx1; // Entering node j of agent c
+      AcTauT(1, 1) = +1;
+
+      // Add measurement contribution to linear cost
+      updateLinearCostFromFixedNeighborLandmarkToLocalPose();
+      G.GetLiftedPoseArray()->pose(i) += L_pose;
+    } else {
+      CHECK(j != IDX_NOT_SET);
+      // Get neighbor's fixed lifted pose
+      const StateID &neighborSrcStateID = meas.getSrcID();
+      XcT_pose.noalias() =
+          getNeighborFixedVariableLiftedData(neighborSrcStateID);
+
+      // Set incidence and data matrices
+      TbT.noalias() = Zero_dx1; // Entering node j of agent b
+      AbTauT(1, 1) = +1;
+      TcT.noalias() = -t; // Leaving node i of agent c
+      AcTauT(1, 1) = -1;
+
+      // Add measurement contribution to linear cost
+      updateLinearCostFromFixedNeighborPoseToLocalLandmark();
+      G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+    }
+  }
+
+  // Reset translation weight matrix to zero
+  OmegaTau.setZero();
+
+  // Iterate over all shared range loop closures
+  for (const auto &meas : range_measurements) {
+    size_t i = IDX_NOT_SET;
+    size_t j = IDX_NOT_SET;
+
+    // Update measurement range matrix
+    DT(1, 1) = meas.range;
+
+    // Update measurement weight matrix
+    OmegaRange(1, 1) = meas.weight * meas.precision;
+
+    // Set indices according to pose/landmark ownership
+    std::optional<bool> are_indices_set =
+        setIndicesFromStateOwnership(meas, &i, &j);
+    if (are_indices_set == false)
+      return false;
+    else if (are_indices_set == std::nullopt)
+      continue;
+
+    // Update linear cost
+    if (i != IDX_NOT_SET) {
+      // get neighbor's fixed lifted pose/landmark
+      const StateID &neighborDstStateID = meas.getDstID();
+      const Matrix XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
+
+      // Set incidence and data matrices
+      CbT(1, 1) = -1; // Leaving node i of agent b
+      CcT(1, 1) = +1; // Entering node j of agent c
+
+      // Update selection matrices
+      PbT(1, 1) = 1;
+      PcT(1, 1) = 0;
+
+      // Set unit sphere variable index
+      const unsigned int l = meas.l;
+
+      // Add measurement contribution to linear cost
+      const StateID &localSrcStateID = meas.getSrcID();
+      if (neighborDstStateID.isPose()) {
+        // Neighbor's fixed state is a lifted pose
+        XcT_pose.noalias() = XcT;
+
+        // Assign linear cost to local pose or landmark
+        if (localSrcStateID.isPose()) {
+          updateLinearCostFromFixedNeighborPoseToLocalPose();
+          G.GetLiftedPoseArray()->pose(i) += L_pose;
+        } else {
+          CHECK(localSrcStateID.isPoint());
+          updateLinearCostFromFixedNeighborPoseToLocalLandmark();
+          G.GetLiftedLandmarkArray()->translation(i) += L_landmark;
+        }
+
+        // Assign linear cost to local unit sphere variable
+        updateLinearCostFromFixedNeighborPoseToLocalUnitSphere();
+        G.GetLiftedUnitSphereArray()->translation(l) += L_unit_sphere;
+
+      } else {
+        CHECK(neighborDstStateID.isPoint());
+
+        // Neighbor's fixed state is a lifted landmark
+        XcT_landmark.noalias() = XcT;
+
+        // Assign linear cost to local pose or landmark
+        if (localSrcStateID.isPose()) {
+          updateLinearCostFromFixedNeighborLandmarkToLocalPose();
+          G.GetLiftedPoseArray()->pose(i) += L_pose;
+        } else {
+          CHECK(localSrcStateID.isPoint());
+          updateLinearCostFromFixedNeighborLandmarkToLocalLandmark();
+          G.GetLiftedLandmarkArray()->translation(i) += L_landmark;
+        }
+
+        // Assign linear cost to local unit sphere variable
+        updateLinearCostFromFixedNeighborLandmarkToLocalUnitSphere();
+        G.GetLiftedUnitSphereArray()->translation(l) += L_unit_sphere;
+      }
+
+      /**
+       * @brief Unit sphere variables belonging to this agent
+       *
+       * For shared range loop closures that leave node i of agent b and enter
+       * node j of agent c, the unit sphere variables associated with these
+       * edges belong to this agent. As such, there are no fixed neighbor unit
+       * sphere variables
+       */
+      continue;
+
+    } else {
+      CHECK(j != IDX_NOT_SET);
+      // Get neighbor's fixed lifted pose/landmark
+      const StateID &neighborSrcStateID = meas.getSrcID();
+      const Matrix XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
+
+      // set incidence and data matrices
+      CbT(1, 1) = +1; // Entering node j of agent b
+      CcT(1, 1) = -1; // Leaving node i of agent c
+
+      // Update selection matrices
+      PbT(1, 1) = 0;
+      PcT(1, 1) = 1;
+
+      // Add measurement contribution to linear cost
+      const StateID &localDstStateID = meas.getDstID();
+      if (neighborSrcStateID.isPose()) {
+        // Neighbor's fixed state is a lifted pose
+        XcT_pose.noalias() = XcT;
+
+        // Assign linear cost to local pose or landmark
+        if (localDstStateID.isPose()) {
+          updateLinearCostFromFixedNeighborPoseToLocalPose();
+          G.GetLiftedPoseArray()->pose(j) += L_pose;
+        } else {
+          CHECK(localDstStateID.isPoint());
+          updateLinearCostFromFixedNeighborPoseToLocalLandmark();
+          G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+        }
+
+      } else {
+        CHECK(neighborSrcStateID.isPoint());
+
+        // Neighbor's fixed state is a lifted landmark
+        XcT_landmark.noalias() = XcT;
+
+        // Assign linear cost to local pose or landmark
+        if (localDstStateID.isPose()) {
+          updateLinearCostFromFixedNeighborLandmarkToLocalPose();
+          G.GetLiftedPoseArray()->pose(j) += L_pose;
+        } else {
+          CHECK(localDstStateID.isPoint());
+          updateLinearCostFromFixedNeighborLandmarkToLocalLandmark();
+          G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+        }
+      }
+
+      /**
+       * @brief Fixed neighbor poses/landmarks do not contributed to the linear
+       * cost associated with local unit sphere variables
+       *
+       * Note: Since Pb^T= 0, Q_32 = 0 and we have no contributions from fixed
+       * neighbor poses/landmarks to this agent's unit sphere variables.
+       * Intuitively, this makes sense as the neighbor poses/landmarks are
+       * connected with local poses/landmarks via an edge with a unit sphere
+       * variables associated with the neighbor
+       */
+
+      /**
+       * @brief Unit sphere variables belonging to neighbor agent
+       *
+       * For shared range loop closures that enter node j of agent b and
+       * leave node i of agent c, the unit sphere variables associated with
+       * these edges belong to the neighbors of this agent. As such, we get the
+       * fixed unit sphere variable of the neighbor
+       */
+      const EdgeID &neighborEdgeID = meas.getEdgeID();
+      XcT_unit_sphere.noalias() =
+          getNeighborFixedVariableLiftedData(neighborEdgeID);
+
+      // Add measurement contribution to linear cost
+      if (localDstStateID.isPose()) {
+        updateLinearCostFromFixedNeighborUnitSphereToLocalPose();
+        G.GetLiftedPoseArray()->pose(j) += L_pose;
+      } else {
+        CHECK(localDstStateID.isPoint());
+        updateLinearCostFromFixedNeighborUnitSphereToLocalLandmark();
+        G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+      }
+    }
+  }
+
+  // Set linear cost matrix
+  G_.emplace(G.getData());
+
   return true;
 }
 
