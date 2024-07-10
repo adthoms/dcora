@@ -14,13 +14,15 @@
 
 namespace DCORA {
 
-Graph::Graph(unsigned int id, unsigned int r, unsigned int d)
+Graph::Graph(unsigned int id, unsigned int r, unsigned int d,
+             GraphType graphType)
     : id_(id),
       r_(r),
       d_(d),
       n_(0),
       l_(0),
       b_(0),
+      graph_type(graphType),
       use_inactive_neighbors_(false),
       prior_kappa_(10000),
       prior_tau_(100) {
@@ -59,6 +61,17 @@ void Graph::reset() {
   for (const auto neighbor_id : nbr_robot_ids_) {
     neighbor_active_[neighbor_id] = true;
   }
+}
+
+bool Graph::isPGOCompatible() const {
+  if (graph_type == GraphType::RangeAidedSLAMGraph)
+    return false;
+
+  if (l_ > 0 || b_ > 0)
+    LOG(FATAL)
+        << "Error: Pose graph cannot contain unit spheres and landmarks!";
+
+  return true;
 }
 
 void Graph::clearNeighborStates() {

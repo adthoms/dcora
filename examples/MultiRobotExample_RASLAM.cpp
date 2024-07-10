@@ -46,8 +46,8 @@ int main(int argc, char **argv) {
 
   // TODO(Alex): Used for debugging purposes for Graph Milestone.
   for (const auto &[robot_id, measurements] : robot_measurements) {
-    std::shared_ptr<DCORA::Graph> graph =
-        std::make_shared<DCORA::Graph>(robot_id, r, d);
+    std::shared_ptr<DCORA::Graph> graph = std::make_shared<DCORA::Graph>(
+        robot_id, r, d, DCORA::GraphType::RangeAidedSLAMGraph);
     graph->setMeasurements(measurements.relative_measurements);
   }
 

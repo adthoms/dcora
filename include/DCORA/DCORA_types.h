@@ -43,6 +43,11 @@ typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
 enum class InitializationMethod { Odometry, Chordal, GNC_TLS };
 
 /**
+ * @brief Graph types
+ */
+enum class GraphType { PoseGraph, RangeAidedSLAMGraph };
+
+/**
  * @brief State types
  */
 enum class StateType { None, Pose, Point };

@@ -52,8 +52,10 @@ public:
    * @param id robot ID
    * @param r relaxation rank
    * @param d dimension (2/3)
+   * @param graphType graph type
    */
-  Graph(unsigned int id, unsigned int r, unsigned int d);
+  Graph(unsigned int id, unsigned int r, unsigned int d,
+        GraphType graphType = GraphType::PoseGraph);
   /**
    * @brief Destructor
    */
@@ -101,11 +103,6 @@ public:
    */
   unsigned int numSharedLoopClosures() const { return shared_lcs_.vec.size(); }
   /**
-   * @brief Return true if the graph is compatible with PGO
-   * @return
-   */
-  bool isPGOCompatible() const { return (b_ == 0 && l_ == 0); }
-  /**
    * @brief Clear all contents and reset this graph to be empty
    */
   void empty();
@@ -113,6 +110,11 @@ public:
    * @brief Clear all temporary data and only keep measurements
    */
   void reset();
+  /**
+   * @brief Return true if the graph is compatible with PGO
+   * @return
+   */
+  bool isPGOCompatible() const;
   /**
    * @brief Clear all cached neighbor states
    */
@@ -411,6 +413,9 @@ protected:
 
   // Problem dimensions
   unsigned int r_, d_, n_, l_, b_;
+
+  // Graph Type
+  GraphType graph_type;
 
   // Store odometry measurements of this robot
   std::vector<RelativePosePoseMeasurement> odometry_;
