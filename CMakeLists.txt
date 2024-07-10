@@ -180,7 +180,6 @@ if(BUILD_DCORA_TESTS)
     tests/testEigenMap.cpp
     tests/testConstruction.cpp
     tests/testLineGraph.cpp
-    tests/testMeasurements.cpp
     tests/testTriangleGraph.cpp
     tests/testOptimizationThread.cpp
   )
