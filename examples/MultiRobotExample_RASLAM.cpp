@@ -37,9 +37,8 @@ int main(int argc, char **argv) {
   DCORA::RobotMeasurements robot_measurements =
       DCORA::getRobotMeasurements(dataset);
 
-  unsigned int n, d, r;
+  unsigned int d, r;
   d = dataset.dim;
-  n = dataset.num_poses;
   r = 5;
   bool acceleration = true;
   bool verbose = false;
