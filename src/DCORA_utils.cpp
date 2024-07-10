@@ -962,6 +962,151 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   return pyfg_dataset;
 }
 
+Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
+  Measurements global_measurements;
+  const unsigned int global_robot_id = 0;
+
+  // Get local robot and state ids
+  const std::vector<unsigned int> &local_pose_robot_ids =
+      pyfg_dataset.ground_truth_pose_robot_ids;
+  const std::vector<unsigned int> &local_pose_state_ids =
+      pyfg_dataset.ground_truth_pose_state_ids;
+  const std::vector<unsigned int> &local_landmark_robot_ids =
+      pyfg_dataset.ground_truth_point_robot_ids;
+  const std::vector<unsigned int> &local_landmark_state_ids =
+      pyfg_dataset.ground_truth_point_state_ids;
+
+  // Initialize maps for reindexing
+  std::map<StateID, StateID, CompareStateID> local_to_global_pose;
+  std::map<StateID, StateID, CompareStateID> local_to_global_landmark;
+  std::map<StateID, StateID, CompareStateID> local_to_global_unit_sphere;
+
+  // Set local state to global state maps
+  unsigned int global_pose_idx = 0;
+  for (size_t i = 0; i < local_pose_robot_ids.size(); i++) {
+    // Set pose indexes
+    PoseID local_pose(local_pose_robot_ids.at(i), local_pose_state_ids.at(i));
+    PoseID global_pose(global_robot_id, global_pose_idx);
+
+    // Populate map
+    local_to_global_pose[local_pose] = global_pose;
+
+    // Increment
+    global_pose_idx++;
+  }
+  unsigned int global_landmark_idx = 0;
+  for (size_t i = 0; i < local_landmark_robot_ids.size(); i++) {
+    // Set landmark indexes
+    PointID local_landmark(local_landmark_robot_ids.at(i),
+                           local_landmark_state_ids.at(i));
+    PointID global_landmark(global_robot_id, global_landmark_idx);
+
+    // Populate map
+    local_to_global_landmark[local_landmark] = global_landmark;
+
+    // Increment
+    global_landmark_idx++;
+  }
+  unsigned int global_unit_sphere_idx = 0;
+  const std::vector<RangeMeasurement> &rang_measurements =
+      pyfg_dataset.measurements.relative_measurements.GetRangeMeasurements();
+  for (const auto m : rang_measurements) {
+    // Set unit sphere indexes
+    PointID local_unit_sphere(m.r1, m.l);
+    PointID global_unit_sphere(global_robot_id, global_unit_sphere_idx);
+
+    // Populate map
+    local_to_global_unit_sphere[local_unit_sphere] = global_unit_sphere;
+
+    // Increment
+    global_unit_sphere_idx++;
+  }
+
+  // Lambda function for globally reindexing relative measurements
+  auto globallyReindexRelativeMeasurement = [](RelativeMeasurement &meas,
+                                               const StateID &global_src_id,
+                                               const StateID &global_dst_id) {
+    meas.r1 = global_src_id.robot_id;
+    meas.p1 = global_src_id.frame_id;
+    meas.r2 = global_dst_id.robot_id;
+    meas.p2 = global_dst_id.frame_id;
+  };
+
+  // TODO(AT): Add support for priors
+
+  // Copy relative measurements and modify source and destination states
+  for (const auto &m : pyfg_dataset.measurements.relative_measurements.vec) {
+    if (std::holds_alternative<RelativePosePoseMeasurement>(m)) {
+      RelativePosePoseMeasurement meas =
+          std::get<RelativePosePoseMeasurement>(m);
+
+      // Get global pose ids
+      const StateID &global_pose_src_id = local_to_global_pose[meas.getSrcID()];
+      const StateID &global_pose_dst_id = local_to_global_pose[meas.getDstID()];
+
+      // Reindex to global state ids
+      globallyReindexRelativeMeasurement(meas, global_pose_src_id,
+                                         global_pose_dst_id);
+
+      // Add reindexed measurement
+      global_measurements.relative_measurements.vec.push_back(meas);
+
+    } else if (std::holds_alternative<RelativePosePointMeasurement>(m)) {
+      RelativePosePointMeasurement meas =
+          std::get<RelativePosePointMeasurement>(m);
+
+      // Get global pose id for source and landmark id for destination
+      const StateID &global_pose_src_id = local_to_global_pose[meas.getSrcID()];
+      const StateID &global_landmark_dst_id =
+          local_to_global_landmark[meas.getDstID()];
+
+      // Reindex to global state ids
+      globallyReindexRelativeMeasurement(meas, global_pose_src_id,
+                                         global_landmark_dst_id);
+
+      // Add reindexed measurement
+      global_measurements.relative_measurements.vec.push_back(meas);
+
+    } else {
+      CHECK(std::holds_alternative<RangeMeasurement>(m));
+      RangeMeasurement meas = std::get<RangeMeasurement>(m);
+
+      // Get global ids depending on state type
+      StateID global_state_src_id;
+      executeStateDependantFunctionals(
+          [&]() {
+            global_state_src_id = local_to_global_pose[meas.getSrcID()];
+          },
+          [&]() {
+            global_state_src_id = local_to_global_landmark[meas.getSrcID()];
+          },
+          meas.stateType1);
+
+      StateID global_state_dst_id;
+      executeStateDependantFunctionals(
+          [&]() {
+            global_state_dst_id = local_to_global_pose[meas.getDstID()];
+          },
+          [&]() {
+            global_state_dst_id = local_to_global_landmark[meas.getDstID()];
+          },
+          meas.stateType2);
+
+      // Reindex unit sphere variables
+      meas.l = local_to_global_unit_sphere[PointID(meas.r1, meas.l)].frame_id;
+
+      // Reindex to global state ids
+      globallyReindexRelativeMeasurement(meas, global_state_src_id,
+                                         global_state_dst_id);
+
+      // Add reindexed measurement
+      global_measurements.relative_measurements.vec.push_back(meas);
+    }
+  }
+
+  return global_measurements;
+}
+
 RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
   RobotMeasurements robot_measurements;
   std::map<unsigned int, unsigned int> robot_first_pose_id;
@@ -1122,8 +1267,9 @@ void getGraphDimensionsFromLocalMeasurements(
   }
   if (d == 0)
     LOG(WARNING)
-        << "Warning: Local measurements only contain range measurements, which "
-           "cannot determine dimension of Euclidean space from measurements.";
+        << "Warning: Local measurements only contain range measurements, "
+           "which cannot determine dimension of Euclidean space from "
+           "measurements.";
 
   // Get number of poses, unit spheres, and landmarks
   unsigned int n = 0;
@@ -1153,8 +1299,7 @@ void getGraphDimensionsFromLocalMeasurements(
           [&]() { n = std::max(n, static_cast<unsigned int>(m_range.p2 + 1)); },
           [&]() { b = std::max(b, static_cast<unsigned int>(m_range.p2 + 1)); },
           m_range.stateType2);
-      l++; // all measurements are assumed unique. See setMeasurements in Graph
-           // class for details.
+      l++; // all measurements are assumed unique
     }
   }
 

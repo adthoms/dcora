@@ -98,6 +98,13 @@ int getDimFromPyfgFirstLine(const std::string &filename);
 PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
+ * @brief Helper function to globally reindex a PyFG dataset's measurements
+ * @param pyfg_dataset
+ * @return
+ */
+Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset);
+
+/**
  * @brief Helper function to partition a PyFG dataset's measurements among its
  * robots
  * @param pyfg_dataset
