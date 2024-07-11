@@ -73,7 +73,7 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
     DCORA::LiftedRangeAidedArray var(r, d, n, l, b);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
-      // poses
+      // Poses
       auto Yi = DCORA::randomStiefelVariable(r, d);
       auto pi = DCORA::randomEuclideanVariable(r);
       var.GetLiftedPoseArray()->rotation(i) = Yi;
@@ -82,14 +82,14 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
       ASSERT_LE((pi - var.GetLiftedPoseArray()->translation(i)).norm(), 1e-6);
     }
     for (int i = 0; i < l; ++i) {
-      // unit spheres
+      // Unit spheres
       auto ri = DCORA::randomObliqueVariable(r);
       var.GetLiftedUnitSphereArray()->translation(i) = ri;
       ASSERT_LE((ri - var.GetLiftedUnitSphereArray()->translation(i)).norm(),
                 1e-6);
     }
     for (int i = 0; i < b; ++i) {
-      // landmarks
+      // Landmarks
       auto li = DCORA::randomEuclideanVariable(r);
       var.GetLiftedLandmarkArray()->translation(i) = li;
       ASSERT_LE((li - var.GetLiftedLandmarkArray()->translation(i)).norm(),
@@ -98,7 +98,6 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
     // Test copy constructor
     DCORA::LiftedRangeAidedArray var2(var);
     ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
-
     // Test assignment
     DCORA::LiftedRangeAidedArray var3(r, d, n, l, b);
     var3 = var;

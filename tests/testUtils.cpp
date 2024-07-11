@@ -47,6 +47,38 @@ TEST(testDCORA, testStiefelProjection) {
   }
 }
 
+TEST(testDCORA, testEuclideanGeneration) {
+  DCORA::Matrix E = DCORA::fixedEuclideanVariable(5, 3);
+  ASSERT_TRUE(E.allFinite());
+}
+
+TEST(testDCORA, testEuclideanRepeat) {
+  DCORA::Matrix E = DCORA::fixedEuclideanVariable(5, 3);
+  for (size_t i = 0; i < 10; ++i) {
+    DCORA::Matrix E_ = DCORA::fixedEuclideanVariable(5, 3);
+    ASSERT_LE((E_ - E).norm(), 1e-5);
+  }
+}
+
+TEST(testDCORA, testObliqueGeneration) {
+  DCORA::Matrix OB = DCORA::fixedObliqueVariable(5, 3);
+  DCORA::Matrix I = DCORA::Matrix::Identity(3, 3);
+  DCORA::Matrix D = (OB.transpose() * OB).diagonal() - I.diagonal();
+  ASSERT_LE(D.norm(), 1e-5);
+  for (int i = 0; i < OB.cols(); ++i) {
+    double d = OB.col(i).norm() - 1.0;
+    ASSERT_LE(d, 1e-5);
+  }
+}
+
+TEST(testDCORA, testObliqueRepeat) {
+  DCORA::Matrix OB = DCORA::fixedObliqueVariable(5, 3);
+  for (size_t i = 0; i < 10; ++i) {
+    DCORA::Matrix OB_ = DCORA::fixedObliqueVariable(5, 3);
+    ASSERT_LE((OB_ - OB).norm(), 1e-5);
+  }
+}
+
 TEST(testDCORA, testObliqueProjection) {
   size_t d = 3;
   size_t r = 5;
@@ -66,12 +98,40 @@ TEST(testDCORA, testLiftedSEManifoldProjection) {
   DCORA::LiftedSEManifold Manifold(r, d, n);
   DCORA::Matrix M = DCORA::Matrix::Random(r, (d + 1) * n);
   DCORA::Matrix X = Manifold.project(M);
+  DCORA::Matrix I = DCORA::Matrix::Identity(d, d);
   ASSERT_EQ(X.rows(), r);
   ASSERT_EQ(X.cols(), (d + 1) * n);
   for (int i = 0; i < n; ++i) {
     DCORA::Matrix Y = X.block(0, i * (d + 1), r, d);
-    DCORA::Matrix D = Y.transpose() * Y - DCORA::Matrix::Identity(d, d);
+    DCORA::Matrix D = Y.transpose() * Y - I;
     ASSERT_LE(D.norm(), 1e-5);
+  }
+}
+
+TEST(testDCORA, testLiftedRAManifoldProjection) {
+  int d = 3;
+  int r = 5;
+  int n = 100;
+  int l = 5;
+  int b = 7;
+  DCORA::LiftedRAManifold Manifold(r, d, n, l, b);
+  DCORA::Matrix M = DCORA::Matrix::Random(r, (d + 1) * n + l + b);
+  DCORA::Matrix X = Manifold.project(M);
+  DCORA::Matrix I_dxd = DCORA::Matrix::Identity(d, d);
+  DCORA::Matrix I_1x1 = DCORA::Matrix::Identity(1, 1);
+  ASSERT_EQ(X.rows(), r);
+  ASSERT_EQ(X.cols(), (d + 1) * n + l + b);
+  for (int i = 0; i < n; ++i) {
+    DCORA::Matrix Y = X.block(0, i * d, r, d);
+    DCORA::Matrix D = Y.transpose() * Y - I_dxd;
+    ASSERT_LE(D.norm(), 1e-5);
+  }
+  for (int i = 0; i < l; ++i) {
+    DCORA::Matrix OB = X.block(0, i + (d * n), r, 1);
+    DCORA::Matrix D = (OB.transpose() * OB).diagonal() - I_1x1.diagonal();
+    double d = OB.norm() - 1.0;
+    ASSERT_LE(D.norm(), 1e-5);
+    ASSERT_LE(d, 1e-5);
   }
 }
 

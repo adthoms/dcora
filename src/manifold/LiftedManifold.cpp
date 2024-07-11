@@ -64,8 +64,10 @@ LiftedRAManifold::~LiftedRAManifold() {
 
 Matrix LiftedRAManifold::project(const Matrix &M) const {
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(M, r_, d_, n_, l_, b_);
-  return createRAMatrix(projectToRotationGroup(X_SE_R),
-                        projectToObliqueManifold(X_OB), X_SE_t, X_E);
+  Matrix X_SE_proj = LiftedSEManifold::project(createSEMatrix(X_SE_R, X_SE_t));
+  auto [X_SE_R_proj, X_SE_t_proj] = partitionSEMatrix(X_SE_proj, r_, d_, n_);
+  return createRAMatrix(X_SE_R_proj, projectToObliqueManifold(X_OB),
+                        X_SE_t_proj, X_E);
 }
 
 } // namespace DCORA
