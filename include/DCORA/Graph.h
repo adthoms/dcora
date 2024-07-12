@@ -86,6 +86,11 @@ public:
    */
   unsigned int b() const { return b_; }
   /**
+   * @brief Get the underlying problem dimension
+   * @return
+   */
+  unsigned int k() const { return (d_ + 1) * n_ + l_ + b_; }
+  /**
    * @brief Return number of odometry edges
    * @return
    */
