@@ -214,6 +214,14 @@ public:
   }
   bool isPose() const { return state_type == StateType::Pose; }
   bool isPoint() const { return state_type == StateType::Point; }
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const StateID &state_type) {
+    os << StateTypeToString(state_type.state_type) << "(" << state_type.robot_id
+       << "," << state_type.frame_id << ")";
+    return os;
+  }
 };
 
 class PoseID : public StateID {
