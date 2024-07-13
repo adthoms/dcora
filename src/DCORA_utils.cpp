@@ -1573,9 +1573,13 @@ partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d,
 Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
   size_t r = X_SE_R.rows();
   size_t n = X_SE_t.cols();
+  if (n == 0) {
+    return Matrix::Zero(r, 0);
+  }
   size_t d = X_SE_R.cols() / n;
   CHECK_EQ(X_SE_R.rows(), X_SE_t.rows());
   CHECK_EQ(X_SE_R.cols() + X_SE_t.cols(), (d + 1) * n);
+
   Matrix X(r, (d + 1) * n);
 #pragma omp parallel for
   for (size_t i = 0; i < n; ++i) {
