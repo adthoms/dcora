@@ -354,4 +354,28 @@ Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB,
 void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
                                       double mem_size);
 
+/**
+ * @brief Project matrix M to the SE manifold
+ * @param M
+ * @param r
+ * @param d
+ * @param n
+ * @return
+ */
+Matrix projectToSEMAtrix(const Matrix &M, unsigned int r, unsigned int d,
+                         unsigned int n);
+
+/**
+ * @brief Project matrix M to the RA manifold
+ * @param M
+ * @param r
+ * @param d
+ * @param n
+ * @param l
+ * @param b
+ * @return
+ */
+Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
+                         unsigned int n, unsigned int l, unsigned int b);
+
 } // namespace DCORA

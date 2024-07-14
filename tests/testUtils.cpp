@@ -91,13 +91,12 @@ TEST(testDCORA, testObliqueProjection) {
   }
 }
 
-TEST(testDCORA, testLiftedSEManifoldProjection) {
+TEST(testDCORA, testProjectToSEMAtrix) {
   int d = 3;
   int r = 5;
   int n = 100;
-  DCORA::LiftedSEManifold Manifold(r, d, n);
   DCORA::Matrix M = DCORA::Matrix::Random(r, (d + 1) * n);
-  DCORA::Matrix X = Manifold.project(M);
+  DCORA::Matrix X = DCORA::projectToSEMAtrix(M, r, d, n);
   DCORA::Matrix I = DCORA::Matrix::Identity(d, d);
   ASSERT_EQ(X.rows(), r);
   ASSERT_EQ(X.cols(), (d + 1) * n);
@@ -108,15 +107,14 @@ TEST(testDCORA, testLiftedSEManifoldProjection) {
   }
 }
 
-TEST(testDCORA, testLiftedRAManifoldProjection) {
+TEST(testDCORA, testProjectToRAMatrix) {
   int d = 3;
   int r = 5;
   int n = 100;
   int l = 5;
   int b = 7;
-  DCORA::LiftedRAManifold Manifold(r, d, n, l, b);
   DCORA::Matrix M = DCORA::Matrix::Random(r, (d + 1) * n + l + b);
-  DCORA::Matrix X = Manifold.project(M);
+  DCORA::Matrix X = DCORA::projectToRAMatrix(M, r, d, n, l, b);
   DCORA::Matrix I_dxd = DCORA::Matrix::Identity(d, d);
   DCORA::Matrix I_1x1 = DCORA::Matrix::Identity(1, 1);
   ASSERT_EQ(X.rows(), r);

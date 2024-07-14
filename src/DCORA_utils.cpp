@@ -1767,4 +1767,25 @@ void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
   memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
 }
 
+Matrix projectToSEMAtrix(const Matrix &M, unsigned int r, unsigned int d,
+                         unsigned int n) {
+  checkSEMatrixSize(M, r, d, n);
+  Matrix X = M;
+#pragma omp parallel for
+  for (size_t i = 0; i < n; ++i) {
+    X.block(0, i * (d + 1), r, d) =
+        projectToStiefelManifold(X.block(0, i * (d + 1), r, d));
+  }
+  return X;
+}
+
+Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
+                         unsigned int n, unsigned int l, unsigned int b) {
+  auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(M, r, d, n, l, b);
+  Matrix X_SE_proj = projectToSEMAtrix(createSEMatrix(X_SE_R, X_SE_t), r, d, n);
+  auto [X_SE_R_proj, X_SE_t_proj] = partitionSEMatrix(X_SE_proj, r, d, n);
+  return createRAMatrix(X_SE_R_proj, projectToObliqueManifold(X_OB),
+                        X_SE_t_proj, X_E);
+}
+
 } // namespace DCORA
