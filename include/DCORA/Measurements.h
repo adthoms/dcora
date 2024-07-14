@@ -644,9 +644,13 @@ private:
  * @brief A simple struct that contains all measurement types.
  */
 struct Measurements {
+  // Measurements
   std::vector<PosePrior> pose_priors;
   std::vector<PointPrior> point_priors;
   RelativeMeasurements relative_measurements;
+
+  // Ground truth initialization
+  std::shared_ptr<RangeAidedArray> ground_truth_init;
 
   // Simple default constructor; does nothing
   Measurements() = default;
@@ -654,6 +658,7 @@ struct Measurements {
   // A utility function for streaming this struct to cout
   inline friend std::ostream &operator<<(std::ostream &os,
                                          const Measurements &measurements) {
+    os << "Measurements:" << std::endl;
     os << "Priors:" << std::endl;
     for (const auto &pose_prior : measurements.pose_priors) {
       os << pose_prior;
@@ -663,63 +668,12 @@ struct Measurements {
     }
     os << "Relative Measurements:" << std::endl;
     os << measurements.relative_measurements << std::endl;
-    return os;
-  }
-};
-
-/**
- * @brief A simple struct that contains the elements of a PyFG dataset.
- */
-struct PyFGDataset {
-  unsigned int dim;                 // Problem dimension
-  size_t num_poses;                 // Number of poses
-  size_t num_points;                // Number of points
-  std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
-
-  // Measurements
-  Measurements measurements;
-
-  // Ground truth poses
-  std::vector<unsigned int> ground_truth_pose_robot_ids;
-  std::vector<unsigned int> ground_truth_pose_state_ids;
-  std::shared_ptr<PoseArray> ground_truth_pose_array;
-
-  // Ground truth points
-  std::vector<unsigned int> ground_truth_point_robot_ids;
-  std::vector<unsigned int> ground_truth_point_state_ids;
-  std::shared_ptr<PointArray> ground_truth_point_array;
-
-  // Simple default constructor; does nothing
-  PyFGDataset() = default;
-
-  // A utility function for streaming this struct to cout
-  inline friend std::ostream &operator<<(std::ostream &os,
-                                         const PyFGDataset &pyfg_dataset) {
-    os << "PyFGDataset:" << std::endl;
-    os << "Dimension: " << pyfg_dataset.dim << std::endl;
-    os << "NumPoses: " << pyfg_dataset.num_poses << std::endl;
-    os << "NumPoints: " << pyfg_dataset.num_points << std::endl;
-    os << "NumRobots: " << pyfg_dataset.robot_IDs.size() - 1 << std::endl;
-    os << "Measurements:" << std::endl;
-    os << pyfg_dataset.measurements;
-    os << "GroundTruth:" << std::endl;
-    os << "Poses:" << std::endl;
-    for (size_t i = 0; i < pyfg_dataset.ground_truth_pose_array->n(); i++) {
-      os << "r: " << pyfg_dataset.ground_truth_pose_robot_ids.at(i)
-         << std::endl;
-      os << "p: " << pyfg_dataset.ground_truth_pose_state_ids.at(i)
-         << std::endl;
-      os << "T: \n"
-         << pyfg_dataset.ground_truth_pose_array->pose(i) << std::endl;
-    }
-    os << "Points:" << std::endl;
-    for (size_t i = 0; i < pyfg_dataset.ground_truth_point_array->n(); i++) {
-      os << "r: " << pyfg_dataset.ground_truth_point_robot_ids.at(i)
-         << std::endl;
-      os << "p: " << pyfg_dataset.ground_truth_point_state_ids.at(i)
-         << std::endl;
-      os << "t: \n"
-         << pyfg_dataset.ground_truth_point_array->translation(i) << std::endl;
+    os << "Ground Truth Initialization Matrix:" << std::endl;
+    if (measurements.ground_truth_init) {
+      os << std::fixed << std::setprecision(9)
+         << measurements.ground_truth_init->getData() << std::endl;
+    } else {
+      os << "Ground truth initialization matrix not set." << std::endl;
     }
     return os;
   }
@@ -737,5 +691,131 @@ inline std::ostream &operator<<(std::ostream &os,
   }
   return os;
 }
+
+/**
+ * @brief A simple struct that contains ground truth states.
+ */
+struct GroundTruth {
+  PoseDict poses;
+  LandmarkDict landmarks;
+  UnitSpherePointDict unit_spheres;
+
+  // Simple default constructor; does nothing
+  GroundTruth() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const GroundTruth &ground_truth) {
+    os << "Ground Truth:" << std::endl;
+    os << "Poses:" << std::endl;
+    for (const auto &[pose_id, pose] : ground_truth.poses) {
+      os << "ID: " << pose_id << std::endl;
+      os << "Variable:\n " << pose.pose() << std::endl;
+    }
+    os << "Landmarks:" << std::endl;
+    for (const auto &[landmark_id, landmark] : ground_truth.landmarks) {
+      os << "ID: " << landmark_id << std::endl;
+      os << "Variable:\n " << landmark.translation() << std::endl;
+    }
+    os << "Unit Spheres:" << std::endl;
+    for (const auto &[unit_sphere_id, unit_sphere] :
+         ground_truth.unit_spheres) {
+      os << "ID: " << unit_sphere_id << std::endl;
+      os << "Variable:\n " << unit_sphere.translation() << std::endl;
+    }
+    return os;
+  }
+};
+
+// Ordered map of local and global states
+typedef std::map<StateID, StateID, CompareStateID> LocalToGlobalStateDict;
+
+/**
+ * @brief A simple struct that contains local to global state mappings.
+ */
+struct LocalToGlobalStateDicts {
+  LocalToGlobalStateDict poses;
+  LocalToGlobalStateDict landmarks;
+  LocalToGlobalStateDict unit_spheres;
+
+  // Simple default constructor; does nothing
+  LocalToGlobalStateDicts() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &
+  operator<<(std::ostream &os,
+             const LocalToGlobalStateDicts &local_to_global_state_dicts) {
+    os << "Local to Global State:" << std::endl;
+    os << "Poses:" << std::endl;
+    for (const auto &[local_id, global_id] :
+         local_to_global_state_dicts.poses) {
+      os << local_id << " --> " << global_id << std::endl;
+    }
+    os << "Landmarks:" << std::endl;
+    for (const auto &[local_id, global_id] :
+         local_to_global_state_dicts.landmarks) {
+      os << local_id << " --> " << global_id << std::endl;
+    }
+    os << "Unit Spheres:" << std::endl;
+    for (const auto &[local_id, global_id] :
+         local_to_global_state_dicts.unit_spheres) {
+      os << local_id << " --> " << global_id << std::endl;
+    }
+    return os;
+  }
+};
+
+/**
+ * @brief A simple struct that contains the elements of a PyFG dataset.
+ */
+struct PyFGDataset {
+  unsigned int dim;                 // Problem dimension
+  std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
+
+  // Ordered maps of robot id to number of states
+  std::map<unsigned int, unsigned int> robot_id_to_num_poses;
+  std::map<unsigned int, unsigned int> robot_id_to_num_landmarks;
+  std::map<unsigned int, unsigned int> robot_id_to_num_unit_spheres;
+
+  // Measurements
+  Measurements measurements;
+
+  // Ground truth
+  GroundTruth ground_truth;
+
+  // Simple default constructor; does nothing
+  PyFGDataset() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const PyFGDataset &pyfg_dataset) {
+    os << "PyFGDataset:" << std::endl;
+    os << "Dimension: " << pyfg_dataset.dim << std::endl;
+    os << "Number of Robots: " << pyfg_dataset.robot_IDs.size() << std::endl;
+    os << "Number of Poses: " << std::endl;
+    for (const auto &[robot_id, num_poses] :
+         pyfg_dataset.robot_id_to_num_poses) {
+      std::cout << "Robot ID: " << robot_id << ", Count: " << num_poses
+                << std::endl;
+    }
+    os << "Number of Landmarks: " << std::endl;
+    for (const auto &[robot_id, num_landmarks] :
+         pyfg_dataset.robot_id_to_num_landmarks) {
+      std::cout << "Robot ID: " << robot_id << ", Count: " << num_landmarks
+                << std::endl;
+    }
+    os << "Number of Unit Spheres: " << std::endl;
+    for (const auto &[robot_id, num_unit_spheres] :
+         pyfg_dataset.robot_id_to_num_unit_spheres) {
+      std::cout << "Robot ID: " << robot_id << ", Count: " << num_unit_spheres
+                << std::endl;
+    }
+    os << "Measurements:" << std::endl;
+    os << pyfg_dataset.measurements;
+    os << "GroundTruth:" << std::endl;
+    os << pyfg_dataset.ground_truth << std::endl;
+    return os;
+  }
+};
 
 } // namespace DCORA

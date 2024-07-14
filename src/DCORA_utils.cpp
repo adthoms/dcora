@@ -529,11 +529,24 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                  << "!";
   };
 
-  // Get dimension of PyFG file
-  const unsigned int dim = getDimFromPyfgFirstLine(filename);
+  auto getTransformFromRotationAndTranslation = [](const Matrix &R,
+                                                   const Vector &t) -> Matrix {
+    CHECK_EQ(R.rows(), R.cols());
+    CHECK_EQ(R.rows(), t.size());
+
+    // Get transform as T = [R | t]
+    unsigned int d = R.rows();
+    Matrix T = Matrix::Zero(d, d + 1);
+    T.block(0, 0, d, d) = R;
+    T.block(0, d, d, 1) = t;
+    return T;
+  };
 
   // Initialize PyFG dataset
   PyFGDataset pyfg_dataset;
+
+  // Get dimension of PyFG file
+  pyfg_dataset.dim = getDimFromPyfgFirstLine(filename);
 
   // Initialize measurements, whose values we will fill in
   PosePrior pose_prior;
@@ -548,11 +561,6 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   // Initialize map to maintain unique range edges
   EdgeIDMap range_edge_id_to_index;
   size_t range_edge_index = 0;
-
-  // Initialize ground truth pose and point matrices
-  std::vector<Matrix> GroundTruthPoseRotationMatrices;
-  std::vector<Vector> GroundTruthPoseTranslationVectors;
-  std::vector<Vector> GroundTruthPointVectors;
 
   // A string used to contain the contents of a single line
   std::string line;
@@ -589,12 +597,20 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Parse symbol
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
         pyfg_dataset.robot_IDs.emplace(robotID);
-        pyfg_dataset.ground_truth_pose_robot_ids.push_back(robotID);
-        pyfg_dataset.ground_truth_pose_state_ids.push_back(stateID);
 
         // Populate ground truth
-        GroundTruthPoseRotationMatrices.push_back(R);
-        GroundTruthPoseTranslationVectors.push_back(t);
+        const PoseID pose_id = PoseID(robotID, stateID);
+        const Matrix T = getTransformFromRotationAndTranslation(R, t);
+        const Pose gt_pose = Pose(T);
+        if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
+            pyfg_dataset.ground_truth.poses.end()) {
+          LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+        }
+        pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+
+        // Increment number of poses for this robot
+        pyfg_dataset.robot_id_to_num_poses[robotID]++;
+
       } else {
         LOG(FATAL) << "Error: could not read pose variable from line: " << line
                    << "!";
@@ -610,12 +626,20 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Parse symbol
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
         pyfg_dataset.robot_IDs.emplace(robotID);
-        pyfg_dataset.ground_truth_pose_robot_ids.push_back(robotID);
-        pyfg_dataset.ground_truth_pose_state_ids.push_back(stateID);
 
         // Populate ground truth
-        GroundTruthPoseRotationMatrices.push_back(R);
-        GroundTruthPoseTranslationVectors.push_back(t);
+        const PoseID pose_id = PoseID(robotID, stateID);
+        const Matrix T = getTransformFromRotationAndTranslation(R, t);
+        const Pose gt_pose = Pose(T);
+        if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
+            pyfg_dataset.ground_truth.poses.end()) {
+          LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+        }
+        pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+
+        // Increment number of poses for this robot
+        pyfg_dataset.robot_id_to_num_poses[robotID]++;
+
       } else {
         LOG(FATAL) << "Error: could not read pose variable from line: " << line
                    << "!";
@@ -686,11 +710,19 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Parse symbol
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
         pyfg_dataset.robot_IDs.emplace(robotID);
-        pyfg_dataset.ground_truth_point_robot_ids.push_back(robotID);
-        pyfg_dataset.ground_truth_point_state_ids.push_back(stateID);
 
         // Populate ground truth
-        GroundTruthPointVectors.push_back(t);
+        const PointID landmark_id = PointID(robotID, stateID);
+        const Point gt_landmark = Point(t);
+        if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
+            pyfg_dataset.ground_truth.landmarks.end()) {
+          LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
+        }
+        pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+
+        // Increment number of landmarks for this robot
+        pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
+
       } else {
         LOG(FATAL) << "Error: could not read point variable from line: " << line
                    << "!";
@@ -705,11 +737,19 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Parse symbol
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
         pyfg_dataset.robot_IDs.emplace(robotID);
-        pyfg_dataset.ground_truth_point_robot_ids.push_back(robotID);
-        pyfg_dataset.ground_truth_point_state_ids.push_back(stateID);
 
         // Populate ground truth
-        GroundTruthPointVectors.push_back(t);
+        const PointID landmark_id = PointID(robotID, stateID);
+        const Point gt_landmark = Point(t);
+        if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
+            pyfg_dataset.ground_truth.landmarks.end()) {
+          LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
+        }
+        pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+
+        // Increment number of landmarks for this robot
+        pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
+
       } else {
         LOG(FATAL) << "Error: could not read point variable from line: " << line
                    << "!";
@@ -905,11 +945,19 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         range_measurement.range = range;
         range_measurement.precision = 1.0 / cov;
 
+        /**
+         * @brief Set unit sphere indexes
+         */
+
         // Ensure unique range measurements for correct unit sphere indexing
         const EdgeID &range_edge_id = range_measurement.getEdgeID();
         if (range_edge_id_to_index.find(range_edge_id) !=
-            range_edge_id_to_index.end())
+            range_edge_id_to_index.end()) {
+          LOG(WARNING) << "Skipping duplicate range measurement from "
+                       << range_measurement.getSrcID() << " to "
+                       << range_measurement.getDstID();
           continue;
+        }
 
         // Add edge to map
         range_edge_id_to_index.emplace(range_edge_id, range_edge_index);
@@ -918,6 +966,54 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Update unit sphere index assuming the source robot takes ownership
         range_measurement.l = robot_id_to_unit_sphere_idx[robot1ID];
         robot_id_to_unit_sphere_idx[robot1ID]++;
+
+        // Increment number of unit spheres for this robot
+        pyfg_dataset.robot_id_to_num_unit_spheres[robot1ID]++;
+
+        /**
+         * @brief Set unit sphere ground truth
+         */
+
+        // Get translation of state 1
+        Vector state1_translation = Vector::Zero(pyfg_dataset.dim);
+        executeStateDependantFunctionals(
+            [&]() {
+              const PoseID &src_id = PoseID(range_measurement.getSrcID());
+              state1_translation.noalias() =
+                  pyfg_dataset.ground_truth.poses.at(src_id).translation();
+            },
+            [&]() {
+              const PointID &src_id = PointID(range_measurement.getSrcID());
+              state1_translation.noalias() =
+                  pyfg_dataset.ground_truth.landmarks.at(src_id).translation();
+            },
+            range_measurement.stateType1);
+
+        // Get translation of state 2
+        Vector state2_translation = Vector::Zero(pyfg_dataset.dim);
+        executeStateDependantFunctionals(
+            [&]() {
+              const PoseID &dst_id = PoseID(range_measurement.getDstID());
+              state2_translation.noalias() =
+                  pyfg_dataset.ground_truth.poses.at(dst_id).translation();
+            },
+            [&]() {
+              const PointID &dst_id = PointID(range_measurement.getDstID());
+              state2_translation.noalias() =
+                  pyfg_dataset.ground_truth.landmarks.at(dst_id).translation();
+            },
+            range_measurement.stateType2);
+
+        // Calculate unit sphere variable
+        const Vector unit_vector =
+            (state2_translation - state1_translation).normalized();
+        const Point unit_sphere_var = Point(unit_vector);
+
+        // Populate ground truth
+        const PointID &unit_sphere_id =
+            PointID(range_measurement.r1, range_measurement.l);
+        pyfg_dataset.ground_truth.unit_spheres[unit_sphere_id] =
+            unit_sphere_var;
 
         // Add measurement
         pyfg_dataset.measurements.relative_measurements.vec.push_back(
@@ -932,95 +1028,65 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 
   infile.close();
 
-  // Get the number of poses and points
-  const unsigned int num_poses = GroundTruthPoseRotationMatrices.size();
-  const unsigned int num_points = GroundTruthPointVectors.size();
-
-  // Initialize ground truth pose and point matrices
-  PoseArray GroundTruthPoseArray(dim, num_poses);
-  PointArray GroundTruthPointArray(dim, num_points);
-
-  // Populate ground truth pose and point matrices
-  for (size_t i = 0; i < num_poses; i++) {
-    GroundTruthPoseArray.rotation(i) = GroundTruthPoseRotationMatrices.at(i);
-    GroundTruthPoseArray.translation(i) =
-        GroundTruthPoseTranslationVectors.at(i);
+  // Set robot states to zero if they do not exist
+  for (const auto &robot_id : pyfg_dataset.robot_IDs) {
+    pyfg_dataset.robot_id_to_num_poses[robot_id] += 0;
+    pyfg_dataset.robot_id_to_num_landmarks[robot_id] += 0;
+    pyfg_dataset.robot_id_to_num_unit_spheres[robot_id] += 0;
   }
-  for (size_t i = 0; i < num_points; i++) {
-    GroundTruthPointArray.translation(i) = GroundTruthPointVectors.at(i);
-  }
-
-  // Populate remaining dataset member variables
-  pyfg_dataset.dim = dim;
-  pyfg_dataset.num_poses = num_poses;
-  pyfg_dataset.num_points = num_points;
-  pyfg_dataset.ground_truth_pose_array =
-      std::make_shared<PoseArray>(GroundTruthPoseArray);
-  pyfg_dataset.ground_truth_point_array =
-      std::make_shared<PointArray>(GroundTruthPointArray);
 
   return pyfg_dataset;
 }
 
-Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
-  Measurements global_measurements;
+LocalToGlobalStateDicts
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
+  LocalToGlobalStateDicts local_to_global_state_dicts;
   const unsigned int global_robot_id = 0;
 
-  // Get local robot and state ids
-  const std::vector<unsigned int> &local_pose_robot_ids =
-      pyfg_dataset.ground_truth_pose_robot_ids;
-  const std::vector<unsigned int> &local_pose_state_ids =
-      pyfg_dataset.ground_truth_pose_state_ids;
-  const std::vector<unsigned int> &local_landmark_robot_ids =
-      pyfg_dataset.ground_truth_point_robot_ids;
-  const std::vector<unsigned int> &local_landmark_state_ids =
-      pyfg_dataset.ground_truth_point_state_ids;
+  // Get ground truth dictionaries
+  const PoseDict &gt_pose_dict = pyfg_dataset.ground_truth.poses;
+  const LandmarkDict &gt_landmark_dict = pyfg_dataset.ground_truth.landmarks;
+  const UnitSpherePointDict &gt_unit_sphere_dict =
+      pyfg_dataset.ground_truth.unit_spheres;
 
-  // Initialize maps for reindexing
-  std::map<StateID, StateID, CompareStateID> local_to_global_pose;
-  std::map<StateID, StateID, CompareStateID> local_to_global_landmark;
-  std::map<StateID, StateID, CompareStateID> local_to_global_unit_sphere;
-
-  // Set local state to global state maps
+  // Assign local to global state mapping
   unsigned int global_pose_idx = 0;
-  for (size_t i = 0; i < local_pose_robot_ids.size(); i++) {
-    // Set pose indexes
-    PoseID local_pose(local_pose_robot_ids.at(i), local_pose_state_ids.at(i));
-    PoseID global_pose(global_robot_id, global_pose_idx);
-
+  for (const auto &[local_pose_id, pose] : gt_pose_dict) {
     // Populate map
-    local_to_global_pose[local_pose] = global_pose;
+    const PoseID global_pose_id(global_robot_id, global_pose_idx);
+    local_to_global_state_dicts.poses[local_pose_id] = global_pose_id;
 
     // Increment
     global_pose_idx++;
   }
   unsigned int global_landmark_idx = 0;
-  for (size_t i = 0; i < local_landmark_robot_ids.size(); i++) {
-    // Set landmark indexes
-    PointID local_landmark(local_landmark_robot_ids.at(i),
-                           local_landmark_state_ids.at(i));
-    PointID global_landmark(global_robot_id, global_landmark_idx);
-
+  for (const auto &[local_landmark_id, landmark] : gt_landmark_dict) {
     // Populate map
-    local_to_global_landmark[local_landmark] = global_landmark;
+    const PointID global_landmark_id(global_robot_id, global_landmark_idx);
+    local_to_global_state_dicts.landmarks[local_landmark_id] =
+        global_landmark_id;
 
     // Increment
     global_landmark_idx++;
   }
   unsigned int global_unit_sphere_idx = 0;
-  const std::vector<RangeMeasurement> &rang_measurements =
-      pyfg_dataset.measurements.relative_measurements.GetRangeMeasurements();
-  for (const auto m : rang_measurements) {
-    // Set unit sphere indexes
-    PointID local_unit_sphere(m.r1, m.l);
-    PointID global_unit_sphere(global_robot_id, global_unit_sphere_idx);
-
+  for (const auto &[local_unit_sphere_id, unit_sphere] : gt_unit_sphere_dict) {
     // Populate map
-    local_to_global_unit_sphere[local_unit_sphere] = global_unit_sphere;
+    const PointID global_unit_sphere(global_robot_id, global_unit_sphere_idx);
+    local_to_global_state_dicts.unit_spheres[local_unit_sphere_id] =
+        global_unit_sphere;
 
     // Increment
     global_unit_sphere_idx++;
   }
+
+  return local_to_global_state_dicts;
+}
+
+Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
+  Measurements global_measurements;
+  const LocalToGlobalStateDicts local_to_global_state_dicts =
+      getLocalToGlobalStateMapping(pyfg_dataset);
 
   // Lambda function for globally reindexing relative measurements
   auto globallyReindexRelativeMeasurement = [](RelativeMeasurement &meas,
@@ -1041,8 +1107,10 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
           std::get<RelativePosePoseMeasurement>(m);
 
       // Get global pose ids
-      const StateID &global_pose_src_id = local_to_global_pose[meas.getSrcID()];
-      const StateID &global_pose_dst_id = local_to_global_pose[meas.getDstID()];
+      const StateID &global_pose_src_id =
+          local_to_global_state_dicts.poses.at(meas.getSrcID());
+      const StateID &global_pose_dst_id =
+          local_to_global_state_dicts.poses.at(meas.getDstID());
 
       // Reindex to global state ids
       globallyReindexRelativeMeasurement(meas, global_pose_src_id,
@@ -1056,9 +1124,10 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
           std::get<RelativePosePointMeasurement>(m);
 
       // Get global pose id for source and landmark id for destination
-      const StateID &global_pose_src_id = local_to_global_pose[meas.getSrcID()];
+      const StateID &global_pose_src_id =
+          local_to_global_state_dicts.poses.at(meas.getSrcID());
       const StateID &global_landmark_dst_id =
-          local_to_global_landmark[meas.getDstID()];
+          local_to_global_state_dicts.landmarks.at(meas.getDstID());
 
       // Reindex to global state ids
       globallyReindexRelativeMeasurement(meas, global_pose_src_id,
@@ -1075,25 +1144,31 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
       StateID global_state_src_id;
       executeStateDependantFunctionals(
           [&]() {
-            global_state_src_id = local_to_global_pose[meas.getSrcID()];
+            global_state_src_id =
+                local_to_global_state_dicts.poses.at(meas.getSrcID());
           },
           [&]() {
-            global_state_src_id = local_to_global_landmark[meas.getSrcID()];
+            global_state_src_id =
+                local_to_global_state_dicts.landmarks.at(meas.getSrcID());
           },
           meas.stateType1);
 
       StateID global_state_dst_id;
       executeStateDependantFunctionals(
           [&]() {
-            global_state_dst_id = local_to_global_pose[meas.getDstID()];
+            global_state_dst_id =
+                local_to_global_state_dicts.poses.at(meas.getDstID());
           },
           [&]() {
-            global_state_dst_id = local_to_global_landmark[meas.getDstID()];
+            global_state_dst_id =
+                local_to_global_state_dicts.landmarks.at(meas.getDstID());
           },
           meas.stateType2);
 
       // Reindex unit sphere variables
-      meas.l = local_to_global_unit_sphere[PointID(meas.r1, meas.l)].frame_id;
+      const PointID &unit_sphere_id = PointID(meas.r1, meas.l);
+      meas.l =
+          local_to_global_state_dicts.unit_spheres.at(unit_sphere_id).frame_id;
 
       // Reindex to global state ids
       globallyReindexRelativeMeasurement(meas, global_state_src_id,
@@ -1103,6 +1178,49 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
       global_measurements.relative_measurements.vec.push_back(meas);
     }
   }
+
+  // Note: global measurements will always be consecutively indexed from
+  // zero regardless of the sequencing of local measurements
+
+  // Initialize ground truth initialization
+  auto sumDictValues = [](const std::map<unsigned int, unsigned int> &map) {
+    return std::accumulate(
+        map.begin(), map.end(), 0,
+        [](int value, const std::pair<unsigned int, unsigned int> &p) {
+          return value + p.second;
+        });
+  };
+  unsigned int d = pyfg_dataset.dim;
+  unsigned int n = sumDictValues(pyfg_dataset.robot_id_to_num_poses);
+  unsigned int l = sumDictValues(pyfg_dataset.robot_id_to_num_unit_spheres);
+  unsigned int b = sumDictValues(pyfg_dataset.robot_id_to_num_landmarks);
+  RangeAidedArray ground_truth_init(d, n, l, b);
+
+  // Set ground truth initialization
+  for (const auto &[local_pose_id, pose] : pyfg_dataset.ground_truth.poses) {
+    const StateID &global_pose_id =
+        local_to_global_state_dicts.poses.at(local_pose_id);
+    ground_truth_init.GetLiftedPoseArray()->pose(global_pose_id.frame_id) =
+        pose.getData();
+  }
+  for (const auto &[local_landmark_id, landmark] :
+       pyfg_dataset.ground_truth.landmarks) {
+    const StateID &global_landmark_id =
+        local_to_global_state_dicts.landmarks.at(local_landmark_id);
+    ground_truth_init.GetLiftedLandmarkArray()->translation(
+        global_landmark_id.frame_id) = landmark.getData();
+  }
+  for (const auto &[local_unit_sphere_id, unit_sphere] :
+       pyfg_dataset.ground_truth.unit_spheres) {
+    const StateID &global_unit_sphere_id =
+        local_to_global_state_dicts.unit_spheres.at(local_unit_sphere_id);
+    ground_truth_init.GetLiftedUnitSphereArray()->translation(
+        global_unit_sphere_id.frame_id) = unit_sphere.getData();
+  }
+
+  // Set ground truth initialization in global measurements
+  global_measurements.ground_truth_init =
+      std::make_shared<RangeAidedArray>(ground_truth_init);
 
   return global_measurements;
 }
@@ -1202,6 +1320,51 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
           },
           m);
     }
+  }
+
+  for (const auto &robot_id : pyfg_dataset.robot_IDs) {
+    // Initialize ground truth initialization
+    unsigned int d = pyfg_dataset.dim;
+    unsigned int n = pyfg_dataset.robot_id_to_num_poses.at(robot_id);
+    unsigned int l = pyfg_dataset.robot_id_to_num_unit_spheres.at(robot_id);
+    unsigned int b = pyfg_dataset.robot_id_to_num_landmarks.at(robot_id);
+    RangeAidedArray ground_truth_init(d, n, l, b);
+
+    // Set ground truth initialization
+    for (const auto &[local_pose_id, pose] : pyfg_dataset.ground_truth.poses) {
+      if (local_pose_id.robot_id != robot_id)
+        continue;
+
+      // Reindex id and add to the ground truth initialization
+      unsigned int idx =
+          local_pose_id.frame_id - robot_first_pose_id.at(robot_id);
+      ground_truth_init.GetLiftedPoseArray()->pose(idx) = pose.getData();
+    }
+    for (const auto &[local_landmark_id, landmark] :
+         pyfg_dataset.ground_truth.landmarks) {
+      if (local_landmark_id.robot_id != robot_id)
+        continue;
+
+      // Reindex id and add to the ground truth initialization
+      unsigned int idx =
+          local_landmark_id.frame_id - robot_first_point_id.at(robot_id);
+      ground_truth_init.GetLiftedLandmarkArray()->translation(idx) =
+          landmark.getData();
+    }
+    for (const auto &[local_unit_sphere_id, unit_sphere] :
+         pyfg_dataset.ground_truth.unit_spheres) {
+      if (local_unit_sphere_id.robot_id != robot_id)
+        continue;
+
+      // Index id and add to the ground truth initialization
+      unsigned int idx = local_unit_sphere_id.frame_id;
+      ground_truth_init.GetLiftedUnitSphereArray()->translation(idx) =
+          unit_sphere.getData();
+    }
+
+    // Set ground truth initialization in robot measurements
+    robot_measurements[robot_id].ground_truth_init =
+        std::make_shared<RangeAidedArray>(ground_truth_init);
   }
 
   return robot_measurements;

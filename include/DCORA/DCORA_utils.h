@@ -98,6 +98,15 @@ int getDimFromPyfgFirstLine(const std::string &filename);
 PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
+ * @brief Helper function to get the local-to-global state indexes from a PyFG
+ * dataset
+ * @param pyfg_dataset
+ * @return
+ */
+LocalToGlobalStateDicts
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset);
+
+/**
  * @brief Helper function to globally reindex a PyFG dataset's measurements
  * @param pyfg_dataset
  * @return
@@ -113,7 +122,7 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset);
 RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset);
 
 /**
- * @brief Execute functionals based on state type
+ * @brief Execute functionals based on source and destination state type
  * @param poseFunction
  * @param pointFunction
  * @param state_type
