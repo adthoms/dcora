@@ -36,37 +36,27 @@ public:
   /**
    * @brief Destructor
    */
-  virtual ~LiftedSEVector();
+  ~LiftedSEVector();
   /**
    * @brief Get underlying ROPTLIB vector
    * @return
    */
-  virtual ROPTLIB::ProductElement *vec() { return MySEVector; }
+  ROPTLIB::ProductElement *vec() { return MySEVector; }
   /**
    * @brief Get data as Eigen matrix
    * @return
    */
-  virtual Matrix getData();
+  Matrix getData();
   /**
    * @brief Set data from Eigen matrix
    * @param X
    */
-  virtual void setData(const Matrix &X);
+  void setData(const Matrix &X);
   /**
    * @brief Set underlying ROPTLIB vector size
    * @return
    */
-  virtual void setSize();
-  /**
-   * @brief Set underlying ROPTLIB vector size from ROPTLIB product element size
-   * @param productElement
-   * @param row
-   * @param col
-   * @param num_el
-   */
-  static void setSizeFromProductElement(ROPTLIB::ProductElement *productElement,
-                                        unsigned int *row, unsigned int *col,
-                                        unsigned int *num_el);
+  void setSize();
 
 protected:
   unsigned int r_, d_, n_;
@@ -80,7 +70,7 @@ protected:
  * @brief This class acts as container for ROPTLIB::ProductElement vectors for
  * RA-SLAM synchronization
  */
-class LiftedRAVector : public LiftedSEVector {
+class LiftedRAVector {
 public:
   /**
    * @brief Constructor
@@ -95,34 +85,34 @@ public:
   /**
    * @brief Destructor
    */
-  ~LiftedRAVector() override;
+  ~LiftedRAVector();
   /**
    * @brief Get underlying ROPTLIB vector
    * @return
    */
-  ROPTLIB::ProductElement *vec() override { return MyRAVector; }
+  ROPTLIB::ProductElement *vec() { return MyRAVector; }
   /**
    * @brief Get data as Eigen matrix
    * @return
    */
-  Matrix getData() override;
+  Matrix getData();
   /**
    * @brief Set data from Eigen matrix
    * @param X
    */
-  void setData(const Matrix &X) override;
+  void setData(const Matrix &X);
   /**
    * @brief Set underlying ROPTLIB vector size
    * @return
    */
-  void setSize() override;
+  void setSize();
 
 private:
-  unsigned int l_, b_;
-  ROPTLIB::ObliqueVector *ObliqueRangeVector;
+  unsigned int r_, d_, n_, l_, b_;
+  ROPTLIB::StieVector *StiefelPoseVector;
+  ROPTLIB::ObliqueVector *ObliqueUnitSphereVector;
+  ROPTLIB::EucVector *EuclideanPoseVector;
   ROPTLIB::EucVector *EuclideanLandmarkVector;
-  ROPTLIB::ProductElement *MyOBVector;
-  ROPTLIB::ProductElement *MyEVector;
   ROPTLIB::ProductElement *MyRAVector;
 };
 
