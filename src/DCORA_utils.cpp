@@ -1767,6 +1767,12 @@ void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
   memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
 }
 
+void setSizeFromElement(ROPTLIB::Element *element, unsigned int *row,
+                        unsigned int *col) {
+  *row = static_cast<unsigned int>(element->Getsize()[0]);
+  *col = static_cast<unsigned int>(element->Getsize()[1]);
+}
+
 Matrix projectToSEMAtrix(const Matrix &M, unsigned int r, unsigned int d,
                          unsigned int n) {
   checkSEMatrixSize(M, r, d, n);

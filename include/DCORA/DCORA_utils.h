@@ -355,6 +355,15 @@ void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
                                       double mem_size);
 
 /**
+ * @brief Set underlying ROPTLIB vector size from ROPTLIB  element size
+ * @param element
+ * @param row
+ * @param col
+ */
+void setSizeFromElement(ROPTLIB::Element *element, unsigned int *row,
+                        unsigned int *col);
+
+/**
  * @brief Project matrix M to the SE manifold
  * @param M
  * @param r
