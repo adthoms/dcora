@@ -24,7 +24,7 @@ LiftedSEVariable::LiftedSEVariable(unsigned int r, unsigned int d,
       translation_var_(std::make_unique<ROPTLIB::EucVariable>(r)),
       pose_var_(std::make_unique<ROPTLIB::ProductElement>(
           2, rotation_var_.get(), 1, translation_var_.get(), 1)),
-      varSE_(std::make_shared<ROPTLIB::ProductElement>(1, pose_var_.get(), n)),
+      varSE_(std::make_unique<ROPTLIB::ProductElement>(1, pose_var_.get(), n)),
       X_SE_(const_cast<double *>(varSE_->ObtainWriteEntireData()), r,
             (d + 1) * n) {
   Matrix Yinit = Matrix::Zero(r_, d_);
@@ -54,7 +54,7 @@ LiftedSEVariable &LiftedSEVariable::operator=(const LiftedSEVariable &other) {
   translation_var_ = std::make_unique<ROPTLIB::EucVariable>(r_);
   pose_var_ = std::make_unique<ROPTLIB::ProductElement>(
       2, rotation_var_.get(), 1, translation_var_.get(), 1);
-  varSE_ = std::make_shared<ROPTLIB::ProductElement>(1, pose_var_.get(), n_);
+  varSE_ = std::make_unique<ROPTLIB::ProductElement>(1, pose_var_.get(), n_);
   new (&X_SE_) Eigen::Map<Matrix>(
       const_cast<double *>(varSE_->ObtainWriteEntireData()), r_, (d_ + 1) * n_);
   setData(other.getData());
@@ -67,6 +67,8 @@ void LiftedSEVariable::setData(const Matrix &X) {
   checkSEMatrixSize(X, r_, d_, n_);
   copyEigenMatrixToROPTLIBVariable(X, varSE_.get(), r_ * (d_ + 1) * n_);
 }
+
+void LiftedSEVariable::setRandomData() { varSE_.get()->RandInManifold(); }
 
 Eigen::Ref<Matrix> LiftedSEVariable::pose(unsigned int index) {
   CHECK(index < n_);
@@ -105,29 +107,32 @@ Vector LiftedSEVariable::translation(unsigned int index) const {
 LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d,
                                    unsigned int n, unsigned int l,
                                    unsigned int b)
-    : LiftedSEVariable(r, d, n),
+    : r_(r),
+      d_(d),
+      n_(n),
       l_(l),
       b_(b),
-      ranges_var_(std::make_unique<ROPTLIB::ObliqueVariable>(r, l)),
+      rotation_var_(std::make_unique<ROPTLIB::StieVariable>(r_, d_)),
+      unit_sphere_var_(std::make_unique<ROPTLIB::ObliqueVariable>(r, l)),
+      translation_var_(std::make_unique<ROPTLIB::EucVariable>(r_, n)),
       landmark_var_(std::make_unique<ROPTLIB::EucVariable>(r, b)),
-      varOB_(
-          std::make_unique<ROPTLIB::ProductElement>(1, ranges_var_.get(), 1)),
-      varE_(
-          std::make_unique<ROPTLIB::ProductElement>(1, landmark_var_.get(), 1)),
       varRA_(std::make_unique<ROPTLIB::ProductElement>(
-          3, varSE_.get(), 1, varOB_.get(), 1, varE_.get(), 1)),
-      X_OB_(const_cast<double *>(varOB_->ObtainWriteEntireData()), r, l),
-      X_E_(const_cast<double *>(varE_->ObtainWriteEntireData()), r, b),
+          4, rotation_var_.get(), n_, unit_sphere_var_.get(), 1,
+          translation_var_.get(), 1, landmark_var_.get(), 1)),
       X_RA_(const_cast<double *>(varRA_->ObtainWriteEntireData()), r,
             (d + 1) * n + l + b) {
+  Matrix Yinit = Matrix::Zero(r_, d_);
+  Yinit.block(0, 0, d_, d_) = Matrix::Identity(d_, d_);
+  for (unsigned int i = 0; i < n; ++i) {
+    rotation(i) = Yinit;
+    translation(i) = Vector::Zero(r_);
+  }
   for (unsigned int i = 0; i < l_; ++i) {
-    rangeUnitSphereVariable(i) = Vector::Zero(r_);
+    unitSphere(i) = Vector::Zero(r_);
   }
   for (unsigned int i = 0; i < b_; ++i) {
-    landmarkTranslation(i) = Vector::Zero(r_);
+    landmark(i) = Vector::Zero(r_);
   }
-  auto [X_SE_R, X_SE_t] = partitionSEMatrix(X_SE_, r, d, n);
-  X_RA_ = createRAMatrix(X_SE_R, X_OB_, X_SE_t, X_E_);
 }
 
 LiftedRAVariable::LiftedRAVariable(
@@ -144,19 +149,18 @@ LiftedRAVariable::LiftedRAVariable(const LiftedRAVariable &other)
 }
 
 LiftedRAVariable &LiftedRAVariable::operator=(const LiftedRAVariable &other) {
-  LiftedSEVariable::operator=(other);
+  r_ = other.r();
+  d_ = other.d();
+  n_ = other.n();
   l_ = other.l();
   b_ = other.b();
-  ranges_var_ = std::make_unique<ROPTLIB::ObliqueVariable>(r_, l_);
+  rotation_var_ = std::make_unique<ROPTLIB::StieVariable>(r_, d_);
+  unit_sphere_var_ = std::make_unique<ROPTLIB::ObliqueVariable>(r_, l_);
+  translation_var_ = std::make_unique<ROPTLIB::EucVariable>(r_, n_);
   landmark_var_ = std::make_unique<ROPTLIB::EucVariable>(r_, b_);
-  varOB_ = std::make_unique<ROPTLIB::ProductElement>(1, ranges_var_.get(), 1);
-  varE_ = std::make_unique<ROPTLIB::ProductElement>(1, landmark_var_.get(), 1);
   varRA_ = std::make_unique<ROPTLIB::ProductElement>(
-      3, varSE_.get(), 1, varOB_.get(), 1, varE_.get(), 1);
-  new (&X_OB_) Eigen::Map<Matrix>(
-      const_cast<double *>(varOB_->ObtainWriteEntireData()), r_, l_);
-  new (&X_E_) Eigen::Map<Matrix>(
-      const_cast<double *>(varE_->ObtainWriteEntireData()), r_, b_);
+      4, rotation_var_.get(), n_, unit_sphere_var_.get(), 1,
+      translation_var_.get(), 1, landmark_var_.get(), 1);
   new (&X_RA_)
       Eigen::Map<Matrix>(const_cast<double *>(varRA_->ObtainWriteEntireData()),
                          r_, (d_ + 1) * n_ + l_ + b_);
@@ -167,38 +171,67 @@ LiftedRAVariable &LiftedRAVariable::operator=(const LiftedRAVariable &other) {
 Matrix LiftedRAVariable::getData() const { return X_RA_; }
 
 void LiftedRAVariable::setData(const Matrix &X) {
-  auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(X, r_, d_, n_, l_, b_);
-  Matrix X_SE = createSEMatrix(X_SE_R, X_SE_t);
-  copyEigenMatrixToROPTLIBVariable(X_SE, varSE_.get(), r_ * (d_ + 1) * n_);
-  copyEigenMatrixToROPTLIBVariable(X_OB, varOB_.get(), r_ * l_);
-  copyEigenMatrixToROPTLIBVariable(X_E, varE_.get(), r_ * b_);
+  checkRAMatrixSize(X, r_, d_, n_, l_, b_);
   copyEigenMatrixToROPTLIBVariable(X, varRA_.get(),
                                    r_ * ((d_ + 1) * n_ + l_ + b_));
 }
 
-Eigen::Ref<Vector> LiftedRAVariable::landmarkTranslation(unsigned int index) {
-  CHECK(index < b_);
-  auto Xi = X_E_.block(0, index, r_, 1);
-  return Xi.col(0);
+void LiftedRAVariable::setRandomData() { varRA_.get()->RandInManifold(); }
+
+Eigen::Ref<Matrix> LiftedRAVariable::pose(unsigned int index) {
+  CHECK(index < n_);
+  Matrix X_SE(r_, d_ + 1);
+  X_SE.block(0, 0, r_, d_) = X_RA_.block(0, index * d_, r_, d_);
+  X_SE.block(0, d_, r_, 1) = X_RA_.col(index + (d_ * n_ + l_));
+  return Eigen::Ref<Matrix>(X_SE);
 }
 
-Vector LiftedRAVariable::landmarkTranslation(unsigned int index) const {
-  CHECK(index < b_);
-  auto Xi = X_E_.block(0, index, r_, 1);
-  return Xi.col(0);
+Matrix LiftedRAVariable::pose(unsigned int index) const {
+  CHECK(index < n_);
+  Matrix X_SE(r_, d_ + 1);
+  X_SE.block(0, 0, r_, d_) = X_RA_.block(0, index * d_, r_, d_);
+  X_SE.block(0, d_, r_, 1) = X_RA_.col(index + (d_ * n_ + l_));
+  return X_SE;
 }
 
-Eigen::Ref<Vector>
-LiftedRAVariable::rangeUnitSphereVariable(unsigned int index) {
+Eigen::Ref<Matrix> LiftedRAVariable::rotation(unsigned int index) {
+  CHECK(index < n_);
+  return X_RA_.block(0, index * d_, r_, d_);
+}
+
+Matrix LiftedRAVariable::rotation(unsigned int index) const {
+  CHECK(index < n_);
+  return X_RA_.block(0, index * d_, r_, d_);
+}
+
+Eigen::Ref<Vector> LiftedRAVariable::translation(unsigned int index) {
+  CHECK(index < n_);
+  return X_RA_.col(index + (d_ * n_ + l_));
+}
+
+Vector LiftedRAVariable::translation(unsigned int index) const {
+  CHECK(index < n_);
+  return X_RA_.col(index + (d_ * n_ + l_));
+}
+
+Eigen::Ref<Vector> LiftedRAVariable::unitSphere(unsigned int index) {
   CHECK(index < l_);
-  auto Xi = X_OB_.block(0, index, r_, 1);
-  return Xi.col(0);
+  return X_RA_.col(index + (d_ * n_));
 }
 
-Vector LiftedRAVariable::rangeUnitSphereVariable(unsigned int index) const {
+Vector LiftedRAVariable::unitSphere(unsigned int index) const {
   CHECK(index < l_);
-  auto Xi = X_OB_.block(0, index, r_, 1);
-  return Xi.col(0);
+  return X_RA_.col(index + (d_ * n_));
+}
+
+Eigen::Ref<Vector> LiftedRAVariable::landmark(unsigned int index) {
+  CHECK(index < b_);
+  return X_RA_.col(index + (d_ * n_ + l_ + n_));
+}
+
+Vector LiftedRAVariable::landmark(unsigned int index) const {
+  CHECK(index < b_);
+  return X_RA_.col(index + (d_ * n_ + l_ + n_));
 }
 
 } // namespace DCORA

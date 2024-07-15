@@ -72,19 +72,21 @@ public:
    * @brief Obtain the variable as an ROPTLIB::ProductElement
    * @return
    */
-  virtual ROPTLIB::ProductElement *var() { return varSE_.get(); }
+  ROPTLIB::ProductElement *var() { return varSE_.get(); }
   /**
    * @brief Obtain the variable as an Eigen matrix
    * @return r-by-(d+1)n matrix of the form: X = [Y1 p1 ... Yn pn]
    */
-  virtual Matrix getData() const;
+  Matrix getData() const;
   /**
    * @brief Set this variable from an Eigen matrix
    * @param X r-by-(d+1)n matrix of the form: X = [Y1 p1 ... Yn pn]
    */
-  virtual void setData(const Matrix &X);
-
-protected:
+  void setData(const Matrix &X);
+  /**
+   * @brief Set this variable as a random Eigen matrix in the SE manifold
+   */
+  void setRandomData();
   /**
    * @brief Obtain the writable pose at the specified index, expressed as an
    * r-by-(d+1) matrix
@@ -128,13 +130,15 @@ protected:
    */
   Vector translation(unsigned int index) const;
 
+private:
   // const dimensions
   unsigned int r_, d_, n_;
   // The actual variable content is stored inside a ROPTLIB::ProductElement
   std::unique_ptr<ROPTLIB::StieVariable> rotation_var_;
   std::unique_ptr<ROPTLIB::EucVariable> translation_var_;
   std::unique_ptr<ROPTLIB::ProductElement> pose_var_;
-  std::shared_ptr<ROPTLIB::ProductElement> varSE_;
+  std::unique_ptr<ROPTLIB::ProductElement> varSE_;
+
   // Internal view of the variable:
   // SE(n) domain as an eigen matrix of dimension r-by-(d+1)n
   Eigen::Map<Matrix> X_SE_;
@@ -146,7 +150,7 @@ protected:
  * X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
  * that can be used by ROPTLIB to perform Riemannian optimization
  */
-class LiftedRAVariable : public LiftedSEVariable {
+class LiftedRAVariable {
 public:
   /**
    * @brief Constructor
@@ -175,7 +179,22 @@ public:
    */
   LiftedRAVariable &operator=(const LiftedRAVariable &other);
   /**
-   * @brief Get number of ranges
+   * @brief Get relaxation rank
+   * @return
+   */
+  unsigned int r() const { return r_; }
+  /**
+   * @brief Get dimension
+   * @return
+   */
+  unsigned int d() const { return d_; }
+  /**
+   * @brief Get number of poses
+   * @return
+   */
+  unsigned int n() const { return n_; }
+  /**
+   * @brief Get number of unit spheres
    * @return
    */
   unsigned int l() const { return l_; }
@@ -188,63 +207,106 @@ public:
    * @brief Obtain the variable as an ROPTLIB::ProductElement
    * @return
    */
-  ROPTLIB::ProductElement *var() override { return varRA_.get(); }
+  ROPTLIB::ProductElement *var() { return varRA_.get(); }
   /**
    * @brief Obtain the variable as an Eigen matrix
    * @return r-by-(d+1)n+l+b matrix of the form:
    * X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
    */
-  Matrix getData() const override;
+  Matrix getData() const;
   /**
    * @brief Set this variable from an Eigen matrix
    * @param X r-by-(d+1)n+l+b matrix of the form:
    * X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
    */
-  void setData(const Matrix &X) override;
+  void setData(const Matrix &X);
   /**
-   * @brief Obtain the writable landmark translation at the specified index,
+   * @brief Set this variable as a random Eigen matrix in the RA manifold
+   */
+  void setRandomData();
+  /**
+   * @brief Obtain the writable pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Matrix> pose(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
+   * @param index
+   * @return
+   */
+  Matrix pose(unsigned int index) const;
+  /**
+   * @brief Obtain the writable pose rotation at the specified index, expressed
+   * as an r-by-d matrix
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Matrix> rotation(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose rotation at the specified index, expressed
+   * as an r-by-d matrix
+   * @param index
+   * @return
+   */
+  Matrix rotation(unsigned int index) const;
+  /**
+   * @brief Obtain the writable pose translation at the specified index,
    * expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Eigen::Ref<Vector> landmarkTranslation(unsigned int index);
+  Eigen::Ref<Vector> translation(unsigned int index);
   /**
-   * @brief Obtain the read-only landmark translation at the specified index,
+   * @brief Obtain the read-only pose translation at the specified index,
    * expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Vector landmarkTranslation(unsigned int index) const;
+  Vector translation(unsigned int index) const;
   /**
    * @brief Obtain the writable unit-sphere auxiliary variable for a range
    * measurement at the specified index, expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Eigen::Ref<Vector> rangeUnitSphereVariable(unsigned int index);
+  Eigen::Ref<Vector> unitSphere(unsigned int index);
   /**
    * @brief Obtain the read-only unit-sphere auxiliary variable at the specified
    * index, expressed as an r dimensional vector
    * @param index
    * @return
    */
-  Vector rangeUnitSphereVariable(unsigned int index) const;
+  Vector unitSphere(unsigned int index) const;
+  /**
+   * @brief Obtain the writable landmark translation at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> landmark(unsigned int index);
+  /**
+   * @brief Obtain the read-only landmark translation at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector landmark(unsigned int index) const;
 
 private:
   // const dimensions
-  unsigned int l_, b_;
+  unsigned int r_, d_, n_, l_, b_;
   // The actual variable content is stored inside a ROPTLIB::ProductElement
-  std::unique_ptr<ROPTLIB::ObliqueVariable> ranges_var_;
+  std::unique_ptr<ROPTLIB::StieVariable> rotation_var_;
+  std::unique_ptr<ROPTLIB::ObliqueVariable> unit_sphere_var_;
+  std::unique_ptr<ROPTLIB::EucVariable> translation_var_;
   std::unique_ptr<ROPTLIB::EucVariable> landmark_var_;
-  std::unique_ptr<ROPTLIB::ProductElement> varOB_;
-  std::unique_ptr<ROPTLIB::ProductElement> varE_;
   std::unique_ptr<ROPTLIB::ProductElement> varRA_;
+
   // Internal view of the variable:
-  // ranges as an eigen matrix of dimension r-by-l
-  Eigen::Map<Matrix> X_OB_;
-  // landmarks as an eigen matrix of dimension r-by-b
-  Eigen::Map<Matrix> X_E_;
-  // RA-SLAM domain as an eigen matrix of dimension r-by-(d+1)n+l+b
+  // RA-SLAM domain as an eigen matrix of dimension r-by-[(d+1)n + l + b]
   Eigen::Map<Matrix> X_RA_;
 };
 
