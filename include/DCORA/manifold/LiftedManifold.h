@@ -36,20 +36,20 @@ public:
   /**
    * @brief Destructor
    */
-  virtual ~LiftedSEManifold();
+  ~LiftedSEManifold();
   /**
    * @brief Get the underlying ROPTLIB product manifold
    * @return
    */
-  virtual ROPTLIB::ProductManifold *getManifold() { return MySEManifold; }
+  ROPTLIB::ProductManifold *getManifold() { return MySEManifold; }
   /**
    * @brief Utility function to project a given matrix onto this manifold
    * @param M
    * @return orthogonal projection of M onto this manifold
    */
-  virtual Matrix project(const Matrix &M) const;
+  Matrix project(const Matrix &M);
 
-protected:
+private:
   unsigned int r_, d_, n_;
   ROPTLIB::Stiefel *StiefelManifold;
   ROPTLIB::Euclidean *EuclideanManifold;
@@ -61,14 +61,14 @@ protected:
  * @brief This class represents a manifold for the RA-SLAM synchronization
  * problem
  */
-class LiftedRAManifold : public LiftedSEManifold {
+class LiftedRAManifold {
 public:
   /**
    * @brief Constructor
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param l number of ranges
+   * @param l number of unit spheres
    * @param b number of landmarks
    */
   LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n,
@@ -76,22 +76,24 @@ public:
   /**
    * @brief Destructor
    */
-  ~LiftedRAManifold() override;
+  ~LiftedRAManifold();
   /**
    * @brief Get the underlying ROPTLIB product manifold
    * @return
    */
-  ROPTLIB::ProductManifold *getManifold() override { return MyRAManifold; }
+  ROPTLIB::ProductManifold *getManifold() { return MyRAManifold; }
   /**
    * @brief Utility function to project a given matrix onto this manifold
    * @param M
    * @return orthogonal projection of M onto this manifold
    */
-  Matrix project(const Matrix &M) const override;
+  Matrix project(const Matrix &M);
 
 private:
-  unsigned int l_, b_;
-  ROPTLIB::Oblique *ObliqueManifold;
+  unsigned int r_, d_, n_, l_, b_;
+  ROPTLIB::Stiefel *StiefelPoseManifold;
+  ROPTLIB::Oblique *ObliqueUnitSphereManifold;
+  ROPTLIB::Euclidean *EuclideanPoseManifold;
   ROPTLIB::Euclidean *EuclideanLandmarkManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };

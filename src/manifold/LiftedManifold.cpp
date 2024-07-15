@@ -34,40 +34,35 @@ LiftedSEManifold::~LiftedSEManifold() {
   delete MySEManifold;
 }
 
-Matrix LiftedSEManifold::project(const Matrix &M) const {
-  checkSEMatrixSize(M, r_, d_, n_);
-  Matrix X = M;
-#pragma omp parallel for
-  for (size_t i = 0; i < n_; ++i) {
-    X.block(0, i * (d_ + 1), r_, d_) =
-        projectToStiefelManifold(X.block(0, i * (d_ + 1), r_, d_));
-  }
-  return X;
+Matrix LiftedSEManifold::project(const Matrix &M) {
+  return projectToSEMAtrix(M, r_, d_, n_);
 }
 
 LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d,
                                    unsigned int n, unsigned int l,
                                    unsigned int b)
-    : LiftedSEManifold(r, d, n), l_(l), b_(b) {
-  ObliqueManifold = new ROPTLIB::Oblique(r, l);
+    : r_(r), d_(d), n_(n), l_(l), b_(b) {
+  StiefelPoseManifold = new ROPTLIB::Stiefel(r, d);
+  StiefelPoseManifold->ChooseStieParamsSet3();
+  ObliqueUnitSphereManifold = new ROPTLIB::Oblique(r, l);
+  EuclideanPoseManifold = new ROPTLIB::Euclidean(r, n);
   EuclideanLandmarkManifold = new ROPTLIB::Euclidean(r, b);
   MyRAManifold = new ROPTLIB::ProductManifold(
-      3, CartanManifold, n, ObliqueManifold, 1, EuclideanLandmarkManifold, 1);
+      4, StiefelPoseManifold, n, ObliqueUnitSphereManifold, 1,
+      EuclideanPoseManifold, 1, EuclideanLandmarkManifold, 1);
 }
 
 LiftedRAManifold::~LiftedRAManifold() {
   // Avoid memory leak
-  delete ObliqueManifold;
+  delete StiefelPoseManifold;
+  delete ObliqueUnitSphereManifold;
+  delete EuclideanPoseManifold;
   delete EuclideanLandmarkManifold;
   delete MyRAManifold;
 }
 
-Matrix LiftedRAManifold::project(const Matrix &M) const {
-  auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(M, r_, d_, n_, l_, b_);
-  Matrix X_SE_proj = LiftedSEManifold::project(createSEMatrix(X_SE_R, X_SE_t));
-  auto [X_SE_R_proj, X_SE_t_proj] = partitionSEMatrix(X_SE_proj, r_, d_, n_);
-  return createRAMatrix(X_SE_R_proj, projectToObliqueManifold(X_OB),
-                        X_SE_t_proj, X_E);
+Matrix LiftedRAManifold::project(const Matrix &M) {
+  return projectToRAMatrix(M, r_, d_, n_, l_, b_);
 }
 
 } // namespace DCORA
