@@ -201,6 +201,48 @@ Matrix projectToStiefelManifold(const Matrix &M);
 Matrix projectToObliqueManifold(const Matrix &M);
 
 /**
+ * @brief Helper function to compute and return the product
+ *
+ *   P = A * SymBlockDiag(B^T * C)
+ *
+ * where A, B, and C are r × dn matrices (cf. eq. (5) in the SE-Sync tech
+ * report).
+ * @param A
+ * @param B
+ * @param C
+ * @param r
+ * @param d
+ * @param n
+ */
+Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
+                           unsigned int r, unsigned int d, unsigned int n);
+
+/**
+ * @brief Given an element Y in M and a matrix V in T_X(R^{r × dn}) (that is, a
+ * (r × dn)-dimensional matrix V considered as an element of the tangent space
+ * to the *entire* ambient Euclidean space at X), this function computes and
+ * returns the projection of V onto T_X(M), the tangent space of M at X (cf.
+ * eq. (42) in the SE-Sync tech report). Matrices Y and V are r × dn
+ * @param Y
+ * @param V
+ * @param r
+ * @param d
+ * @param n
+ */
+Matrix projectToTangentSpaceStiefelManifold(const Matrix &Y, const Matrix &V,
+                                            unsigned int r, unsigned int d,
+                                            unsigned int n);
+
+/**
+ * @brief Projects a matrix V in R^{r × l} onto the tangent space T_Y(M) of
+ * the oblique manifold at Y in R^{r × l}.
+ * @param V
+ * @param Y
+ * @return
+ */
+Matrix projectToTangentSpaceObliqueManifold(const Matrix &Y, const Matrix &V);
+
+/**
  * @brief Generate a fixed element of the Stiefel element
  * The returned value is guaranteed to be the same for each r and d
  * @param r

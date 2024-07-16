@@ -1628,6 +1628,44 @@ Matrix projectToObliqueManifold(const Matrix &M) {
   return X;
 }
 
+Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
+                           unsigned int r, unsigned int d, unsigned int n) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+  Matrix R(r, d * n);
+  Matrix P(d, d);
+  Matrix S(d, d);
+  for (auto i = 0; i < n; ++i) {
+    auto start_col = static_cast<Eigen::Index>(i * d);
+    P = BT.block(start_col, 0, d, r) * C.block(0, start_col, r, d);
+    S = .5 * (P + P.transpose());
+    R.block(0, start_col, r, d) = A.block(0, start_col, r, d) * S;
+  }
+  return R;
+}
+
+Matrix projectToTangentSpaceStiefelManifold(const Matrix &Y, const Matrix &V,
+                                            unsigned int r, unsigned int d,
+                                            unsigned int n) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+  return V - symBlockDiagProduct(Y, Y.transpose(), V, r, d, n);
+}
+
+Matrix projectToTangentSpaceObliqueManifold(const Matrix &Y, const Matrix &V) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+  Vector inner_prods = (Y.array() * V.array()).colwise().sum();
+  Matrix scaled_cols = Y.array().rowwise() * inner_prods.transpose().array();
+  return V - scaled_cols;
+}
+
 Matrix fixedStiefelVariable(unsigned r, unsigned d) {
   std::srand(1);
   return randomStiefelVariable(r, d);
