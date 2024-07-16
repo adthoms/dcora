@@ -78,6 +78,11 @@ LiftedPoseArray::LiftedPoseArray(unsigned int r, unsigned int d, unsigned int n)
   }
 }
 
+void LiftedPoseArray::setRandomData() {
+  Matrix M = Matrix::Random(r_, (d_ + 1) * n_);
+  X_ = projectToSEMatrix(M, r_, d_, n_);
+}
+
 void LiftedPoseArray::checkData() const {
   for (unsigned i = 0; i < n_; ++i) {
     checkStiefelMatrix(rotation(i));
@@ -160,6 +165,16 @@ void LiftedRangeAidedArray::setData(const Matrix &X) {
   poses_->setData(createSEMatrix(X_SE_R, X_SE_t));
   unit_spheres_->setData(X_OB);
   landmarks_->setData(X_E);
+}
+
+void LiftedRangeAidedArray::setRandomData() {
+  Matrix M = Matrix::Random(r_, (d_ + 1) * n_);
+  Matrix X_SE_rand = projectToSEMatrix(M, r_, d_, n_);
+  Matrix X_OB_rand = randomObliqueVariable(r_, l_);
+  Matrix X_E_rand = randomEuclideanVariable(r_, b_);
+  poses_->setData(X_SE_rand);
+  unit_spheres_->setData(X_OB_rand);
+  landmarks_->setData(X_E_rand);
 }
 
 void LiftedRangeAidedArray::setDataToZero() {

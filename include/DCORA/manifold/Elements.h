@@ -122,6 +122,10 @@ public:
    */
   LiftedPoseArray(unsigned int r, unsigned int d, unsigned int n);
   /**
+   * @brief Set the underlying Eigen matrix as random in the SE manifold
+   */
+  void setRandomData();
+  /**
    * @brief Check that the stored data are valid
    */
   void checkData() const;
@@ -235,6 +239,10 @@ public:
    * @param X
    */
   void setData(const Matrix &X);
+  /**
+   * @brief Set the underlying Eigen matrix as random in the RA manifold
+   */
+  void setRandomData();
   /**
    * @brief Set the underlying Eigen matrices of encapsulated arrays to zero
    */
