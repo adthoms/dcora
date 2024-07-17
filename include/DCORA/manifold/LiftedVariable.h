@@ -204,6 +204,16 @@ public:
    */
   unsigned int b() const { return b_; }
   /**
+   * @brief Return true if the oblique variable is empty. False otherwise.
+   * @return
+   */
+  bool isObliqueVariableEmpty() const { return is_oblique_var_empty_; }
+  /**
+   * @brief Return true if the landmark variable is empty. False otherwise.
+   * @return
+   */
+  bool isLandmarkVariableEmpty() const { return is_landmark_var_empty_; }
+  /**
    * @brief Obtain the variable as an ROPTLIB::ProductElement
    * @return
    */
@@ -298,6 +308,8 @@ public:
 private:
   // const dimensions
   unsigned int r_, d_, n_, l_, b_;
+  // Bools for determining if oblique and landmark variables are empty
+  bool is_oblique_var_empty_, is_landmark_var_empty_;
   // The actual variable content is stored inside a ROPTLIB::ProductElement
   std::unique_ptr<ROPTLIB::StieVariable> rotation_var_;
   std::unique_ptr<ROPTLIB::ObliqueVariable> unit_sphere_var_;

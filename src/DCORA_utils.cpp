@@ -1637,7 +1637,7 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
   Matrix R(r, d * n);
   Matrix P(d, d);
   Matrix S(d, d);
-  for (auto i = 0; i < n; ++i) {
+  for (unsigned int i = 0; i < n; ++i) {
     auto start_col = static_cast<Eigen::Index>(i * d);
     P = BT.block(start_col, 0, d, r) * C.block(0, start_col, r, d);
     S = .5 * (P + P.transpose());
@@ -1682,18 +1682,27 @@ Matrix fixedObliqueVariable(unsigned r, unsigned l) {
 }
 
 Matrix randomStiefelVariable(unsigned r, unsigned d) {
+  if (d == 0) {
+    return Matrix::Zero(r, 0);
+  }
   ROPTLIB::StieVariable var(r, d);
   var.RandInManifold();
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, d);
 }
 
 Matrix randomEuclideanVariable(unsigned r, unsigned b) {
+  if (b == 0) {
+    return Matrix::Zero(r, 0);
+  }
   ROPTLIB::EucVariable var(r, b);
   var.RandInManifold();
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, b);
 }
 
 Matrix randomObliqueVariable(unsigned r, unsigned l) {
+  if (l == 0) {
+    return Matrix::Zero(r, 0);
+  }
   ROPTLIB::ObliqueVariable var(r, l);
   var.RandInManifold();
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, l);

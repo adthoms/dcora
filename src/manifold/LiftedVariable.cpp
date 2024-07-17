@@ -65,7 +65,8 @@ Matrix LiftedSEVariable::getData() const { return X_SE_; }
 
 void LiftedSEVariable::setData(const Matrix &X) {
   checkSEMatrixSize(X, r_, d_, n_);
-  copyEigenMatrixToROPTLIBVariable(X, varSE_.get(), r_ * (d_ + 1) * n_);
+  size_t mem_size = r_ * (d_ + 1) * n_;
+  copyEigenMatrixToROPTLIBVariable(X, varSE_.get(), mem_size);
 }
 
 void LiftedSEVariable::setRandomData() { varSE_.get()->RandInManifold(); }
@@ -112,13 +113,48 @@ LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d,
       n_(n),
       l_(l),
       b_(b),
+      is_oblique_var_empty_(false),
+      is_landmark_var_empty_(false),
       rotation_var_(std::make_unique<ROPTLIB::StieVariable>(r_, d_)),
-      unit_sphere_var_(std::make_unique<ROPTLIB::ObliqueVariable>(r, l)),
       translation_var_(std::make_unique<ROPTLIB::EucVariable>(r_, n)),
-      landmark_var_(std::make_unique<ROPTLIB::EucVariable>(r, b)),
-      varRA_(std::make_unique<ROPTLIB::ProductElement>(
-          4, rotation_var_.get(), n, unit_sphere_var_.get(), 1,
-          translation_var_.get(), 1, landmark_var_.get(), 1)),
+      unit_sphere_var_([&] {
+        if (l > 0) {
+          return std::make_unique<ROPTLIB::ObliqueVariable>(r, l);
+        } else {
+          // Initialize dummy variable and set flag
+          is_oblique_var_empty_ = true;
+          return std::make_unique<ROPTLIB::ObliqueVariable>(r, 1);
+        }
+      }()),
+      landmark_var_([&] {
+        if (b > 0) {
+          return std::make_unique<ROPTLIB::EucVariable>(r, b);
+        } else {
+          // Initialize dummy variable and set flag
+          is_landmark_var_empty_ = true;
+          return std::make_unique<ROPTLIB::EucVariable>(r, 1);
+        }
+      }()),
+      varRA_([&] {
+        if (!is_oblique_var_empty_ && !is_landmark_var_empty_) {
+          return std::make_unique<ROPTLIB::ProductElement>(
+              4, rotation_var_.get(), n, unit_sphere_var_.get(), 1,
+              translation_var_.get(), 1, landmark_var_.get(), 1);
+        } else if (!is_oblique_var_empty_ && is_landmark_var_empty_) {
+          return std::make_unique<ROPTLIB::ProductElement>(
+              3, rotation_var_.get(), n, unit_sphere_var_.get(), 1,
+              translation_var_.get(), 1);
+        } else if (is_oblique_var_empty_ && !is_landmark_var_empty_) {
+          return std::make_unique<ROPTLIB::ProductElement>(
+              3, rotation_var_.get(), n, translation_var_.get(), 1,
+              landmark_var_.get(), 1);
+        } else {
+          CHECK(is_oblique_var_empty_);
+          CHECK(is_landmark_var_empty_);
+          return std::make_unique<ROPTLIB::ProductElement>(
+              2, rotation_var_.get(), n, translation_var_.get(), 1);
+        }
+      }()),
       X_RA_(const_cast<double *>(varRA_->ObtainWriteEntireData()), r,
             (d + 1) * n + l + b) {
   Matrix Yinit = Matrix::Zero(r_, d_);
@@ -154,13 +190,37 @@ LiftedRAVariable &LiftedRAVariable::operator=(const LiftedRAVariable &other) {
   n_ = other.n();
   l_ = other.l();
   b_ = other.b();
+  is_oblique_var_empty_ = other.isObliqueVariableEmpty();
+  is_landmark_var_empty_ = other.isLandmarkVariableEmpty();
   rotation_var_ = std::make_unique<ROPTLIB::StieVariable>(r_, d_);
-  unit_sphere_var_ = std::make_unique<ROPTLIB::ObliqueVariable>(r_, l_);
   translation_var_ = std::make_unique<ROPTLIB::EucVariable>(r_, n_);
-  landmark_var_ = std::make_unique<ROPTLIB::EucVariable>(r_, b_);
-  varRA_ = std::make_unique<ROPTLIB::ProductElement>(
-      4, rotation_var_.get(), n_, unit_sphere_var_.get(), 1,
-      translation_var_.get(), 1, landmark_var_.get(), 1);
+
+  // Construct additional variables if not empty
+  if (!is_oblique_var_empty_)
+    unit_sphere_var_ = std::make_unique<ROPTLIB::ObliqueVariable>(r_, l_);
+  if (!is_landmark_var_empty_)
+    landmark_var_ = std::make_unique<ROPTLIB::EucVariable>(r_, b_);
+
+  // Construct RA variable
+  if (!is_oblique_var_empty_ && !is_landmark_var_empty_) {
+    varRA_ = std::make_unique<ROPTLIB::ProductElement>(
+        4, rotation_var_.get(), n_, unit_sphere_var_.get(), 1,
+        translation_var_.get(), 1, landmark_var_.get(), 1);
+  } else if (!is_oblique_var_empty_ && is_landmark_var_empty_) {
+    varRA_ = std::make_unique<ROPTLIB::ProductElement>(
+        3, rotation_var_.get(), n_, unit_sphere_var_.get(), 1,
+        translation_var_.get(), 1);
+  } else if (is_oblique_var_empty_ && !is_landmark_var_empty_) {
+    varRA_ = std::make_unique<ROPTLIB::ProductElement>(
+        3, rotation_var_.get(), n_, translation_var_.get(), 1,
+        landmark_var_.get(), 1);
+  } else {
+    CHECK(is_oblique_var_empty_);
+    CHECK(is_landmark_var_empty_);
+    varRA_ = std::make_unique<ROPTLIB::ProductElement>(
+        2, rotation_var_.get(), n_, translation_var_.get(), 1);
+  }
+
   new (&X_RA_)
       Eigen::Map<Matrix>(const_cast<double *>(varRA_->ObtainWriteEntireData()),
                          r_, (d_ + 1) * n_ + l_ + b_);
@@ -172,8 +232,8 @@ Matrix LiftedRAVariable::getData() const { return X_RA_; }
 
 void LiftedRAVariable::setData(const Matrix &X) {
   checkRAMatrixSize(X, r_, d_, n_, l_, b_);
-  copyEigenMatrixToROPTLIBVariable(X, varRA_.get(),
-                                   r_ * ((d_ + 1) * n_ + l_ + b_));
+  size_t mem_size = r_ * ((d_ + 1) * n_ + l_ + b_);
+  copyEigenMatrixToROPTLIBVariable(X, varRA_.get(), mem_size);
 }
 
 void LiftedRAVariable::setRandomData() { varRA_.get()->RandInManifold(); }

@@ -100,8 +100,8 @@ public:
 private:
   unsigned int r_, d_, n_, l_, b_;
   ROPTLIB::StieVector *StiefelPoseVector;
-  ROPTLIB::ObliqueVector *ObliqueUnitSphereVector;
   ROPTLIB::EucVector *EuclideanPoseVector;
+  ROPTLIB::ObliqueVector *ObliqueUnitSphereVector;
   ROPTLIB::EucVector *EuclideanLandmarkVector;
   ROPTLIB::ProductElement *MyRAVector;
 };

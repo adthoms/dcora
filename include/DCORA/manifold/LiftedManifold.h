@@ -110,8 +110,8 @@ public:
 private:
   unsigned int r_, d_, n_, l_, b_;
   ROPTLIB::Stiefel *StiefelPoseManifold;
-  ROPTLIB::Oblique *ObliqueUnitSphereManifold;
   ROPTLIB::Euclidean *EuclideanPoseManifold;
+  ROPTLIB::Oblique *ObliqueUnitSphereManifold;
   ROPTLIB::Euclidean *EuclideanLandmarkManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };

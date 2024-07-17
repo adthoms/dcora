@@ -46,19 +46,45 @@ LiftedRAVector::LiftedRAVector(unsigned int r, unsigned int d, unsigned int n,
                                unsigned int l, unsigned int b)
     : r_(r), d_(d), n_(n), l_(l), b_(b) {
   StiefelPoseVector = new ROPTLIB::StieVector(r, d);
-  ObliqueUnitSphereVector = new ROPTLIB::ObliqueVector(r, l);
   EuclideanPoseVector = new ROPTLIB::EucVector(r, n);
-  EuclideanLandmarkVector = new ROPTLIB::EucVector(r, b);
-  MyRAVector = new ROPTLIB::ProductElement(
-      4, StiefelPoseVector, n, ObliqueUnitSphereVector, 1, EuclideanPoseVector,
-      1, EuclideanLandmarkVector, 1);
+  ObliqueUnitSphereVector = nullptr;
+  EuclideanLandmarkVector = nullptr;
+
+  // Construct additional vectors if not empty
+  if (l > 0)
+    ObliqueUnitSphereVector = new ROPTLIB::ObliqueVector(r, l);
+  if (b > 0)
+    EuclideanLandmarkVector = new ROPTLIB::EucVector(r, b);
+
+  // Construct RA manifold
+  if (ObliqueUnitSphereVector != nullptr &&
+      EuclideanLandmarkVector != nullptr) {
+    MyRAVector = new ROPTLIB::ProductElement(
+        4, StiefelPoseVector, n, ObliqueUnitSphereVector, 1,
+        EuclideanPoseVector, 1, EuclideanLandmarkVector, 1);
+  } else if (ObliqueUnitSphereVector != nullptr &&
+             EuclideanLandmarkVector == nullptr) {
+    MyRAVector = new ROPTLIB::ProductElement(3, StiefelPoseVector, n,
+                                             ObliqueUnitSphereVector, 1,
+                                             EuclideanPoseVector, 1);
+  } else if (ObliqueUnitSphereVector == nullptr &&
+             EuclideanLandmarkVector != nullptr) {
+    MyRAVector = new ROPTLIB::ProductElement(3, StiefelPoseVector, n,
+                                             EuclideanPoseVector, 1,
+                                             EuclideanLandmarkVector, 1);
+  } else {
+    CHECK_EQ(ObliqueUnitSphereVector, nullptr);
+    CHECK_EQ(EuclideanLandmarkVector, nullptr);
+    MyRAVector = new ROPTLIB::ProductElement(2, StiefelPoseVector, n,
+                                             EuclideanPoseVector, 1);
+  }
 }
 
 LiftedRAVector::~LiftedRAVector() {
   // Avoid memory leak
   delete StiefelPoseVector;
-  delete ObliqueUnitSphereVector;
   delete EuclideanPoseVector;
+  delete ObliqueUnitSphereVector;
   delete EuclideanLandmarkVector;
   delete MyRAVector;
 }

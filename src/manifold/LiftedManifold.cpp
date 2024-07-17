@@ -50,20 +50,49 @@ LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d,
     : r_(r), d_(d), n_(n), l_(l), b_(b) {
   StiefelPoseManifold = new ROPTLIB::Stiefel(r, d);
   StiefelPoseManifold->ChooseStieParamsSet3();
-  ObliqueUnitSphereManifold = new ROPTLIB::Oblique(r, l);
-  ObliqueUnitSphereManifold->ChooseObliqueParamsSet3();
   EuclideanPoseManifold = new ROPTLIB::Euclidean(r, n);
-  EuclideanLandmarkManifold = new ROPTLIB::Euclidean(r, b);
-  MyRAManifold = new ROPTLIB::ProductManifold(
-      4, StiefelPoseManifold, n, ObliqueUnitSphereManifold, 1,
-      EuclideanPoseManifold, 1, EuclideanLandmarkManifold, 1);
+  ObliqueUnitSphereManifold = nullptr;
+  EuclideanLandmarkManifold = nullptr;
+
+  // Construct additional manifolds if not empty
+  if (l > 0) {
+    ObliqueUnitSphereManifold = new ROPTLIB::Oblique(r, l);
+    ObliqueUnitSphereManifold->ChooseObliqueParamsSet3();
+  }
+  if (b > 0) {
+    EuclideanLandmarkManifold = new ROPTLIB::Euclidean(r, b);
+  }
+
+  // Construct RA manifold
+  if (ObliqueUnitSphereManifold != nullptr &&
+      EuclideanLandmarkManifold != nullptr) {
+    MyRAManifold = new ROPTLIB::ProductManifold(
+        4, StiefelPoseManifold, n, ObliqueUnitSphereManifold, 1,
+        EuclideanPoseManifold, 1, EuclideanLandmarkManifold, 1);
+
+  } else if (ObliqueUnitSphereManifold != nullptr &&
+             EuclideanLandmarkManifold == nullptr) {
+    MyRAManifold = new ROPTLIB::ProductManifold(3, StiefelPoseManifold, n,
+                                                ObliqueUnitSphereManifold, 1,
+                                                EuclideanPoseManifold, 1);
+  } else if (ObliqueUnitSphereManifold == nullptr &&
+             EuclideanLandmarkManifold != nullptr) {
+    MyRAManifold = new ROPTLIB::ProductManifold(3, StiefelPoseManifold, n,
+                                                EuclideanPoseManifold, 1,
+                                                EuclideanLandmarkManifold, 1);
+  } else {
+    CHECK_EQ(ObliqueUnitSphereManifold, nullptr);
+    CHECK_EQ(EuclideanLandmarkManifold, nullptr);
+    MyRAManifold = new ROPTLIB::ProductManifold(2, StiefelPoseManifold, n,
+                                                EuclideanPoseManifold, 1);
+  }
 }
 
 LiftedRAManifold::~LiftedRAManifold() {
   // Avoid memory leak
   delete StiefelPoseManifold;
-  delete ObliqueUnitSphereManifold;
   delete EuclideanPoseManifold;
+  delete ObliqueUnitSphereManifold;
   delete EuclideanLandmarkManifold;
   delete MyRAManifold;
 }
