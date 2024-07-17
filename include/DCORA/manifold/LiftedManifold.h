@@ -48,6 +48,15 @@ public:
    * @return orthogonal projection of M onto this manifold
    */
   Matrix project(const Matrix &M);
+  /**
+   * @brief Utility function to project a matrix v onto the tangent space T_Y(M)
+   * of the manifold at point x using ROBOTLIB containers.
+   * @param x
+   * @param v
+   * @param result
+   */
+  void projectToTangentSpace(ROPTLIB::Variable *x, ROPTLIB::Vector *v,
+                             ROPTLIB::Vector *result);
 
 private:
   unsigned int r_, d_, n_;
@@ -88,6 +97,15 @@ public:
    * @return orthogonal projection of M onto this manifold
    */
   Matrix project(const Matrix &M);
+  /**
+   * @brief Utility function to project a matrix v onto the tangent space T_Y(M)
+   * of the manifold at point x using ROBOTLIB containers.
+   * @param x
+   * @param v
+   * @param result
+   */
+  void projectToTangentSpace(ROPTLIB::Variable *x, ROPTLIB::Vector *v,
+                             ROPTLIB::Vector *result);
 
 private:
   unsigned int r_, d_, n_, l_, b_;

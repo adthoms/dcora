@@ -34,8 +34,14 @@ LiftedSEManifold::~LiftedSEManifold() {
   delete MySEManifold;
 }
 
+void LiftedSEManifold::projectToTangentSpace(ROPTLIB::Variable *x,
+                                             ROPTLIB::Vector *v,
+                                             ROPTLIB::Vector *result) {
+  MySEManifold->Projection(x, v, result);
+}
+
 Matrix LiftedSEManifold::project(const Matrix &M) {
-  return projectToSEMAtrix(M, r_, d_, n_);
+  return projectToSEMatrix(M, r_, d_, n_);
 }
 
 LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d,
@@ -63,6 +69,35 @@ LiftedRAManifold::~LiftedRAManifold() {
 
 Matrix LiftedRAManifold::project(const Matrix &M) {
   return projectToRAMatrix(M, r_, d_, n_, l_, b_);
+}
+
+void LiftedRAManifold::projectToTangentSpace(ROPTLIB::Variable *x,
+                                             ROPTLIB::Vector *v,
+                                             ROPTLIB::Vector *result) {
+  MyRAManifold->Projection(x, v, result);
+
+  /**
+   * @brief Correcting the tangent space projection method for the oblique
+   * manifold
+   *
+   * In ROPTLIB, the Oblique manifold's tangent space projection function is
+   * incorrect, as tested against CORA. As such we manually correct for it here,
+   * noting other potential bugs in the library that may have to be addressed
+   * later when updating the Quadratic optimizer and solver.
+   */
+  unsigned int k = (d_ + 1) * n_ + l_ + b_;
+  Eigen::Map<const DCORA::Matrix> Y(const_cast<double *>(x->ObtainReadData()),
+                                    r_, k);
+  Eigen::Map<const DCORA::Matrix> V(const_cast<double *>(v->ObtainReadData()),
+                                    r_, k);
+  Eigen::Map<DCORA::Matrix> R(
+      const_cast<double *>(result->ObtainWriteEntireData()), r_, k);
+
+  // Project to Oblique Manifold
+  Matrix Y_OB = Y.block(0, d_ * n_, r_, l_);
+  Matrix V_OB = V.block(0, d_ * n_, r_, l_);
+  R.block(0, d_ * n_, r_, l_) =
+      DCORA::projectToObliqueManifoldTangentSpace(Y_OB, V_OB);
 }
 
 } // namespace DCORA

@@ -177,7 +177,7 @@ if(BUILD_DCORA_TESTS)
     tests/testUtils.cpp
     tests/testCORA.cpp
     tests/testElements.cpp
-    tests/testEigenMap.cpp
+    tests/testManifold.cpp
     tests/testConstruction.cpp
     tests/testLineGraph.cpp
     tests/testTriangleGraph.cpp

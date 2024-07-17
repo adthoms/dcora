@@ -1646,7 +1646,7 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
   return R;
 }
 
-Matrix projectToTangentSpaceStiefelManifold(const Matrix &Y, const Matrix &V,
+Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
                                             unsigned int r, unsigned int d,
                                             unsigned int n) {
   /*
@@ -1656,7 +1656,7 @@ Matrix projectToTangentSpaceStiefelManifold(const Matrix &Y, const Matrix &V,
   return V - symBlockDiagProduct(Y, Y.transpose(), V, r, d, n);
 }
 
-Matrix projectToTangentSpaceObliqueManifold(const Matrix &Y, const Matrix &V) {
+Matrix projectToObliqueManifoldTangentSpace(const Matrix &Y, const Matrix &V) {
   /*
   The following implementation is adapted from:
   CORA: https://github.com/MarineRoboticsGroup/cora
@@ -1799,7 +1799,7 @@ Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB,
 }
 
 void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
-                                      double memSize) {
+                                      size_t memSize) {
   const double *matrix_data = Y.data();
   double *prodvar_data = var->ObtainWriteEntireData();
   memcpy(prodvar_data, matrix_data, sizeof(double) * memSize);
@@ -1811,7 +1811,7 @@ void setSizeFromElement(ROPTLIB::Element *element, unsigned int *row,
   *col = static_cast<unsigned int>(element->Getsize()[1]);
 }
 
-Matrix projectToSEMAtrix(const Matrix &M, unsigned int r, unsigned int d,
+Matrix projectToSEMatrix(const Matrix &M, unsigned int r, unsigned int d,
                          unsigned int n) {
   checkSEMatrixSize(M, r, d, n);
   Matrix X = M;
@@ -1826,7 +1826,7 @@ Matrix projectToSEMAtrix(const Matrix &M, unsigned int r, unsigned int d,
 Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
                          unsigned int n, unsigned int l, unsigned int b) {
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(M, r, d, n, l, b);
-  Matrix X_SE_proj = projectToSEMAtrix(createSEMatrix(X_SE_R, X_SE_t), r, d, n);
+  Matrix X_SE_proj = projectToSEMatrix(createSEMatrix(X_SE_R, X_SE_t), r, d, n);
   auto [X_SE_R_proj, X_SE_t_proj] = partitionSEMatrix(X_SE_proj, r, d, n);
   return createRAMatrix(X_SE_R_proj, projectToObliqueManifold(X_OB),
                         X_SE_t_proj, X_E);

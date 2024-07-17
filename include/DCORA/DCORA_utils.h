@@ -229,7 +229,7 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
  * @param d
  * @param n
  */
-Matrix projectToTangentSpaceStiefelManifold(const Matrix &Y, const Matrix &V,
+Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
                                             unsigned int r, unsigned int d,
                                             unsigned int n);
 
@@ -240,7 +240,7 @@ Matrix projectToTangentSpaceStiefelManifold(const Matrix &Y, const Matrix &V,
  * @param Y
  * @return
  */
-Matrix projectToTangentSpaceObliqueManifold(const Matrix &Y, const Matrix &V);
+Matrix projectToObliqueManifoldTangentSpace(const Matrix &Y, const Matrix &V);
 
 /**
  * @brief Generate a fixed element of the Stiefel element
@@ -394,7 +394,7 @@ Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB,
  * @param mem_size
  */
 void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
-                                      double mem_size);
+                                      size_t mem_size);
 
 /**
  * @brief Set underlying ROPTLIB vector size from ROPTLIB  element size
@@ -413,7 +413,7 @@ void setSizeFromElement(ROPTLIB::Element *element, unsigned int *row,
  * @param n
  * @return
  */
-Matrix projectToSEMAtrix(const Matrix &M, unsigned int r, unsigned int d,
+Matrix projectToSEMatrix(const Matrix &M, unsigned int r, unsigned int d,
                          unsigned int n);
 
 /**

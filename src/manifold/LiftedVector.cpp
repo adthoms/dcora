@@ -14,7 +14,8 @@
 
 namespace DCORA {
 
-LiftedSEVector::LiftedSEVector(unsigned int r, unsigned int d, unsigned int n) {
+LiftedSEVector::LiftedSEVector(unsigned int r, unsigned int d, unsigned int n)
+    : r_(r), d_(d), n_(n) {
   StiefelVector = new ROPTLIB::StieVector(r, d);
   EuclideanVector = new ROPTLIB::EucVector(r);
   CartanVector =
@@ -31,23 +32,19 @@ LiftedSEVector::~LiftedSEVector() {
 }
 
 Matrix LiftedSEVector::getData() {
-  setSize();
   return Eigen::Map<Matrix>(const_cast<double *>(MySEVector->ObtainReadData()),
                             r_, (d_ + 1) * n_);
 }
-void LiftedSEVector::setData(const Matrix &X) {
-  setSize();
-  checkSEMatrixSize(X, r_, d_, n_);
-  copyEigenMatrixToROPTLIBVariable(X, MySEVector, r_ * (d_ + 1) * n_);
-}
 
-void LiftedSEVector::setSize() {
-  setSizeFromElement(StiefelVector, &r_, &d_);
-  n_ = static_cast<unsigned int>(MySEVector->GetNumofElement());
+void LiftedSEVector::setData(const Matrix &X) {
+  checkSEMatrixSize(X, r_, d_, n_);
+  size_t mem_size = r_ * (d_ + 1) * n_;
+  copyEigenMatrixToROPTLIBVariable(X, MySEVector, mem_size);
 }
 
 LiftedRAVector::LiftedRAVector(unsigned int r, unsigned int d, unsigned int n,
-                               unsigned int l, unsigned int b) {
+                               unsigned int l, unsigned int b)
+    : r_(r), d_(d), n_(n), l_(l), b_(b) {
   StiefelPoseVector = new ROPTLIB::StieVector(r, d);
   ObliqueUnitSphereVector = new ROPTLIB::ObliqueVector(r, l);
   EuclideanPoseVector = new ROPTLIB::EucVector(r, n);
@@ -67,23 +64,14 @@ LiftedRAVector::~LiftedRAVector() {
 }
 
 Matrix LiftedRAVector::getData() {
-  setSize();
   return Eigen::Map<Matrix>(const_cast<double *>(MyRAVector->ObtainReadData()),
                             r_, (d_ + 1) * n_ + l_ + b_);
 }
 
 void LiftedRAVector::setData(const Matrix &X) {
-  setSize();
   checkRAMatrixSize(X, r_, d_, n_, l_, b_);
-  copyEigenMatrixToROPTLIBVariable(X, MyRAVector,
-                                   r_ * ((d_ + 1) * n_ + l_ + b_));
-}
-
-void LiftedRAVector::setSize() {
-  setSizeFromElement(StiefelPoseVector, &r_, &d_);
-  setSizeFromElement(EuclideanPoseVector, &r_, &n_);
-  setSizeFromElement(EuclideanLandmarkVector, &r_, &b_);
-  l_ = static_cast<unsigned int>(ObliqueUnitSphereVector->GetNumofElement());
+  size_t mem_size = r_ * ((d_ + 1) * n_ + l_ + b_);
+  copyEigenMatrixToROPTLIBVariable(X, MyRAVector, mem_size);
 }
 
 } // namespace DCORA

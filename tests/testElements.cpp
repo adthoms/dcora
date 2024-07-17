@@ -38,6 +38,10 @@ TEST(testDCORA, testLiftedPoseArray) {
     DCORA::LiftedPoseArray var3(r, d, n);
     var3 = var;
     ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+    // Test random data
+    var.setRandomData();
+    DCORA::Matrix Y = var.getData();
+    ASSERT_LE((DCORA::projectToSEMatrix(Y, r, d, n) - Y).norm(), 1e-6);
   }
 }
 
@@ -102,6 +106,10 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
     DCORA::LiftedRangeAidedArray var3(r, d, n, l, b);
     var3 = var;
     ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+    // Test random data
+    var.setRandomData();
+    DCORA::Matrix Y = var.getData();
+    ASSERT_LE((DCORA::projectToRAMatrix(Y, r, d, n, l, b) - Y).norm(), 1e-6);
   }
 }
 

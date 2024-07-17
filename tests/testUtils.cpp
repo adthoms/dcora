@@ -12,8 +12,11 @@
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_solver.h>
 #include <DCORA/DCORA_types.h>
+#include <DCORA/DCORA_utils.h>
 #include <DCORA/Graph.h>
 #include <DCORA/manifold/LiftedManifold.h>
+#include <DCORA/manifold/LiftedVariable.h>
+#include <DCORA/manifold/LiftedVector.h>
 
 #include <iostream>
 #include <random>
@@ -96,7 +99,7 @@ TEST(testDCORA, testProjectToSEMAtrix) {
   int r = 5;
   int n = 100;
   DCORA::Matrix M = DCORA::Matrix::Random(r, (d + 1) * n);
-  DCORA::Matrix X = DCORA::projectToSEMAtrix(M, r, d, n);
+  DCORA::Matrix X = DCORA::projectToSEMatrix(M, r, d, n);
   DCORA::Matrix I = DCORA::Matrix::Identity(d, d);
   ASSERT_EQ(X.rows(), r);
   ASSERT_EQ(X.cols(), (d + 1) * n);
@@ -266,4 +269,22 @@ TEST(testDCORA, testCreateRAMatrix) {
       ASSERT_EQ(var_X_RA(i, j), X_RA(i, j));
     }
   }
+}
+
+TEST(testDCORA, testSetSizeFromElement) {
+  int d = 3;
+  int r = 5;
+  int n = 3;
+  std::unique_ptr<ROPTLIB::StieVector> StiefelVector =
+      std::make_unique<ROPTLIB::StieVector>(r, d);
+  std::unique_ptr<ROPTLIB::EucVector> EuclideanVector =
+      std::make_unique<ROPTLIB::EucVector>(r, n);
+
+  unsigned int row, col;
+  DCORA::setSizeFromElement(StiefelVector.get(), &row, &col);
+  ASSERT_EQ(row, r);
+  ASSERT_EQ(col, d);
+  DCORA::setSizeFromElement(EuclideanVector.get(), &row, &col);
+  ASSERT_EQ(row, r);
+  ASSERT_EQ(col, n);
 }

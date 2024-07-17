@@ -52,11 +52,6 @@ public:
    * @param X
    */
   void setData(const Matrix &X);
-  /**
-   * @brief Set underlying ROPTLIB vector size
-   * @return
-   */
-  void setSize();
 
 protected:
   unsigned int r_, d_, n_;
@@ -101,11 +96,6 @@ public:
    * @param X
    */
   void setData(const Matrix &X);
-  /**
-   * @brief Set underlying ROPTLIB vector size
-   * @return
-   */
-  void setSize();
 
 private:
   unsigned int r_, d_, n_, l_, b_;

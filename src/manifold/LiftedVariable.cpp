@@ -117,7 +117,7 @@ LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d,
       translation_var_(std::make_unique<ROPTLIB::EucVariable>(r_, n)),
       landmark_var_(std::make_unique<ROPTLIB::EucVariable>(r, b)),
       varRA_(std::make_unique<ROPTLIB::ProductElement>(
-          4, rotation_var_.get(), n_, unit_sphere_var_.get(), 1,
+          4, rotation_var_.get(), n, unit_sphere_var_.get(), 1,
           translation_var_.get(), 1, landmark_var_.get(), 1)),
       X_RA_(const_cast<double *>(varRA_->ObtainWriteEntireData()), r,
             (d + 1) * n + l + b) {
