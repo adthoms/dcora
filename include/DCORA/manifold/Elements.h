@@ -248,6 +248,76 @@ public:
    */
   void setDataToZero();
   /**
+   * @brief Obtain the writable pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Matrix> pose(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
+   * @param index
+   * @return
+   */
+  Matrix pose(unsigned int index) const;
+  /**
+   * @brief Obtain the writable pose rotation at the specified index, expressed
+   * as an r-by-d matrix
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Matrix> rotation(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose rotation at the specified index, expressed
+   * as an r-by-d matrix
+   * @param index
+   * @return
+   */
+  Matrix rotation(unsigned int index) const;
+  /**
+   * @brief Obtain the writable pose translation at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> translation(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose translation at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector translation(unsigned int index) const;
+  /**
+   * @brief Obtain the writable unit-sphere auxiliary variable, expressed as an
+   * r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> unitSphere(unsigned int index);
+  /**
+   * @brief Obtain the read-only unit-sphere auxiliary variable, expressed as an
+   * r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector unitSphere(unsigned int index) const;
+  /**
+   * @brief Obtain the writable landmark at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> landmark(unsigned int index);
+  /**
+   * @brief Obtain the read-only landmark at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector landmark(unsigned int index) const;
+  /**
    * @brief Get "lifted" pose array
    * @return
    */

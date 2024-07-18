@@ -1200,22 +1200,21 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
   for (const auto &[local_pose_id, pose] : pyfg_dataset.ground_truth.poses) {
     const StateID &global_pose_id =
         local_to_global_state_dicts.poses.at(local_pose_id);
-    ground_truth_init.GetLiftedPoseArray()->pose(global_pose_id.frame_id) =
-        pose.getData();
+    ground_truth_init.pose(global_pose_id.frame_id) = pose.getData();
   }
   for (const auto &[local_landmark_id, landmark] :
        pyfg_dataset.ground_truth.landmarks) {
     const StateID &global_landmark_id =
         local_to_global_state_dicts.landmarks.at(local_landmark_id);
-    ground_truth_init.GetLiftedLandmarkArray()->translation(
-        global_landmark_id.frame_id) = landmark.getData();
+    ground_truth_init.landmark(global_landmark_id.frame_id) =
+        landmark.getData();
   }
   for (const auto &[local_unit_sphere_id, unit_sphere] :
        pyfg_dataset.ground_truth.unit_spheres) {
     const StateID &global_unit_sphere_id =
         local_to_global_state_dicts.unit_spheres.at(local_unit_sphere_id);
-    ground_truth_init.GetLiftedUnitSphereArray()->translation(
-        global_unit_sphere_id.frame_id) = unit_sphere.getData();
+    ground_truth_init.unitSphere(global_unit_sphere_id.frame_id) =
+        unit_sphere.getData();
   }
 
   // Set ground truth initialization in global measurements
@@ -1338,7 +1337,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
       // Reindex id and add to the ground truth initialization
       unsigned int idx =
           local_pose_id.frame_id - robot_first_pose_id.at(robot_id);
-      ground_truth_init.GetLiftedPoseArray()->pose(idx) = pose.getData();
+      ground_truth_init.pose(idx) = pose.getData();
     }
     for (const auto &[local_landmark_id, landmark] :
          pyfg_dataset.ground_truth.landmarks) {
@@ -1348,8 +1347,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
       // Reindex id and add to the ground truth initialization
       unsigned int idx =
           local_landmark_id.frame_id - robot_first_point_id.at(robot_id);
-      ground_truth_init.GetLiftedLandmarkArray()->translation(idx) =
-          landmark.getData();
+      ground_truth_init.landmark(idx) = landmark.getData();
     }
     for (const auto &[local_unit_sphere_id, unit_sphere] :
          pyfg_dataset.ground_truth.unit_spheres) {
@@ -1358,8 +1356,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
 
       // Index id and add to the ground truth initialization
       unsigned int idx = local_unit_sphere_id.frame_id;
-      ground_truth_init.GetLiftedUnitSphereArray()->translation(idx) =
-          unit_sphere.getData();
+      ground_truth_init.unitSphere(idx) = unit_sphere.getData();
     }
 
     // Set ground truth initialization in robot measurements

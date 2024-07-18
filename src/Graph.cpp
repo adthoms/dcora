@@ -1499,7 +1499,7 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborPoseToLocalPose();
-      G.GetLiftedPoseArray()->pose(i) += L_pose;
+      G.pose(i) += L_pose;
     } else {
       CHECK(j != IDX_NOT_SET);
       // Get neighbor's fixed lifted pose
@@ -1517,7 +1517,7 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborPoseToLocalPose();
-      G.GetLiftedPoseArray()->pose(j) += L_pose;
+      G.pose(j) += L_pose;
     }
   }
 
@@ -1558,7 +1558,7 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborLandmarkToLocalPose();
-      G.GetLiftedPoseArray()->pose(i) += L_pose;
+      G.pose(i) += L_pose;
     } else {
       CHECK(j != IDX_NOT_SET);
       // Get neighbor's fixed lifted pose
@@ -1574,7 +1574,7 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborPoseToLocalLandmark();
-      G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+      G.landmark(j) += L_landmark;
     }
   }
 
@@ -1626,16 +1626,16 @@ bool Graph::constructLinearCostTermRASLAM() {
         // Assign linear cost to local pose or landmark
         if (localSrcStateID.isPose()) {
           updateLinearCostFromFixedNeighborPoseToLocalPose();
-          G.GetLiftedPoseArray()->pose(i) += L_pose;
+          G.pose(i) += L_pose;
         } else {
           CHECK(localSrcStateID.isPoint());
           updateLinearCostFromFixedNeighborPoseToLocalLandmark();
-          G.GetLiftedLandmarkArray()->translation(i) += L_landmark;
+          G.landmark(i) += L_landmark;
         }
 
         // Assign linear cost to local unit sphere variable
         updateLinearCostFromFixedNeighborPoseToLocalUnitSphere();
-        G.GetLiftedUnitSphereArray()->translation(l) += L_unit_sphere;
+        G.unitSphere(l) += L_unit_sphere;
 
       } else {
         CHECK(neighborDstStateID.isPoint());
@@ -1646,16 +1646,16 @@ bool Graph::constructLinearCostTermRASLAM() {
         // Assign linear cost to local pose or landmark
         if (localSrcStateID.isPose()) {
           updateLinearCostFromFixedNeighborLandmarkToLocalPose();
-          G.GetLiftedPoseArray()->pose(i) += L_pose;
+          G.pose(i) += L_pose;
         } else {
           CHECK(localSrcStateID.isPoint());
           updateLinearCostFromFixedNeighborLandmarkToLocalLandmark();
-          G.GetLiftedLandmarkArray()->translation(i) += L_landmark;
+          G.landmark(i) += L_landmark;
         }
 
         // Assign linear cost to local unit sphere variable
         updateLinearCostFromFixedNeighborLandmarkToLocalUnitSphere();
-        G.GetLiftedUnitSphereArray()->translation(l) += L_unit_sphere;
+        G.unitSphere(l) += L_unit_sphere;
       }
 
       /**
@@ -1691,11 +1691,11 @@ bool Graph::constructLinearCostTermRASLAM() {
         // Assign linear cost to local pose or landmark
         if (localDstStateID.isPose()) {
           updateLinearCostFromFixedNeighborPoseToLocalPose();
-          G.GetLiftedPoseArray()->pose(j) += L_pose;
+          G.pose(j) += L_pose;
         } else {
           CHECK(localDstStateID.isPoint());
           updateLinearCostFromFixedNeighborPoseToLocalLandmark();
-          G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+          G.landmark(j) += L_landmark;
         }
 
       } else {
@@ -1707,11 +1707,11 @@ bool Graph::constructLinearCostTermRASLAM() {
         // Assign linear cost to local pose or landmark
         if (localDstStateID.isPose()) {
           updateLinearCostFromFixedNeighborLandmarkToLocalPose();
-          G.GetLiftedPoseArray()->pose(j) += L_pose;
+          G.pose(j) += L_pose;
         } else {
           CHECK(localDstStateID.isPoint());
           updateLinearCostFromFixedNeighborLandmarkToLocalLandmark();
-          G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+          G.landmark(j) += L_landmark;
         }
       }
 
@@ -1741,11 +1741,11 @@ bool Graph::constructLinearCostTermRASLAM() {
       // Add measurement contribution to linear cost
       if (localDstStateID.isPose()) {
         updateLinearCostFromFixedNeighborUnitSphereToLocalPose();
-        G.GetLiftedPoseArray()->pose(j) += L_pose;
+        G.pose(j) += L_pose;
       } else {
         CHECK(localDstStateID.isPoint());
         updateLinearCostFromFixedNeighborUnitSphereToLocalLandmark();
-        G.GetLiftedLandmarkArray()->translation(j) += L_landmark;
+        G.landmark(j) += L_landmark;
       }
     }
   }

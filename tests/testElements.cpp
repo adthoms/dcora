@@ -24,6 +24,9 @@ TEST(testDCORA, testLiftedPoseArray) {
     DCORA::LiftedPoseArray var(r, d, n);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
+      auto Y = DCORA::randomStiefelVariable(r, d + 1);
+      var.pose(i) = Y;
+      ASSERT_LE((Y - var.pose(i)).norm(), 1e-6);
       auto Yi = DCORA::randomStiefelVariable(r, d);
       auto pi = DCORA::randomEuclideanVariable(r);
       var.rotation(i) = Yi;
@@ -77,27 +80,25 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
     DCORA::LiftedRangeAidedArray var(r, d, n, l, b);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
-      // Poses
+      auto Y = DCORA::randomStiefelVariable(r, d + 1);
+      var.pose(i) = Y;
+      ASSERT_LE((Y - var.pose(i)).norm(), 1e-6);
       auto Yi = DCORA::randomStiefelVariable(r, d);
       auto pi = DCORA::randomEuclideanVariable(r);
-      var.GetLiftedPoseArray()->rotation(i) = Yi;
-      var.GetLiftedPoseArray()->translation(i) = pi;
-      ASSERT_LE((Yi - var.GetLiftedPoseArray()->rotation(i)).norm(), 1e-6);
-      ASSERT_LE((pi - var.GetLiftedPoseArray()->translation(i)).norm(), 1e-6);
+      var.rotation(i) = Yi;
+      var.translation(i) = pi;
+      ASSERT_LE((Yi - var.rotation(i)).norm(), 1e-6);
+      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
     }
     for (int i = 0; i < l; ++i) {
-      // Unit spheres
       auto ri = DCORA::randomObliqueVariable(r);
-      var.GetLiftedUnitSphereArray()->translation(i) = ri;
-      ASSERT_LE((ri - var.GetLiftedUnitSphereArray()->translation(i)).norm(),
-                1e-6);
+      var.unitSphere(i) = ri;
+      ASSERT_LE((ri - var.unitSphere(i)).norm(), 1e-6);
     }
     for (int i = 0; i < b; ++i) {
-      // Landmarks
       auto li = DCORA::randomEuclideanVariable(r);
-      var.GetLiftedLandmarkArray()->translation(i) = li;
-      ASSERT_LE((li - var.GetLiftedLandmarkArray()->translation(i)).norm(),
-                1e-6);
+      var.landmark(i) = li;
+      ASSERT_LE((li - var.landmark(i)).norm(), 1e-6);
     }
     // Test copy constructor
     DCORA::LiftedRangeAidedArray var2(var);

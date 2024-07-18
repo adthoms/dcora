@@ -277,28 +277,28 @@ public:
    */
   Vector translation(unsigned int index) const;
   /**
-   * @brief Obtain the writable unit-sphere auxiliary variable for a range
-   * measurement at the specified index, expressed as an r dimensional vector
+   * @brief Obtain the writable unit-sphere auxiliary variable, expressed as an
+   * r dimensional vector
    * @param index
    * @return
    */
   Eigen::Ref<Vector> unitSphere(unsigned int index);
   /**
-   * @brief Obtain the read-only unit-sphere auxiliary variable at the specified
-   * index, expressed as an r dimensional vector
+   * @brief Obtain the read-only unit-sphere auxiliary variable, expressed as an
+   * r dimensional vector
    * @param index
    * @return
    */
   Vector unitSphere(unsigned int index) const;
   /**
-   * @brief Obtain the writable landmark translation at the specified index,
+   * @brief Obtain the writable landmark at the specified index,
    * expressed as an r dimensional vector
    * @param index
    * @return
    */
   Eigen::Ref<Vector> landmark(unsigned int index);
   /**
-   * @brief Obtain the read-only landmark translation at the specified index,
+   * @brief Obtain the read-only landmark at the specified index,
    * expressed as an r dimensional vector
    * @param index
    * @return
