@@ -400,7 +400,7 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
   // Log initial trajectory
   if (mParams.logData) {
     mLogger.logTrajectory(dimension(), num_poses(), T.getData(),
-                          "trajectory_initial.csv");
+                          "trajectory_initial.txt");
   }
 
   if (optimizationHalted)
@@ -485,7 +485,7 @@ void PGOAgent::reset() {
     Matrix T;
     if (getTrajectoryInGlobalFrame(&T)) {
       mLogger.logTrajectory(dimension(), num_poses(), T,
-                            "trajectory_optimized.csv");
+                            "trajectory_optimized.txt");
       std::cout << "Saved optimized trajectory to " << mParams.logDirectory
                 << std::endl;
     }

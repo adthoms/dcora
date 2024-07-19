@@ -21,21 +21,21 @@
 
 namespace DCORA {
 
-class PGOLogger {
+class Logger {
 public:
   /**
    * @brief Constructor
    * @param logDir directory to store all log files
    */
-  explicit PGOLogger(std::string logDir);
+  explicit Logger(std::string logDir);
 
   /**
    * @brief Destructor
    */
-  ~PGOLogger() = default;
+  ~Logger() = default;
 
   /**
-   * @brief Log trajectory to file (currently only work for 3D data)
+   * @brief Log trajectory to file
    * @param d dimension (2 or 3)
    * @param n number of poses
    * @param T d-by-(d+1)*n matrix where each d-by-(d+1) block represents a pose
@@ -45,28 +45,20 @@ public:
                      const std::string &filename);
 
   /**
-   * @brief Log measurements to file (currently only work for 3D data)
-   * @param measurements a vector of relative pose measurements
+   * @brief Log pose-pose measurements to file
+   * @param measurements
    * @param filename
    */
   void logMeasurements(std::vector<RelativePosePoseMeasurement> *measurements,
                        const std::string &filename);
 
   /**
-   * @brief Load trajectory from file
+   * @brief Log relative measurements to file
+   * @param measurements
    * @param filename
-   * @return
    */
-  Matrix loadTrajectory(const std::string &filename);
-
-  /**
-   * @brief Read a list of measurements from file
-   * @param filename
-   * @param load_weight
-   * @return
-   */
-  static std::vector<RelativePosePoseMeasurement>
-  loadMeasurements(const std::string &filename, bool load_weight = false);
+  void logMeasurements(RelativeMeasurements *measurements,
+                       const std::string &filename);
 
 private:
   std::string logDirectory;

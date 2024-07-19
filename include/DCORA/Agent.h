@@ -643,7 +643,7 @@ protected:
   ROPTResult mLocalOptResult;
 
   // Logging
-  PGOLogger mLogger;
+  Logger mLogger;
 
   // Store status of peer agents
   std::unordered_map<unsigned, PGOAgentStatus> mTeamStatus;

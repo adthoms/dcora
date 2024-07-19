@@ -16,9 +16,9 @@
 
 namespace DCORA {
 
-PGOLogger::PGOLogger(std::string logDir) : logDirectory(std::move(logDir)) {}
+Logger::Logger(std::string logDir) : logDirectory(std::move(logDir)) {}
 
-void PGOLogger::logMeasurements(
+void Logger::logMeasurements(
     std::vector<RelativePosePoseMeasurement> *measurements,
     const std::string &filename) {
   if (measurements->empty())
@@ -61,10 +61,41 @@ void PGOLogger::logMeasurements(
   file.close();
 }
 
-void PGOLogger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
-                              const std::string &filename) {
-  if (d == 2)
+void Logger::logMeasurements(RelativeMeasurements *measurements,
+                             const std::string &filename) {
+  if (measurements->vec.empty())
     return;
+
+  std::ofstream file;
+  file.open(logDirectory + filename);
+  if (!file.is_open())
+    return;
+
+  const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
+      measurements->GetRelativePosePoseMeasurements();
+  const std::vector<RelativePosePointMeasurement> &pose_point_measurements =
+      measurements->GetRelativePosePointMeasurements();
+  const std::vector<RangeMeasurement> &range_measurements =
+      measurements->GetRangeMeasurements();
+
+  for (const auto &meas : pose_pose_measurements) {
+    file << "Pose-Pose Measurements\n";
+    file << meas << "\n";
+  }
+  for (const auto &meas : pose_point_measurements) {
+    file << "Pose-Point Measurements\n";
+    file << meas << "\n";
+  }
+  for (const auto &meas : range_measurements) {
+    file << "Range Measurements\n";
+    file << meas << "\n";
+  }
+
+  file.close();
+}
+
+void Logger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
+                           const std::string &filename) {
   CHECK_EQ(T.rows(), d);
   CHECK_EQ(T.cols(), (d + 1) * n);
   std::ofstream file;
@@ -72,169 +103,33 @@ void PGOLogger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
   if (!file.is_open())
     return;
 
-  // Insert header row
-  file << "pose_index,qx,qy,qz,qw,tx,ty,tz\n";
+  auto getTranslationAndQuaternion =
+      [&d](const Matrix &T) -> std::pair<Eigen::Vector3d, Eigen::Quaterniond> {
+    Eigen::Matrix3d R = Matrix::Identity(3, 3);
+    Eigen::Vector3d t = Matrix::Zero(3, 1);
+    if (d == 2) {
+      R.topLeftCorner<2, 2>() = T.block<2, 2>(0, 0);
+      t.head<2>() = T.block<2, 1>(0, 2);
+    } else {
+      CHECK_EQ(d, 3);
+      R = T.block<3, 3>(0, 0);
+      t = T.block<3, 1>(0, 3);
+    }
+    Eigen::Quaterniond quat(R);
+    return {t, quat};
+  };
 
+  file << "# pose_index x y z qx qy qz qw\n";
   for (size_t i = 0; i < n; ++i) {
-    Eigen::Matrix3d R = T.block(0, i * (d + 1), d, d);
-    Eigen::Quaternion<double> quat(R);
-    Matrix t = T.block(0, i * (d + 1) + d, d, 1);
-    file << i << ",";
-    file << quat.x() << ",";
-    file << quat.y() << ",";
-    file << quat.z() << ",";
-    file << quat.w() << ",";
-    file << t(0) << ",";
-    file << t(1) << ",";
-    file << t(2) << "\n";
+    Matrix Ti = T.block(0, i * (d + 1), d, d + 1);
+    auto [t, quat] = getTranslationAndQuaternion(Ti);
+    file << i << " " << std::fixed << std::setprecision(9);
+    file << t.x() << " " << t.y() << " " << t.z() << " ";
+    file << quat.x() << " " << quat.y() << " " << quat.z() << " " << quat.w()
+         << "\n";
   }
 
   file.close();
-}
-
-Matrix PGOLogger::loadTrajectory(const std::string &filename) {
-  std::ifstream infile(logDirectory + filename);
-  std::cout << "Loading trajectory from " << logDirectory + filename << "..."
-            << std::endl;
-  if (!infile.is_open()) {
-    std::cout << "Could not open specified file!" << std::endl;
-    return Matrix(0, 0);
-  }
-
-  std::unordered_map<uint32_t, Matrix> Tmap;
-
-  // Scalars that will be populated
-  uint32_t pose_id = 0;
-  uint32_t num_poses = 0;
-  double qx, qy, qz, qw;
-  double tx, ty, tz;
-
-  std::string line;
-  std::string token;
-
-  // Skip first line (headers)
-  std::getline(infile, line);
-
-  // Iterate over remaining lines
-  while (std::getline(infile, line)) {
-    std::istringstream ss(line);
-    num_poses++;
-
-    std::getline(ss, token, ',');
-    pose_id = std::stoi(token);
-
-    std::getline(ss, token, ',');
-    qx = std::stod(token);
-    std::getline(ss, token, ',');
-    qy = std::stod(token);
-    std::getline(ss, token, ',');
-    qz = std::stod(token);
-    std::getline(ss, token, ',');
-    qw = std::stod(token);
-    Eigen::Quaternion<double> quat(qw, qx, qy, qz);
-    quat.normalize();
-
-    std::getline(ss, token, ',');
-    tx = std::stod(token);
-    std::getline(ss, token, ',');
-    ty = std::stod(token);
-    std::getline(ss, token, ',');
-    tz = std::stod(token);
-    Eigen::Vector3d tVec;
-    tVec << tx, ty, tz;
-
-    Matrix Ti(3, 4);
-    Ti.block(0, 0, 3, 3) = quat.toRotationMatrix();
-    Ti.block(0, 3, 3, 1) = tVec;
-    Tmap.emplace(pose_id, Ti);
-  }
-
-  Matrix T = Matrix(3, 4 * num_poses);
-  for (unsigned i = 0; i < num_poses; ++i) {
-    T.block(0, 4 * i, 3, 4) = Tmap.at(i);
-  }
-
-  std::cout << "Loaded " << num_poses << " poses." << std::endl;
-  return T;
-}
-
-std::vector<RelativePosePoseMeasurement>
-PGOLogger::loadMeasurements(const std::string &filename, bool load_weight) {
-  std::vector<RelativePosePoseMeasurement> measurements;
-  std::cout << "Loading measurements from " << filename << "..." << std::endl;
-  std::ifstream infile(filename);
-
-  if (!infile.is_open()) {
-    std::cout << "Could not open specified file!" << std::endl;
-    return measurements;
-  }
-
-  // Scalars that will be filled upon reading each measurement
-  uint32_t robot_src, robot_dst, pose_src, pose_dst;
-  double qx, qy, qz, qw;
-  double tx, ty, tz;
-  double kappa, tau, weight;
-  bool fixed_weight;
-
-  std::string line;
-  std::string token;
-
-  // Skip first line (headers)
-  std::getline(infile, line);
-
-  // Iterate over remaining lines
-  while (std::getline(infile, line)) {
-    std::istringstream ss(line);
-
-    std::getline(ss, token, ',');
-    robot_src = std::stoi(token);
-    std::getline(ss, token, ',');
-    pose_src = std::stoi(token);
-    std::getline(ss, token, ',');
-    robot_dst = std::stoi(token);
-    std::getline(ss, token, ',');
-    pose_dst = std::stoi(token);
-
-    std::getline(ss, token, ',');
-    qx = std::stod(token);
-    std::getline(ss, token, ',');
-    qy = std::stod(token);
-    std::getline(ss, token, ',');
-    qz = std::stod(token);
-    std::getline(ss, token, ',');
-    qw = std::stod(token);
-    Eigen::Quaternion<double> quat(qw, qx, qy, qz);
-    quat.normalize();
-
-    std::getline(ss, token, ',');
-    tx = std::stod(token);
-    std::getline(ss, token, ',');
-    ty = std::stod(token);
-    std::getline(ss, token, ',');
-    tz = std::stod(token);
-    Eigen::Vector3d tVec;
-    tVec << tx, ty, tz;
-
-    std::getline(ss, token, ',');
-    kappa = std::stod(token);
-    std::getline(ss, token, ',');
-    tau = std::stod(token);
-    std::getline(ss, token, ',');
-    fixed_weight = std::stoi(token);
-    std::getline(ss, token, ',');
-    weight = std::stod(token);
-
-    RelativePosePoseMeasurement m(robot_src, robot_dst, pose_src, pose_dst,
-                                  quat.toRotationMatrix(), tVec, kappa, tau);
-    m.fixedWeight = fixed_weight;
-    if (load_weight)
-      m.weight = weight;
-
-    measurements.push_back(m);
-  }
-
-  printf("Loaded %zu measurements.\n", measurements.size());
-  return measurements;
 }
 
 } // namespace DCORA
