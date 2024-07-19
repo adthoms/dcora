@@ -217,21 +217,24 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     // Update number of poses and landmarks
     updateNumPosesAndLandmarks(factor.getSrcID());
 
-    // Add local shared state to graph
+    // Add local shared pose/landmark to graph
     executeStateDependantFunctionals(
         [&, this]() { loc_shared_pose_ids_.emplace(factor.r1, factor.p1); },
         [&, this]() { loc_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
         factor.stateType1);
 
-    // Add neighbor shared state to graph
+    // Add neighbor shared pose/landmark to graph
     executeStateDependantFunctionals(
         [&, this]() { nbr_shared_pose_ids_.emplace(factor.r2, factor.p2); },
         [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
         factor.stateType2);
 
-    // add local shared edge to graph
-    if (factor.measurementType == MeasurementType::Range)
-      loc_shared_unit_sphere_ids_.emplace(edge_id);
+    // add local shared unit-sphere to graph
+    if (factor.measurementType == MeasurementType::Range) {
+      const RangeMeasurement &range_factor =
+          dynamic_cast<const RangeMeasurement &>(factor);
+      loc_shared_unit_sphere_ids_.emplace(range_factor.getUnitSphereID());
+    }
 
     // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r2);
@@ -244,21 +247,24 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
     // Update number of poses and landmarks
     updateNumPosesAndLandmarks(factor.getDstID());
 
-    // Add local shared state to graph
+    // Add local shared pose/landmark to graph
     executeStateDependantFunctionals(
         [&, this]() { loc_shared_pose_ids_.emplace(factor.r2, factor.p2); },
         [&, this]() { loc_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
         factor.stateType2);
 
-    // Add neighbor shared state to graph
+    // Add neighbor shared pose/landmark to graph
     executeStateDependantFunctionals(
         [&, this]() { nbr_shared_pose_ids_.emplace(factor.r1, factor.p1); },
         [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
         factor.stateType1);
 
-    // add neighbor shared edge to graph
-    if (factor.measurementType == MeasurementType::Range)
-      nbr_shared_unit_sphere_ids_.emplace(edge_id);
+    // Add neighbor shared unit-sphere to graph
+    if (factor.measurementType == MeasurementType::Range) {
+      const RangeMeasurement &range_factor =
+          dynamic_cast<const RangeMeasurement &>(factor);
+      nbr_shared_unit_sphere_ids_.emplace(range_factor.getUnitSphereID());
+    }
 
     // Update neighbor robot IDs
     nbr_robot_ids_.insert(factor.r1);
@@ -378,7 +384,8 @@ bool Graph::requireNeighborLandmark(const PointID &landmark_id) const {
          nbr_shared_landmark_ids_.end();
 }
 
-bool Graph::requireNeighborUnitSphere(const EdgeID &unit_sphere_id) const {
+bool Graph::requireNeighborUnitSphere(
+    const UnitSphereID &unit_sphere_id) const {
   return nbr_shared_unit_sphere_ids_.find(unit_sphere_id) !=
          nbr_shared_unit_sphere_ids_.end();
 }
@@ -456,9 +463,9 @@ LandmarkSet Graph::activeNeighborPublicLandmarkIDs() const {
 
 UnitSphereSet Graph::activeNeighborPublicUnitSphereIDs() const {
   UnitSphereSet output;
-  for (const auto &edge_id : nbr_shared_unit_sphere_ids_) {
-    if (isNeighborActive(edge_id.src_state_id.robot_id)) {
-      output.emplace(edge_id);
+  for (const auto &unit_sphere_id : nbr_shared_unit_sphere_ids_) {
+    if (isNeighborActive(unit_sphere_id.robot_id)) {
+      output.emplace(unit_sphere_id);
     }
   }
   return output;
@@ -1734,9 +1741,9 @@ bool Graph::constructLinearCostTermRASLAM() {
        * these edges belong to the neighbors of this agent. As such, we get the
        * fixed unit sphere variable of the neighbor
        */
-      const EdgeID &neighborEdgeID = meas.getEdgeID();
+      const StateID &neighborUnitSphereID = meas.getUnitSphereID();
       XcT_unit_sphere.noalias() =
-          getNeighborFixedVariableLiftedData(neighborEdgeID);
+          getNeighborFixedVariableLiftedData(neighborUnitSphereID);
 
       // Add measurement contribution to linear cost
       if (localDstStateID.isPose()) {
@@ -1835,41 +1842,39 @@ Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
 
 Matrix
 Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
-  // Set neighbor state fixed variable to contain its lifted data
   Matrix X;
-  executeStateDependantFunctionals(
-      [&, this]() {
-        const PoseID neighborPoseID(neighborStateID);
-        const auto neighborPoseItr = neighbor_poses_.find(neighborPoseID);
-        CHECK(neighborPoseItr != neighbor_poses_.end())
-            << "Error: Fixed pose variable of agent's neighbor "
-            << neighborStateID.robot_id << " not found!";
+  switch (neighborStateID.state_type) {
+  case StateType::Pose: {
+    const PoseID neighborPoseID(neighborStateID);
+    const auto neighborPoseItr = neighbor_poses_.find(neighborPoseID);
+    CHECK(neighborPoseItr != neighbor_poses_.end())
+        << "Error: Fixed pose variable of agent's neighbor "
+        << neighborStateID.robot_id << " not found!";
+    X = neighborPoseItr->second.pose();
+  } break;
+  case StateType::Point: {
+    const PointID neighborLandmarkID(neighborStateID);
+    const auto neighborPointItr = neighbor_landmarks_.find(neighborLandmarkID);
+    CHECK(neighborPointItr != neighbor_landmarks_.end())
+        << "Error: Fixed landmark variable of agent's neighbor "
+        << neighborStateID.robot_id << " not found!";
+    X = neighborPointItr->second.translation();
+  } break;
+  case StateType::UnitSphere: {
+    const UnitSphereID neighborUnitSphereID(neighborStateID);
+    const auto neighborUnitSphereItr =
+        neighbor_unit_spheres_.find(neighborUnitSphereID);
+    CHECK(neighborUnitSphereItr != neighbor_unit_spheres_.end())
+        << "Error: Fixed unit sphere variable of agent's neighbor "
+        << neighborStateID.robot_id << " not found!";
+    X = neighborUnitSphereItr->second.translation();
+    CHECK_LE(X.norm() - 1, 1e-6) << "Error: Unit sphere is not normalized!";
+  } break;
+  default:
+    LOG(FATAL) << "Invalid StateType: "
+               << StateTypeToString(neighborStateID.state_type) << "!";
+  }
 
-        X = neighborPoseItr->second.pose();
-      },
-      [&, this]() {
-        const PointID neighborLandmarkID(neighborStateID);
-        const auto neighborPointItr =
-            neighbor_landmarks_.find(neighborLandmarkID);
-        CHECK(neighborPointItr != neighbor_landmarks_.end())
-            << "Error: Fixed landmark variable of agent's neighbor "
-            << neighborStateID.robot_id << " not found!";
-
-        X = neighborPointItr->second.translation();
-      },
-      neighborStateID.state_type);
-
-  return X;
-}
-
-Matrix Graph::getNeighborFixedVariableLiftedData(const EdgeID &neighborEdgeID) {
-  // Set neighbor state fixed variable to contain its lifted data
-  const auto neighborEdgeItr = neighbor_unit_spheres_.find(neighborEdgeID);
-  CHECK(neighborEdgeItr != neighbor_unit_spheres_.end())
-      << "Error: Fixed unit sphere variable of agent's neighbor "
-      << neighborEdgeID.src_state_id.robot_id << " not found!";
-  const Matrix X = neighborEdgeItr->second.translation();
-  CHECK_EQ(X.norm(), 1) << "Error: Unit sphere is not normalized!";
   return X;
 }
 

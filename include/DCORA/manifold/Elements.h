@@ -533,13 +533,14 @@ typedef std::map<PointID, LiftedPoint, CompareStateID> LandmarkDict;
 // Ordered set of PointID
 typedef std::set<PointID, CompareStateID> LandmarkSet;
 
-// Ordered map of EdgeID to LiftedPoint object
-typedef std::map<EdgeID, LiftedPoint, CompareEdgeID> UnitSphereDict;
-// Ordered set of EdgeID
-typedef std::set<EdgeID, CompareEdgeID> UnitSphereSet;
+// Ordered map of UnitSphereID to LiftedPoint object
+typedef std::map<UnitSphereID, LiftedPoint, CompareStateID> UnitSphereDict;
+// Ordered set of UnitSphereID
+typedef std::set<UnitSphereID, CompareStateID> UnitSphereSet;
 
-// TODO(AT): Refactor state types to use Pose, Landmark, UnitSphere
-typedef LandmarkDict UnitSpherePointDict;
-typedef LandmarkSet UnitSpherePointSet;
+// Ordered map of EdgeID to LiftedPoint object
+typedef std::map<EdgeID, LiftedPoint, CompareEdgeID> EdgeDict;
+// Ordered set of EdgeID
+typedef std::set<EdgeID, CompareEdgeID> EdgeSet;
 
 } // namespace DCORA

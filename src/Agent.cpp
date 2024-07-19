@@ -110,7 +110,7 @@ bool PGOAgent::getSharedPoseDict(PoseDict *map) {
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
@@ -123,7 +123,7 @@ bool PGOAgent::getSharedPoseDict(PoseDict *map) {
 
 bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
                                              unsigned neighborID) {
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
@@ -151,7 +151,7 @@ bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
@@ -164,7 +164,7 @@ bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
 
 bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
                                                 unsigned neighborID) {
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
@@ -603,7 +603,7 @@ Pose PGOAgent::computeNeighborTransform(
 bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
                                                       const PoseDict &poseDict,
                                                       Pose *T_world_robot) {
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
@@ -665,7 +665,7 @@ bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
 bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
                                               const PoseDict &poseDict,
                                               Pose *T_world_robot) {
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
@@ -719,7 +719,7 @@ bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
 
 void PGOAgent::updateNeighborPoses(unsigned neighborID,
                                    const PoseDict &poseDict) {
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   CHECK(neighborID != mID);
   if (!YLift)
     return;
@@ -752,7 +752,7 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID,
 
 void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
                                       const PoseDict &poseDict) {
-  // TODO(AT): update function for LandmarkDict and UnitSphereDict
+  // TODO(AT): update function for LandmarkDict and EdgeDict
   CHECK(mParams.acceleration);
   CHECK(neighborID != mID);
   if (!YLift)

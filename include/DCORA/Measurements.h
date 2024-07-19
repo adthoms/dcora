@@ -483,6 +483,8 @@ struct RangeMeasurement : RelativeMeasurement {
     return EdgeID(getSrcID(), getDstID(), MeasurementType::Range);
   }
 
+  UnitSphereID getUnitSphereID() const { return UnitSphereID(r1, l); }
+
   void print(std::ostream &os) const override {
     os << "l: " << l << std::endl;
     os << "range: " << range << std::endl;
@@ -698,7 +700,7 @@ inline std::ostream &operator<<(std::ostream &os,
 struct GroundTruth {
   PoseDict poses;
   LandmarkDict landmarks;
-  UnitSpherePointDict unit_spheres;
+  UnitSphereDict unit_spheres;
 
   // Simple default constructor; does nothing
   GroundTruth() = default;

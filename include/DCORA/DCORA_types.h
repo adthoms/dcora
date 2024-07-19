@@ -50,7 +50,7 @@ enum class GraphType { PoseGraph, RangeAidedSLAMGraph };
 /**
  * @brief State types
  */
-enum class StateType { None, Pose, Point };
+enum class StateType { None, Pose, Point, UnitSphere };
 
 /**
  * @brief Measurement types
@@ -214,6 +214,7 @@ public:
   }
   bool isPose() const { return state_type == StateType::Pose; }
   bool isPoint() const { return state_type == StateType::Point; }
+  bool isUnitSphere() const { return state_type == StateType::UnitSphere; }
 
   // A utility function for streaming this struct to cout
   inline friend std::ostream &operator<<(std::ostream &os,
@@ -248,6 +249,21 @@ public:
     CHECK(state.isPoint())
         << "Error: Cannot construct PointID from StateID: State is "
            "not of type Point!";
+    state_type = state.state_type;
+    robot_id = state.robot_id;
+    frame_id = state.frame_id;
+  }
+};
+
+class UnitSphereID : public StateID {
+public:
+  explicit UnitSphereID(unsigned int rid = 0, unsigned int fid = 0)
+      : StateID(StateType::UnitSphere, rid, fid) {}
+
+  explicit UnitSphereID(const StateID &state) {
+    CHECK(state.isUnitSphere())
+        << "Error: Cannot construct UnitSphereID from StateID: State is "
+           "not of type UnitSphereID!";
     state_type = state.state_type;
     robot_id = state.robot_id;
     frame_id = state.frame_id;

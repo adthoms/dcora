@@ -385,7 +385,7 @@ public:
    * @param unit_sphere_id
    * @return
    */
-  bool requireNeighborUnitSphere(const EdgeID &unit_sphere_id) const;
+  bool requireNeighborUnitSphere(const UnitSphereID &unit_sphere_id) const;
   /**
    * @brief Compute number of accepted, rejected, and undecided loop closures
    * Note that loop closures with inactive neighbors are not included
@@ -558,14 +558,6 @@ protected:
    * @return
    */
   Matrix getNeighborFixedVariableLiftedData(const StateID &neighborStateID);
-  /**
-   * @brief Helper function to return the lifted data matrix of the fixed public
-   * variable (associated with neighborEdgeID) owned by a neighbor of this
-   * agent. Supported fixed variables include lifted unit spheres
-   * @param neighborEdgeID
-   * @return
-   */
-  Matrix getNeighborFixedVariableLiftedData(const EdgeID &neighborEdgeID);
   /**
    * @brief Construct the preconditioner for this graph
    * @return

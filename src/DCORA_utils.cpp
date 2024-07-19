@@ -64,6 +64,9 @@ std::string StateTypeToString(const StateType &type) {
   case StateType::Point: {
     return "Point";
   }
+  case StateType::UnitSphere: {
+    return "UnitSphere";
+  }
   }
   return "";
 }
@@ -1010,8 +1013,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const Point unit_sphere_var = Point(unit_vector);
 
         // Populate ground truth
-        const PointID &unit_sphere_id =
-            PointID(range_measurement.r1, range_measurement.l);
+        const UnitSphereID &unit_sphere_id =
+            range_measurement.getUnitSphereID();
         pyfg_dataset.ground_truth.unit_spheres[unit_sphere_id] =
             unit_sphere_var;
 
@@ -1046,7 +1049,7 @@ getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
   // Get ground truth dictionaries
   const PoseDict &gt_pose_dict = pyfg_dataset.ground_truth.poses;
   const LandmarkDict &gt_landmark_dict = pyfg_dataset.ground_truth.landmarks;
-  const UnitSpherePointDict &gt_unit_sphere_dict =
+  const UnitSphereDict &gt_unit_sphere_dict =
       pyfg_dataset.ground_truth.unit_spheres;
 
   // Assign local to global state mapping
@@ -1072,7 +1075,8 @@ getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
   unsigned int global_unit_sphere_idx = 0;
   for (const auto &[local_unit_sphere_id, unit_sphere] : gt_unit_sphere_dict) {
     // Populate map
-    const PointID global_unit_sphere(global_robot_id, global_unit_sphere_idx);
+    const UnitSphereID global_unit_sphere(global_robot_id,
+                                          global_unit_sphere_idx);
     local_to_global_state_dicts.unit_spheres[local_unit_sphere_id] =
         global_unit_sphere;
 
@@ -1166,7 +1170,7 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
           meas.stateType2);
 
       // Reindex unit sphere variables
-      const PointID &unit_sphere_id = PointID(meas.r1, meas.l);
+      const UnitSphereID &unit_sphere_id = meas.getUnitSphereID();
       meas.l =
           local_to_global_state_dicts.unit_spheres.at(unit_sphere_id).frame_id;
 
