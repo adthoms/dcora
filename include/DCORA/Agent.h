@@ -328,6 +328,8 @@ public:
    */
   inline unsigned relaxation_rank() const { return mPoseGraph->r(); }
 
+  // TODO(AT): Add supporting getters for graph dims l,b,k
+
   /**
    * @brief Get current instance number
    * @return
@@ -677,10 +679,12 @@ protected:
   PoseDict neighborPoseDict;
 
   // Implement locking to synchronize read & write of trajectory estimate
+  // TODO(AT): Rename as mStatesMutex as all states should be locked
   std::mutex mPosesMutex;
 
   // Implement locking to synchronize read & write of shared poses from
   // neighbors
+  // TODO(AT): Rename as mNeighborPosesMutex as all states should be locked
   std::mutex mNeighborPosesMutex;
 
   // Implement locking on measurements

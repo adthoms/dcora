@@ -46,9 +46,14 @@ PGOAgent::PGOAgent(unsigned ID, const PGOAgentParameters &params)
       Y(X),
       V(X),
       XPrev(X) {
+  // TODO(AT): set lifting matrix based on graph type. Also, we should be able
+  // to pass a lifting matrix set from the previous iteration on r, so consider
+  // passing this as input
   if (mID == 0)
     setLiftingMatrix(fixedStiefelVariable(r, d));
   mTeamRobotActive.assign(mParams.numRobots, true);
+  // TODO(AT): Declare X, Y, V, and associated arrays as
+  // LiftedRangeAidedArrays, add GraphType to PGOAgentParameters
 }
 
 PGOAgent::~PGOAgent() {
@@ -60,6 +65,7 @@ void PGOAgent::setX(const Matrix &Xin) {
   std::lock_guard<std::mutex> lock(mPosesMutex);
   CHECK_NE(mState, PGOAgentState::WAIT_FOR_DATA);
   CHECK_EQ(Xin.rows(), relaxation_rank());
+  // TODO(AT): update col dim as k
   CHECK_EQ(Xin.cols(), (dimension() + 1) * num_poses());
   mState = PGOAgentState::INITIALIZED;
   X.setData(Xin);
@@ -84,6 +90,7 @@ bool PGOAgent::getX(Matrix *Mout) {
   return true;
 }
 
+// TODO(AT): add getSharedLandmark and getSharedUnitSphere functions
 bool PGOAgent::getSharedPose(unsigned int index, Matrix *Mout) {
   if (mState != PGOAgentState::INITIALIZED)
     return false;
@@ -94,6 +101,7 @@ bool PGOAgent::getSharedPose(unsigned int index, Matrix *Mout) {
   return true;
 }
 
+// TODO(AT): function appears unused
 bool PGOAgent::getAuxSharedPose(unsigned int index, Matrix *Mout) {
   CHECK(mParams.acceleration);
   if (mState != PGOAgentState::INITIALIZED)
@@ -105,12 +113,12 @@ bool PGOAgent::getAuxSharedPose(unsigned int index, Matrix *Mout) {
   return true;
 }
 
+// TODO(AT): update function for LandmarkDict and UnitSphereDict
 bool PGOAgent::getSharedPoseDict(PoseDict *map) {
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
@@ -121,14 +129,13 @@ bool PGOAgent::getSharedPoseDict(PoseDict *map) {
   return true;
 }
 
+// TODO(AT): function appears unused
 bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
                                              unsigned neighborID) {
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  // TODO(AT): update for all measurements
   const RelativeMeasurements measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
@@ -145,13 +152,13 @@ bool PGOAgent::getSharedPoseDictWithNeighbor(PoseDict *map,
   return true;
 }
 
+// TODO(AT): update function for LandmarkDict and UnitSphereDict
 bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
   CHECK(mParams.acceleration);
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   for (const auto &pose_id : mPoseGraph->myPublicPoseIDs()) {
     auto robot_id = pose_id.robot_id;
     auto frame_id = pose_id.frame_id;
@@ -162,14 +169,13 @@ bool PGOAgent::getAuxSharedPoseDict(PoseDict *map) {
   return true;
 }
 
+// TODO(AT): function appears unused
 bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
                                                 unsigned neighborID) {
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   if (mState != PGOAgentState::INITIALIZED)
     return false;
   map->clear();
   std::lock_guard<std::mutex> lock(mPosesMutex);
-  // TODO(AT): update for all measurements
   const RelativeMeasurements measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
@@ -186,6 +192,8 @@ bool PGOAgent::getAuxSharedPoseDictWithNeighbor(PoseDict *map,
   return true;
 }
 
+// TODO(AT): In MultiRobotExample_RASLAM, we should reset the lifting matrix
+// each time we climb the Riemannian staircase
 void PGOAgent::setLiftingMatrix(const Matrix &M) {
   CHECK_EQ(M.rows(), r);
   CHECK_EQ(M.cols(), d);
@@ -220,6 +228,12 @@ void PGOAgent::setMeasurements(
   mPoseGraph->setMeasurements(measurements);
 }
 
+// TODO(AT): overload setMeasurements with RelativeMeasurements as input
+
+// TODO(AT): Keep TInitPtr as PoseArray and pass optional initial guesses for
+// unit-spheres and landmarks. If no initial guesses are given, randomly
+// initialize. Since we want to benchmark CORA against DCORA, we should
+// initialize from the same random matrix.
 void PGOAgent::initialize(const PoseArray *TInitPtr) {
   if (mState != PGOAgentState::WAIT_FOR_DATA)
     return;
@@ -254,7 +268,7 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
     case (InitializationMethod::Chordal): {
       LOG(INFO) << "Computing local chordal initialization.";
       if (!mPoseGraph->isPGOCompatible())
-        LOG(FATAL) << "Chordal initialization requires all relative "
+        LOG(FATAL) << "Error: Chordal initialization requires all relative "
                       "measurement to be pose-pose measurements!";
       const RelativeMeasurements m = mPoseGraph->localMeasurements();
       T = chordalInitialization(m.GetRelativePosePoseMeasurements());
@@ -275,8 +289,8 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       params.robust_params.GNCMuStep = 1.4;
       PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
       if (!mPoseGraph->isPGOCompatible())
-        LOG(FATAL) << "Error: relative measurements must be pose-pose for "
-                      "GNC_TLS initialization!";
+        LOG(FATAL) << "Error: GNC_TLS initialization requires all relative "
+                      "measurement to be pose-pose measurements!";
       const RelativeMeasurements m = mPoseGraph->localMeasurements();
       std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
           m.GetRelativePosePoseMeasurements();
@@ -338,6 +352,8 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
     startOptimizationLoop();
 }
 
+// TODO(AT): update to transform landmark and unit-sphere estimates into
+// T_world_robot
 void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
   CHECK(YLift);
   CHECK_EQ(T_world_robot.d(), dimension());
@@ -365,6 +381,10 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
     Pose T_world_frame = T_world_robot * T_robot_frame;
     T.pose(i) = T_world_frame.pose();
   }
+
+  // TODO(AT): Apply global transformation to local unit-sphere and landmark
+  // estimates (though they will be randomly initialized, for testing we will be
+  // passing ground truth values and thus transformation is necessary)
 
   // Lift back to correct relaxation rank
   X.setData(YLift.value() * T.getData());
@@ -437,6 +457,7 @@ bool PGOAgent::iterate(bool doOptimization) {
       mStatus.state = mState;
       mStatus.instanceNumber = instance_number();
       mStatus.iterationNumber = iteration_number();
+      // TODO(AT): ask AP and DR about updating this function for RA-SLAM
       mStatus.relativeChange = LiftedArray::maxTranslationDistance(X, XPrev);
       // Check local termination condition
       bool readyToTerminate = true;
@@ -475,19 +496,19 @@ void PGOAgent::reset() {
   endOptimizationLoop();
 
   if (mParams.logData) {
-    // Save measurements (including final weights)
-    // TODO(JV): update for all measurements
-    std::vector<RelativePosePoseMeasurement> m =
-        mPoseGraph->allMeasurements().GetRelativePosePoseMeasurements();
-    mLogger.logMeasurements(&m, "measurements.csv");
+    // Save measurements
+    RelativeMeasurements m = mPoseGraph->allMeasurements();
+    mLogger.logMeasurements(&m, "measurements.txt");
 
     // Save trajectory estimates after rounding
     Matrix T;
     if (getTrajectoryInGlobalFrame(&T)) {
-      mLogger.logTrajectory(dimension(), num_poses(), T,
-                            "trajectory_optimized.txt");
-      std::cout << "Saved optimized trajectory to " << mParams.logDirectory
-                << std::endl;
+      std::string filename = "dcora_" + std::string(1, 'A' + getID()) + ".txt";
+      mLogger.logTrajectory(dimension(), num_poses(), T, filename);
+      LOG(INFO) << "Saved optimized trajectory to " << mParams.logDirectory;
+    } else {
+      LOG(WARNING) << "Global anchor not set for agent " << getID()
+                   << ". Optimized trajectory not saved.";
     }
 
     // Save solution before rounding
@@ -603,12 +624,10 @@ Pose PGOAgent::computeNeighborTransform(
 bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
                                                       const PoseDict &poseDict,
                                                       Pose *T_world_robot) {
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
   // Each alignment corresponds to a single inter-robot loop closure
-  // TODO(AT): update for all measurements
   const RelativeMeasurements measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
@@ -665,12 +684,10 @@ bool PGOAgent::computeRobustNeighborTransformTwoStage(unsigned int neighborID,
 bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
                                               const PoseDict &poseDict,
                                               Pose *T_world_robot) {
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   std::vector<Matrix> RVec;
   std::vector<Vector> tVec;
   // Populate candidate alignments
   // Each alignment corresponds to a single inter-robot loop closure
-  // TODO(AT): update for all measurements
   const RelativeMeasurements measurements =
       mPoseGraph->sharedLoopClosuresWithRobot(neighborID);
   for (const auto &m : measurements.GetRelativePosePoseMeasurements()) {
@@ -717,9 +734,9 @@ bool PGOAgent::computeRobustNeighborTransform(unsigned int neighborID,
   return true;
 }
 
+// TODO(AT): update function for LandmarkDict and UnitSphereDict
 void PGOAgent::updateNeighborPoses(unsigned neighborID,
                                    const PoseDict &poseDict) {
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   CHECK(neighborID != mID);
   if (!YLift)
     return;
@@ -728,6 +745,8 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID,
   if (getNeighborStatus(neighborID).state != PGOAgentState::INITIALIZED)
     return;
   if (mState == PGOAgentState::WAIT_FOR_INITIALIZATION) {
+    // TODO(AT): retain for RA-SLAM and update initializeInGlobalFrame to
+    // transform landmark and unit-sphere estimates into T_world_robot
     Pose T_world_robot(dimension());
     if (computeRobustNeighborTransformTwoStage(neighborID, poseDict,
                                                &T_world_robot)) {
@@ -750,9 +769,9 @@ void PGOAgent::updateNeighborPoses(unsigned neighborID,
   }
 }
 
+// TODO(AT): update function for LandmarkDict and UnitSphereDict
 void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
                                       const PoseDict &poseDict) {
-  // TODO(AT): update function for LandmarkDict and EdgeDict
   CHECK(mParams.acceleration);
   CHECK(neighborID != mID);
   if (!YLift)
@@ -776,15 +795,15 @@ void PGOAgent::updateAuxNeighborPoses(unsigned neighborID,
   }
 }
 
+// TODO(AT): update for landmark and unit sphere dicts
 void PGOAgent::clearNeighborStates() {
-  // TODO(AT): update for landmark and unit sphere dicts
   std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   neighborPoseDict.clear();
   neighborAuxPoseDict.clear();
 }
 
+// TODO(AT): update for landmark and unit sphere dicts
 void PGOAgent::clearActiveNeighborPoses() {
-  // TODO(AT): update for landmark and unit sphere dicts
   std::lock_guard<std::mutex> lock(mNeighborPosesMutex);
   for (const auto &pose_id : mPoseGraph->activeNeighborPublicPoseIDs()) {
     neighborPoseDict.erase(pose_id);
@@ -792,12 +811,15 @@ void PGOAgent::clearActiveNeighborPoses() {
   }
 }
 
+// TODO(AT): Retain obtention of trajectory for state estimate comparison
 bool PGOAgent::getTrajectoryInLocalFrame(Matrix *Trajectory) {
   if (mState != PGOAgentState::INITIALIZED) {
     return false;
   }
   std::lock_guard<std::mutex> lock(mPosesMutex);
 
+  // TODO(AT): Since X will be a LiftedRangeAidedArray, we will need to update
+  // this block to just get the encapsulate LiftedPoseArray
   PoseArray T(d, num_poses());
   T.setData(X.rotation(0).transpose() * X.getData());
   auto t0 = T.translation(0);
@@ -832,6 +854,8 @@ bool PGOAgent::getTrajectoryInGlobalFrame(PoseArray *Trajectory) {
     return false;
   std::lock_guard<std::mutex> lock(mPosesMutex);
 
+  // TODO(AT): Since X will be a LiftedRangeAidedArray, we will need to update
+  // this block to just get the encapsulate LiftedPoseArray
   PoseArray T(d, num_poses());
   T.setData(Xa.rotation().transpose() * X.getData());
   Vector t0 = Xa.rotation().transpose() * Xa.translation();
@@ -847,6 +871,7 @@ bool PGOAgent::getTrajectoryInGlobalFrame(PoseArray *Trajectory) {
   return true;
 }
 
+// TODO(AT): function appears unused
 bool PGOAgent::getPoseInGlobalFrame(unsigned int poseID, Matrix *T) {
   if (!globalAnchor)
     return false;
@@ -870,6 +895,7 @@ bool PGOAgent::getPoseInGlobalFrame(unsigned int poseID, Matrix *T) {
   return true;
 }
 
+// TODO(AT): function appears unused
 bool PGOAgent::getNeighborPoseInGlobalFrame(unsigned int neighborID,
                                             unsigned int poseID, Matrix *T) {
   if (!globalAnchor)
@@ -934,6 +960,7 @@ void PGOAgent::setGlobalAnchor(const Matrix &M) {
   globalAnchor.emplace(Xa);
 }
 
+// TODO(AT): function appears unused
 bool PGOAgent::shouldTerminate() {
   // terminate if reached maximum iterations
   if (iteration_number() >= mParams.maxNumIters) {
@@ -1013,6 +1040,7 @@ void PGOAgent::updateAlpha() {
   alpha = 1 / (gamma * mParams.numRobots);
 }
 
+// TODO(AT): update for RA-SLAM manifold
 void PGOAgent::updateY() {
   CHECK(mParams.acceleration);
   CHECK(mState == PGOAgentState::INITIALIZED);
@@ -1021,6 +1049,7 @@ void PGOAgent::updateY() {
   Y.setData(manifold.project(M));
 }
 
+// TODO(AT): update for RA-SLAM manifold
 void PGOAgent::updateV() {
   CHECK(mParams.acceleration);
   CHECK(mState == PGOAgentState::INITIALIZED);
@@ -1077,6 +1106,7 @@ bool PGOAgent::updateX(bool doOptimization, bool acceleration) {
     X0 = X.getData();
   }
   CHECK(X0.rows() == relaxation_rank());
+  // TODO(AT): update col dim as k
   CHECK(X0.cols() == (dimension() + 1) * num_poses());
 
   // Optimize!
