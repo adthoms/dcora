@@ -16,74 +16,105 @@
 
 namespace DCORA {
 
-QuadraticProblem::QuadraticProblem(const std::shared_ptr<Graph> &pose_graph)
-    : pose_graph_(pose_graph),
-      M(new LiftedSEManifold(pose_graph_->r(), pose_graph_->d(),
-                             pose_graph_->n())) {
+QuadraticProblem::QuadraticProblem(const std::shared_ptr<Graph> &graph)
+    : graph_(graph), use_se_manifold_(graph_->isPGOCompatible()) {
   ROPTLIB::Problem::SetUseGrad(true);
   ROPTLIB::Problem::SetUseHess(true);
-  ROPTLIB::Problem::SetDomain(M->getManifold());
+
+  // Set manifold according to graph type
+  if (use_se_manifold_) {
+    M_SE = std::make_unique<LiftedSEManifold>(graph_->r(), graph_->d(),
+                                              graph_->n());
+    ROPTLIB::Problem::SetDomain(M_SE->getManifold());
+  } else {
+    M_RA = std::make_unique<LiftedRAManifold>(
+        graph_->r(), graph_->d(), graph_->n(), graph_->l(), graph_->b());
+    ROPTLIB::Problem::SetDomain(M_RA->getManifold());
+  }
 }
 
-QuadraticProblem::~QuadraticProblem() { delete M; }
+QuadraticProblem::~QuadraticProblem() = default;
 
 double QuadraticProblem::f(const Matrix &Y) const {
   CHECK_EQ((unsigned)Y.rows(), relaxation_rank());
-  CHECK_EQ((unsigned)Y.cols(), (dimension() + 1) * num_poses());
+  CHECK_EQ((unsigned)Y.cols(), problem_dimension());
   // returns 0.5 * (Y * Q * Y.transpose()).trace() + (Y * G.transpose()).trace()
-  return 0.5 * ((Y * pose_graph_->quadraticMatrix()).cwiseProduct(Y)).sum() +
-         (Y.cwiseProduct(pose_graph_->linearMatrix())).sum();
+  return 0.5 * ((Y * graph_->quadraticMatrix()).cwiseProduct(Y)).sum() +
+         (Y.cwiseProduct(graph_->linearMatrix())).sum();
 }
 
 double QuadraticProblem::f(ROPTLIB::Variable *x) const {
-  Eigen::Map<const Matrix> X((double *)x->ObtainReadData(), relaxation_rank(),
-                             (dimension() + 1) * num_poses());
-  return 0.5 * ((X * pose_graph_->quadraticMatrix()).cwiseProduct(X)).sum() +
-         (X.cwiseProduct(pose_graph_->linearMatrix())).sum();
+  Eigen::Map<const Matrix> X(const_cast<double *>(x->ObtainReadData()),
+                             relaxation_rank(), problem_dimension());
+  return 0.5 * ((X * graph_->quadraticMatrix()).cwiseProduct(X)).sum() +
+         (X.cwiseProduct(graph_->linearMatrix())).sum();
 }
 
 void QuadraticProblem::EucGrad(ROPTLIB::Variable *x, ROPTLIB::Vector *g) const {
-  Eigen::Map<const Matrix> X((double *)x->ObtainReadData(), relaxation_rank(),
-                             (dimension() + 1) * num_poses());
-  Eigen::Map<Matrix> EG((double *)g->ObtainWriteEntireData(), relaxation_rank(),
-                        (dimension() + 1) * num_poses());
-  EG = X * pose_graph_->quadraticMatrix() + pose_graph_->linearMatrix();
+  Eigen::Map<const Matrix> X(const_cast<double *>(x->ObtainReadData()),
+                             relaxation_rank(), problem_dimension());
+  Eigen::Map<Matrix> EG(const_cast<double *>(g->ObtainWriteEntireData()),
+                        relaxation_rank(), problem_dimension());
+  EG = X * graph_->quadraticMatrix() + graph_->linearMatrix();
 }
 
 void QuadraticProblem::EucHessianEta(ROPTLIB::Variable *x, ROPTLIB::Vector *v,
                                      ROPTLIB::Vector *Hv) const {
-  Eigen::Map<const Matrix> V((double *)v->ObtainReadData(), relaxation_rank(),
-                             (dimension() + 1) * num_poses());
-  Eigen::Map<Matrix> HV((double *)Hv->ObtainWriteEntireData(),
-                        relaxation_rank(), (dimension() + 1) * num_poses());
-  HV = V * pose_graph_->quadraticMatrix();
+  Eigen::Map<const Matrix> V(const_cast<double *>(v->ObtainReadData()),
+                             relaxation_rank(), problem_dimension());
+  Eigen::Map<Matrix> HV(const_cast<double *>(Hv->ObtainWriteEntireData()),
+                        relaxation_rank(), problem_dimension());
+  HV = V * graph_->quadraticMatrix();
 }
 
 void QuadraticProblem::PreConditioner(ROPTLIB::Variable *x,
                                       ROPTLIB::Vector *inVec,
                                       ROPTLIB::Vector *outVec) const {
-  Eigen::Map<const Matrix> INVEC((double *)inVec->ObtainReadData(),
-                                 relaxation_rank(),
-                                 (dimension() + 1) * num_poses());
-  Eigen::Map<Matrix> OUTVEC((double *)outVec->ObtainWriteEntireData(),
-                            relaxation_rank(), (dimension() + 1) * num_poses());
-  if (pose_graph_->hasPreconditioner()) {
-    OUTVEC =
-        pose_graph_->preconditioner()->solve(INVEC.transpose()).transpose();
+  Eigen::Map<const Matrix> INVEC(const_cast<double *>(inVec->ObtainReadData()),
+                                 relaxation_rank(), problem_dimension());
+  Eigen::Map<Matrix> OUTVEC(
+      const_cast<double *>(outVec->ObtainWriteEntireData()), relaxation_rank(),
+      problem_dimension());
+  if (graph_->hasPreconditioner()) {
+    OUTVEC = graph_->preconditioner()->solve(INVEC.transpose()).transpose();
   } else {
     LOG(WARNING) << "Failed to compute preconditioner.";
   }
-  M->getManifold()->Projection(
-      x, outVec, outVec); // Project output to the tangent space at x
+  projectToTangentSpace(x, outVec, outVec);
 }
 
 Matrix QuadraticProblem::RieGrad(const Matrix &Y) const {
-  LiftedSEVariable Var(relaxation_rank(), dimension(), num_poses());
+  // Get problem dimensions
+  unsigned int r = relaxation_rank();
+  unsigned int d = dimension();
+  unsigned int n = num_poses();
+  unsigned int l = num_unit_spheres();
+  unsigned int b = num_landmarks();
+
+  // Delegate to specific Riemannian gradient based on manifold type
+  return use_se_manifold_ ? RieGradSE(Y, r, d, n) : RieGradRA(Y, r, d, n, l, b);
+}
+
+Matrix QuadraticProblem::RieGradSE(const Matrix &Y, unsigned int r,
+                                   unsigned int d, unsigned int n) const {
+  LiftedSEVariable Var(r, d, n);
   Var.setData(Y);
-  LiftedSEVector EGrad(relaxation_rank(), dimension(), num_poses());
-  LiftedSEVector RGrad(relaxation_rank(), dimension(), num_poses());
+  LiftedSEVector RGrad(r, d, n);
+  LiftedSEVector EGrad(r, d, n);
   EucGrad(Var.var(), EGrad.vec());
-  M->getManifold()->Projection(Var.var(), EGrad.vec(), RGrad.vec());
+  projectToTangentSpace(Var.var(), EGrad.vec(), RGrad.vec());
+  return RGrad.getData();
+}
+
+Matrix QuadraticProblem::RieGradRA(const Matrix &Y, unsigned int r,
+                                   unsigned int d, unsigned int n,
+                                   unsigned int l, unsigned int b) const {
+  LiftedRAVariable Var(r, d, n, l, b);
+  Var.setData(Y);
+  LiftedRAVector EGrad(r, d, n, l, b);
+  LiftedRAVector RGrad(r, d, n, l, b);
+  EucGrad(Var.var(), EGrad.vec());
+  projectToTangentSpace(Var.var(), EGrad.vec(), RGrad.vec());
   return RGrad.getData();
 }
 
@@ -91,15 +122,14 @@ double QuadraticProblem::RieGradNorm(const Matrix &Y) const {
   return RieGrad(Y).norm();
 }
 
-Matrix QuadraticProblem::readElement(const ROPTLIB::Element *element) const {
-  return Eigen::Map<Matrix>(const_cast<double *>(element->ObtainReadData()),
-                            relaxation_rank(), num_poses() * (dimension() + 1));
-}
-
-void QuadraticProblem::setElement(ROPTLIB::Element *element,
-                                  const Matrix *matrix) const {
-  memcpy(element->ObtainWriteEntireData(), matrix->data(),
-         sizeof(double) * relaxation_rank() * (dimension() + 1) * num_poses());
+void QuadraticProblem::projectToTangentSpace(ROPTLIB::Variable *x,
+                                             ROPTLIB::Vector *inVec,
+                                             ROPTLIB::Vector *outVec) const {
+  if (use_se_manifold_) {
+    M_SE->projectToTangentSpace(x, inVec, outVec);
+  } else {
+    M_RA->projectToTangentSpace(x, inVec, outVec);
+  }
 }
 
 } // namespace DCORA

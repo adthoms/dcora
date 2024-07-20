@@ -28,18 +28,23 @@
 namespace DCORA {
 
 /**
- * @brief This class implements a ROPTLIB problem with the following cost
- * function: f(X) = 0.5*<Q, XtX> + <X,G>; Q is the quadratic part with dimension
- * (d+1)n-by-(d+1)n; G is the linear part with dimension r-by-(d+1)n
+ * @brief This class implements a ROPTLIB problem with the cost function:
+ *
+ *   f(X) = 0.5 × <Q, X^T × X> + <X,G>
+ *
+ * where Q is the quadratic part with dimension k-by-k and G is the
+ * linear part with dimension r-by-k. The dimension of k depends on the problem
+ * instance, where:
+ *   k = (d + 1) × n; for pose graph optimization and
+ *   k = (d + 1) × n + l + b; for range-aided SLAM
  */
 class QuadraticProblem : public ROPTLIB::Problem {
 public:
   /**
-   * @brief Construct a quadratic optimization problem from a pose graph
-   * @param pose_graph input pose graph must be initialized (or can be
-   * initialized) otherwise throw a runtime error
+   * @brief Construct a quadratic optimization problem from a graph
+   * @param graph
    */
-  explicit QuadraticProblem(const std::shared_ptr<Graph> &pose_graph);
+  explicit QuadraticProblem(const std::shared_ptr<Graph> &graph);
 
   /**
    * @brief Deconstructor
@@ -47,22 +52,46 @@ public:
   ~QuadraticProblem() override;
 
   /**
-   * @brief Number of pose variables
-   * @return
-   */
-  unsigned int num_poses() const { return pose_graph_->n(); }
-
-  /**
    * @brief Dimension (2 or 3) of estimation problem
    * @return
    */
-  unsigned int dimension() const { return pose_graph_->d(); }
+  unsigned int dimension() const { return graph_->d(); }
 
   /**
    * @brief Relaxation rank in Riemannian optimization problem
    * @return
    */
-  unsigned int relaxation_rank() const { return pose_graph_->r(); }
+  unsigned int relaxation_rank() const { return graph_->r(); }
+
+  /**
+   * @brief Number of pose variables
+   * @return
+   */
+  unsigned int num_poses() const { return graph_->n(); }
+
+  /**
+   * @brief Number of unit sphere variables
+   * @return
+   */
+  unsigned int num_unit_spheres() const { return graph_->l(); }
+
+  /**
+   * @brief Number of landmark variables
+   * @return
+   */
+  unsigned int num_landmarks() const { return graph_->b(); }
+
+  /**
+   * @brief Riemannian optimization problem dimension
+   * @return
+   */
+  unsigned int problem_dimension() const { return graph_->k(); }
+
+  /**
+   * @brief Return true if SE manifold is used
+   * @return
+   */
+  bool useSEManifold() const { return use_se_manifold_; }
 
   /**
    * @brief Evaluate objective function
@@ -118,15 +147,51 @@ public:
   double RieGradNorm(const Matrix &Y) const;
 
 private:
-  // The pose graph that represents the optimization problem
-  std::shared_ptr<Graph> pose_graph_;
+  // The graph that represents the optimization problem
+  std::shared_ptr<Graph> graph_;
 
-  // Underlying manifold
-  LiftedSEManifold *M;
+  // Bool for using SE manifold or RA manifold
+  bool use_se_manifold_;
 
-  // Helper functions to convert between ROPTLIB::Element and Eigen Matrix
-  Matrix readElement(const ROPTLIB::Element *element) const;
-  void setElement(ROPTLIB::Element *element, const Matrix *matrix) const;
+  // Underlying manifolds
+  std::unique_ptr<LiftedSEManifold> M_SE;
+  std::unique_ptr<LiftedRAManifold> M_RA;
+
+  /**
+   * @brief Helper function to compute the Riemannian gradient at Y in the SE
+   * domain. See RieGrad for more details.
+   * @param Y
+   * @param r
+   * @param d
+   * @param n
+   * @return
+   */
+  Matrix RieGradSE(const Matrix &Y, unsigned int r, unsigned int d,
+                   unsigned int n) const;
+
+  /**
+   * @brief Helper function to compute the Riemannian gradient at Y in the RA
+   * domain. See RieGrad for more details.
+   * @param Y
+   * @param r
+   * @param d
+   * @param n
+   * @param l
+   * @param b
+   * @return
+   */
+  Matrix RieGradRA(const Matrix &Y, unsigned int r, unsigned int d,
+                   unsigned int n, unsigned int l, unsigned int b) const;
+
+  /**
+   * @brief Helper function to project vector inVec onto the tangent space of
+   * the manifold at x, yielding outVec
+   * @param x
+   * @param inVec
+   * @param outVec
+   */
+  void projectToTangentSpace(ROPTLIB::Variable *x, ROPTLIB::Vector *inVec,
+                             ROPTLIB::Vector *outVec) const;
 };
 
 } // namespace DCORA
