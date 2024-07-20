@@ -538,9 +538,4 @@ typedef std::map<UnitSphereID, LiftedPoint, CompareStateID> UnitSphereDict;
 // Ordered set of UnitSphereID
 typedef std::set<UnitSphereID, CompareStateID> UnitSphereSet;
 
-// Ordered map of EdgeID to LiftedPoint object
-typedef std::map<EdgeID, LiftedPoint, CompareEdgeID> EdgeDict;
-// Ordered set of EdgeID
-typedef std::set<EdgeID, CompareEdgeID> EdgeSet;
-
 } // namespace DCORA
