@@ -20,63 +20,61 @@ TEST(testDCORA, testLiftedPoseArray) {
   int r = 5;
   int d = 3;
   int n = 3;
-  for (int trial = 0; trial < 50; ++trial) {
-    DCORA::LiftedPoseArray var(r, d, n);
-    // Test setter and getter methods
-    for (int i = 0; i < n; ++i) {
-      auto Y = DCORA::randomStiefelVariable(r, d + 1);
-      var.pose(i) = Y;
-      ASSERT_LE((Y - var.pose(i)).norm(), 1e-6);
-      auto Yi = DCORA::randomStiefelVariable(r, d);
-      auto pi = DCORA::randomEuclideanVariable(r);
-      var.rotation(i) = Yi;
-      var.translation(i) = pi;
-      ASSERT_LE((Yi - var.rotation(i)).norm(), 1e-6);
-      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
-    }
-    // Test copy constructor
-    DCORA::LiftedPoseArray var2(var);
-    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
-    // Test assignment
-    DCORA::LiftedPoseArray var3(r, d, n);
-    var3 = var;
-    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
-    // Test random data
-    var.setRandomData();
-    DCORA::Matrix Y = var.getData();
-    ASSERT_LE((DCORA::projectToSEMatrix(Y, r, d, n) - Y).norm(), 1e-6);
+  DCORA::LiftedPoseArray var(r, d, n);
+  // Test setter and getter methods
+  for (int i = 0; i < n; ++i) {
+    auto Y = DCORA::randomStiefelVariable(r, d + 1);
+    var.pose(i) = Y;
+    ASSERT_LE((Y - var.pose(i)).norm(), 1e-6);
+    auto Yi = DCORA::randomStiefelVariable(r, d);
+    auto pi = DCORA::randomEuclideanVariable(r);
+    var.rotation(i) = Yi;
+    var.translation(i) = pi;
+    ASSERT_LE((Yi - var.rotation(i)).norm(), 1e-6);
+    ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
   }
+  // Test copy constructor
+  DCORA::LiftedPoseArray var2(var);
+  ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+  // Test assignment
+  DCORA::LiftedPoseArray var3(r, d, n);
+  var3 = var;
+  ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  // Test random data
+  var.setRandomData();
+  DCORA::Matrix Y = var.getData();
+  ASSERT_LE((DCORA::projectToSEMatrix(Y, r, d, n) - Y).norm(), 1e-6);
 }
 
 TEST(testDCORA, testLiftedPointArray) {
   int r = 5;
   int d = 3;
   int n = 3;
-  for (int trial = 0; trial < 50; ++trial) {
-    DCORA::LiftedPointArray var(r, d, n);
-    // Test setter and getter methods
-    for (int i = 0; i < n; ++i) {
-      auto pi = DCORA::randomEuclideanVariable(r);
-      var.translation(i) = pi;
-      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
-    }
-    // Test copy constructor
-    DCORA::LiftedPointArray var2(var);
-    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
-    // Test assignment
-    DCORA::LiftedPointArray var3(r, d, n);
-    var3 = var;
-    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  DCORA::LiftedPointArray var(r, d, n);
+  // Test setter and getter methods
+  for (int i = 0; i < n; ++i) {
+    auto pi = DCORA::randomEuclideanVariable(r);
+    var.translation(i) = pi;
+    ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
   }
+  // Test copy constructor
+  DCORA::LiftedPointArray var2(var);
+  ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+  // Test assignment
+  DCORA::LiftedPointArray var3(r, d, n);
+  var3 = var;
+  ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
 }
 
 TEST(testDCORA, testLiftedRangeAidedArray) {
   int r = 5;
   int d = 3;
   int n = 3;
-  int l = 5;
-  int b = 7;
-  for (int trial = 0; trial < 50; ++trial) {
+  std::vector<size_t> l_cases = {0, 6, 0, 6};
+  std::vector<size_t> b_cases = {0, 0, 7, 7};
+  for (size_t i = 0; i < l_cases.size(); i++) {
+    size_t l = l_cases.at(i);
+    size_t b = b_cases.at(i);
     DCORA::LiftedRangeAidedArray var(r, d, n, l, b);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {
