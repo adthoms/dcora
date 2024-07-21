@@ -379,7 +379,7 @@ public:
    * @param landmark_id
    * @return
    */
-  bool requireNeighborLandmark(const PointID &landmark_id) const;
+  bool requireNeighborLandmark(const LandmarkID &landmark_id) const;
   /**
    * @brief Return true if the given neighbor unit sphere ID is required by me
    * @param unit_sphere_id

@@ -528,10 +528,10 @@ typedef std::map<PoseID, LiftedPose, CompareStateID> PoseDict;
 // Ordered set of PoseID
 typedef std::set<PoseID, CompareStateID> PoseSet;
 
-// Ordered map of PointID to LiftedPoint object
-typedef std::map<PointID, LiftedPoint, CompareStateID> LandmarkDict;
-// Ordered set of PointID
-typedef std::set<PointID, CompareStateID> LandmarkSet;
+// Ordered map of LandmarkID to LiftedPoint object
+typedef std::map<LandmarkID, LiftedPoint, CompareStateID> LandmarkDict;
+// Ordered set of LandmarkID
+typedef std::set<LandmarkID, CompareStateID> LandmarkSet;
 
 // Ordered map of UnitSphereID to LiftedPoint object
 typedef std::map<UnitSphereID, LiftedPoint, CompareStateID> UnitSphereDict;

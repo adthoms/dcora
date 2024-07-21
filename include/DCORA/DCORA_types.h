@@ -50,16 +50,16 @@ enum class GraphType { PoseGraph, RangeAidedSLAMGraph };
 /**
  * @brief State types
  */
-enum class StateType { None, Pose, Point, UnitSphere };
+enum class StateType { None, Pose, Landmark, UnitSphere };
 
 /**
  * @brief Measurement types
  */
 enum class MeasurementType {
   PosePrior,
-  PointPrior,
+  LandmarkPrior,
   PosePose,
-  PosePoint,
+  PoseLandmark,
   Range
 };
 
@@ -213,7 +213,7 @@ public:
             frame_id == other.frame_id);
   }
   bool isPose() const { return state_type == StateType::Pose; }
-  bool isPoint() const { return state_type == StateType::Point; }
+  bool isLandmark() const { return state_type == StateType::Landmark; }
   bool isUnitSphere() const { return state_type == StateType::UnitSphere; }
 
   // A utility function for streaming this struct to cout
@@ -232,23 +232,23 @@ public:
 
   explicit PoseID(const StateID &state) {
     CHECK(state.isPose())
-        << "Error: Cannot construct PoseID from StateID: State is not "
-           "of type Pose!";
+        << "Error: Cannot construct PoseID from StateID with type: "
+        << StateTypeToString(state.state_type);
     state_type = state.state_type;
     robot_id = state.robot_id;
     frame_id = state.frame_id;
   }
 };
 
-class PointID : public StateID {
+class LandmarkID : public StateID {
 public:
-  explicit PointID(unsigned int rid = 0, unsigned int fid = 0)
-      : StateID(StateType::Point, rid, fid) {}
+  explicit LandmarkID(unsigned int rid = 0, unsigned int fid = 0)
+      : StateID(StateType::Landmark, rid, fid) {}
 
-  explicit PointID(const StateID &state) {
-    CHECK(state.isPoint())
-        << "Error: Cannot construct PointID from StateID: State is "
-           "not of type Point!";
+  explicit LandmarkID(const StateID &state) {
+    CHECK(state.isLandmark())
+        << "Error: Cannot construct LandmarkID from StateID with type: "
+        << StateTypeToString(state.state_type);
     state_type = state.state_type;
     robot_id = state.robot_id;
     frame_id = state.frame_id;
@@ -262,8 +262,8 @@ public:
 
   explicit UnitSphereID(const StateID &state) {
     CHECK(state.isUnitSphere())
-        << "Error: Cannot construct UnitSphereID from StateID: State is "
-           "not of type UnitSphereID!";
+        << "Error: Cannot construct UnitSphereID from StateID with type: "
+        << StateTypeToString(state.state_type);
     state_type = state.state_type;
     robot_id = state.robot_id;
     frame_id = state.frame_id;

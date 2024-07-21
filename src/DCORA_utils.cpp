@@ -61,8 +61,8 @@ std::string StateTypeToString(const StateType &type) {
   case StateType::Pose: {
     return "Pose";
   }
-  case StateType::Point: {
-    return "Point";
+  case StateType::Landmark: {
+    return "Landmark";
   }
   case StateType::UnitSphere: {
     return "UnitSphere";
@@ -76,14 +76,14 @@ std::string MeasurementTypeToString(const MeasurementType &type) {
   case MeasurementType::PosePrior: {
     return "PosePrior";
   }
-  case MeasurementType::PointPrior: {
-    return "PointPrior";
+  case MeasurementType::LandmarkPrior: {
+    return "LandmarkPrior";
   }
   case MeasurementType::PosePose: {
     return "PosePose";
   }
-  case MeasurementType::PosePoint: {
-    return "PosePoint";
+  case MeasurementType::PoseLandmark: {
+    return "PoseLandmark";
   }
   case MeasurementType::Range: {
     return "Range";
@@ -494,20 +494,21 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
     unsigned int robotID;
     unsigned int stateID;
     if (sym[0] == 'L') {
-      // Symbol is a point
+      // Symbol is a landmark
       if (std::isupper(sym[1])) {
         if (sym[1] == 'M') {
-          // Point is associated with the map, though does not obey PyFG
+          // Landmark is associated with the map, though does not obey PyFG
           // formatting.
           LOG(WARNING)
-              << "Warning: point symbol 'LM#' is (by default) associated with "
-                 "the map. Map point features should be formatted as 'L#'.";
+              << "Warning: landmark symbol 'LM#' is (by default) associated "
+                 "with the map. Map landmark features should be formatted as "
+                 "'L#'.";
         }
-        // Point is associated with a robot according to PyFG formatting
+        // Landmark is associated with a robot according to PyFG formatting
         robotID = static_cast<unsigned int>(sym[1] - 'A');
         stateID = std::stoi(sym.substr(2));
       } else {
-        // Point is associated with the map
+        // Landmark is associated with the map
         robotID = static_cast<unsigned int>('M' - 'A');
         stateID = std::stoi(sym.substr(1));
       }
@@ -524,7 +525,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 
   auto getStateTypeFromSymbol = [](const std::string &sym) -> StateType {
     if (sym[0] == 'L')
-      return StateType::Point;
+      return StateType::Landmark;
     else if (std::isupper(sym[0]))
       return StateType::Pose;
     else
@@ -553,9 +554,9 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 
   // Initialize measurements, whose values we will fill in
   PosePrior pose_prior;
-  PointPrior point_prior;
+  LandmarkPrior landmark_prior;
   RelativePosePoseMeasurement pose_pose_measurement;
-  RelativePosePointMeasurement pose_point_measurement;
+  RelativePoseLandmarkMeasurement pose_landmark_measurement;
   RangeMeasurement range_measurement;
 
   // Initialize map for indexing unit spheres according to robot ID
@@ -715,7 +716,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pyfg_dataset.robot_IDs.emplace(robotID);
 
         // Populate ground truth
-        const PointID landmark_id = PointID(robotID, stateID);
+        const LandmarkID landmark_id = LandmarkID(robotID, stateID);
         const Point gt_landmark = Point(t);
         if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
             pyfg_dataset.ground_truth.landmarks.end()) {
@@ -727,8 +728,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
 
       } else {
-        LOG(FATAL) << "Error: could not read point variable from line: " << line
-                   << "!";
+        LOG(FATAL) << "Error: could not read landmark variable from line: "
+                   << line << "!";
       }
       break;
     case LANDMARK_TYPE_3D:
@@ -742,7 +743,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pyfg_dataset.robot_IDs.emplace(robotID);
 
         // Populate ground truth
-        const PointID landmark_id = PointID(robotID, stateID);
+        const LandmarkID landmark_id = LandmarkID(robotID, stateID);
         const Point gt_landmark = Point(t);
         if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
             pyfg_dataset.ground_truth.landmarks.end()) {
@@ -754,8 +755,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
 
       } else {
-        LOG(FATAL) << "Error: could not read point variable from line: " << line
-                   << "!";
+        LOG(FATAL) << "Error: could not read landmark variable from line: "
+                   << line << "!";
       }
       break;
     case LANDMARK_PRIOR_2D:
@@ -769,15 +770,15 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
 
         // Fill in measurement
-        point_prior.r = robotID;
-        point_prior.p = stateID;
-        point_prior.t = t;
-        point_prior.tau = getTau(cov);
+        landmark_prior.r = robotID;
+        landmark_prior.p = stateID;
+        landmark_prior.t = t;
+        landmark_prior.tau = getTau(cov);
 
         // Add measurement
-        pyfg_dataset.measurements.point_priors.push_back(point_prior);
+        pyfg_dataset.measurements.landmark_priors.push_back(landmark_prior);
       } else {
-        LOG(FATAL) << "Error: could not read point prior from line: " << line
+        LOG(FATAL) << "Error: could not read landmark prior from line: " << line
                    << "!";
       }
       break;
@@ -792,15 +793,15 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const auto [robotID, stateID] = getRobotAndStateIDFromSymbol(sym1);
 
         // Fill in measurement
-        point_prior.r = robotID;
-        point_prior.p = stateID;
-        point_prior.t = t;
-        point_prior.tau = getTau(cov);
+        landmark_prior.r = robotID;
+        landmark_prior.p = stateID;
+        landmark_prior.t = t;
+        landmark_prior.tau = getTau(cov);
 
         // Add measurement
-        pyfg_dataset.measurements.point_priors.push_back(point_prior);
+        pyfg_dataset.measurements.landmark_priors.push_back(landmark_prior);
       } else {
-        LOG(FATAL) << "Error: could not read point prior from line: " << line
+        LOG(FATAL) << "Error: could not read landmark prior from line: " << line
                    << "!";
       }
       break;
@@ -882,20 +883,21 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
 
         // Fill in measurement
-        pose_point_measurement.r1 = robot1ID;
-        pose_point_measurement.p1 = state1ID;
-        pose_point_measurement.r2 = robot2ID;
-        pose_point_measurement.p2 = state2ID;
-        pose_point_measurement.t = t;
-        pose_point_measurement.tau = getTau(cov);
+        pose_landmark_measurement.r1 = robot1ID;
+        pose_landmark_measurement.p1 = state1ID;
+        pose_landmark_measurement.r2 = robot2ID;
+        pose_landmark_measurement.p2 = state2ID;
+        pose_landmark_measurement.t = t;
+        pose_landmark_measurement.tau = getTau(cov);
 
         // Add measurement
         pyfg_dataset.measurements.relative_measurements.vec.push_back(
-            pose_point_measurement);
+            pose_landmark_measurement);
       } else {
-        LOG(FATAL) << "Error: could not read relative pose-point measurement "
-                      "from line: "
-                   << line << "!";
+        LOG(FATAL)
+            << "Error: could not read relative pose-landmark measurement "
+               "from line: "
+            << line << "!";
       }
       break;
     case REL_POSE_LANDMARK_TYPE_3D:
@@ -911,20 +913,21 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const auto [robot2ID, state2ID] = getRobotAndStateIDFromSymbol(sym2);
 
         // Fill in measurement
-        pose_point_measurement.r1 = robot1ID;
-        pose_point_measurement.p1 = state1ID;
-        pose_point_measurement.r2 = robot2ID;
-        pose_point_measurement.p2 = state2ID;
-        pose_point_measurement.t = t;
-        pose_point_measurement.tau = getTau(cov);
+        pose_landmark_measurement.r1 = robot1ID;
+        pose_landmark_measurement.p1 = state1ID;
+        pose_landmark_measurement.r2 = robot2ID;
+        pose_landmark_measurement.p2 = state2ID;
+        pose_landmark_measurement.t = t;
+        pose_landmark_measurement.tau = getTau(cov);
 
         // Add measurement
         pyfg_dataset.measurements.relative_measurements.vec.push_back(
-            pose_point_measurement);
+            pose_landmark_measurement);
       } else {
-        LOG(FATAL) << "Error: could not read relative pose-point measurement "
-                      "from line: "
-                   << line << "!";
+        LOG(FATAL)
+            << "Error: could not read relative pose-landmark measurement "
+               "from line: "
+            << line << "!";
       }
       break;
     case RANGE_MEASURE_TYPE:
@@ -986,7 +989,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                   pyfg_dataset.ground_truth.poses.at(src_id).translation();
             },
             [&]() {
-              const PointID &src_id = PointID(range_measurement.getSrcID());
+              const LandmarkID &src_id =
+                  LandmarkID(range_measurement.getSrcID());
               state1_translation.noalias() =
                   pyfg_dataset.ground_truth.landmarks.at(src_id).translation();
             },
@@ -1001,7 +1005,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                   pyfg_dataset.ground_truth.poses.at(dst_id).translation();
             },
             [&]() {
-              const PointID &dst_id = PointID(range_measurement.getDstID());
+              const LandmarkID &dst_id =
+                  LandmarkID(range_measurement.getDstID());
               state2_translation.noalias() =
                   pyfg_dataset.ground_truth.landmarks.at(dst_id).translation();
             },
@@ -1065,7 +1070,7 @@ getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
   unsigned int global_landmark_idx = 0;
   for (const auto &[local_landmark_id, landmark] : gt_landmark_dict) {
     // Populate map
-    const PointID global_landmark_id(global_robot_id, global_landmark_idx);
+    const LandmarkID global_landmark_id(global_robot_id, global_landmark_idx);
     local_to_global_state_dicts.landmarks[local_landmark_id] =
         global_landmark_id;
 
@@ -1123,9 +1128,9 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
       // Add reindexed measurement
       global_measurements.relative_measurements.vec.push_back(meas);
 
-    } else if (std::holds_alternative<RelativePosePointMeasurement>(m)) {
-      RelativePosePointMeasurement meas =
-          std::get<RelativePosePointMeasurement>(m);
+    } else if (std::holds_alternative<RelativePoseLandmarkMeasurement>(m)) {
+      RelativePoseLandmarkMeasurement meas =
+          std::get<RelativePoseLandmarkMeasurement>(m);
 
       // Get global pose id for source and landmark id for destination
       const StateID &global_pose_src_id =
@@ -1231,13 +1236,13 @@ Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset) {
 RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
   RobotMeasurements robot_measurements;
   std::map<unsigned int, unsigned int> robot_first_pose_id;
-  std::map<unsigned int, unsigned int> robot_first_point_id;
+  std::map<unsigned int, unsigned int> robot_first_landmark_id;
 
   // Copy measurements from dataset to robot
   for (const auto &robot_id : pyfg_dataset.robot_IDs) {
     Measurements measurements;
     std::set<unsigned int> pose_ids;
-    std::set<unsigned int> point_ids;
+    std::set<unsigned int> landmark_ids;
 
     // add priors
     for (const auto &pose_prior : pyfg_dataset.measurements.pose_priors) {
@@ -1246,10 +1251,11 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
         pose_ids.insert(pose_prior.p);
       }
     }
-    for (const auto &point_prior : pyfg_dataset.measurements.point_priors) {
-      if (point_prior.r == robot_id) {
-        measurements.point_priors.push_back(point_prior);
-        point_ids.insert(point_prior.p);
+    for (const auto &landmark_prior :
+         pyfg_dataset.measurements.landmark_priors) {
+      if (landmark_prior.r == robot_id) {
+        measurements.landmark_priors.push_back(landmark_prior);
+        landmark_ids.insert(landmark_prior.p);
       }
     }
 
@@ -1262,12 +1268,12 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
               if (m.r1 == robot_id) {
                 executeStateDependantFunctionals(
                     [&]() { pose_ids.insert(m.p1); },
-                    [&]() { point_ids.insert(m.p1); }, m.stateType1);
+                    [&]() { landmark_ids.insert(m.p1); }, m.stateType1);
               }
               if (m.r2 == robot_id) {
                 executeStateDependantFunctionals(
                     [&]() { pose_ids.insert(m.p2); },
-                    [&]() { point_ids.insert(m.p2); }, m.stateType2);
+                    [&]() { landmark_ids.insert(m.p2); }, m.stateType2);
               }
             }
           },
@@ -1283,21 +1289,21 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
     if (!areStateIDsConsecutive(pose_ids))
       LOG(FATAL) << "Error: Pose IDs are not consecutive for robot " << robot_id
                  << "!";
-    if (!areStateIDsConsecutive(point_ids))
-      LOG(FATAL) << "Error: Point IDs are not consecutive for robot "
+    if (!areStateIDsConsecutive(landmark_ids))
+      LOG(FATAL) << "Error: Landmark IDs are not consecutive for robot "
                  << robot_id << "!";
 
     // get first IDs for reindexing
     const unsigned int first_pose_id = *pose_ids.begin();
-    const unsigned int first_point_id = *point_ids.begin();
+    const unsigned int first_landmark_id = *landmark_ids.begin();
     if (first_pose_id != 0)
       LOG(WARNING) << "WARNING: Pose IDs do not start at 0 for robot "
                    << robot_id << " and will be reindexed.";
-    if (first_point_id != 0)
-      LOG(WARNING) << "WARNING: Point IDs do not start at 0 for robot "
+    if (first_landmark_id != 0)
+      LOG(WARNING) << "WARNING: Landmark IDs do not start at 0 for robot "
                    << robot_id << " and will be reindexed.";
     robot_first_pose_id[robot_id] = first_pose_id;
-    robot_first_point_id[robot_id] = first_point_id;
+    robot_first_landmark_id[robot_id] = first_landmark_id;
 
     // emplace
     robot_measurements[robot_id] = measurements;
@@ -1308,18 +1314,18 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
     for (auto &pose_prior : measurements.pose_priors) {
       pose_prior.p -= robot_first_pose_id[robot_id];
     }
-    for (auto &point_prior : measurements.point_priors) {
-      point_prior.p -= robot_first_point_id[robot_id];
+    for (auto &landmark_prior : measurements.landmark_priors) {
+      landmark_prior.p -= robot_first_landmark_id[robot_id];
     }
     for (auto &m : measurements.relative_measurements.vec) {
       std::visit(
           [&](auto &&m) {
             executeStateDependantFunctionals(
                 [&]() { m.p1 -= robot_first_pose_id[m.r1]; },
-                [&]() { m.p1 -= robot_first_point_id[m.r1]; }, m.stateType1);
+                [&]() { m.p1 -= robot_first_landmark_id[m.r1]; }, m.stateType1);
             executeStateDependantFunctionals(
                 [&]() { m.p2 -= robot_first_pose_id[m.r2]; },
-                [&]() { m.p2 -= robot_first_point_id[m.r2]; }, m.stateType2);
+                [&]() { m.p2 -= robot_first_landmark_id[m.r2]; }, m.stateType2);
           },
           m);
     }
@@ -1350,7 +1356,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
 
       // Reindex id and add to the ground truth initialization
       unsigned int idx =
-          local_landmark_id.frame_id - robot_first_point_id.at(robot_id);
+          local_landmark_id.frame_id - robot_first_landmark_id.at(robot_id);
       ground_truth_init.landmark(idx) = landmark.getData();
     }
     for (const auto &[local_unit_sphere_id, unit_sphere] :
@@ -1372,14 +1378,14 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
 }
 
 void executeStateDependantFunctionals(std::function<void()> poseFunction,
-                                      std::function<void()> pointFunction,
+                                      std::function<void()> landmarkFunction,
                                       const StateType &state_type) {
   switch (state_type) {
   case StateType::Pose:
     poseFunction();
     break;
-  case StateType::Point:
-    pointFunction();
+  case StateType::Landmark:
+    landmarkFunction();
     break;
   default:
     LOG(FATAL) << "Invalid StateType: " << StateTypeToString(state_type) << "!";

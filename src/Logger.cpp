@@ -73,8 +73,9 @@ void Logger::logMeasurements(RelativeMeasurements *measurements,
 
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
       measurements->GetRelativePosePoseMeasurements();
-  const std::vector<RelativePosePointMeasurement> &pose_point_measurements =
-      measurements->GetRelativePosePointMeasurements();
+  const std::vector<RelativePoseLandmarkMeasurement>
+      &pose_landmark_measurements =
+          measurements->GetRelativePoseLandmarkMeasurements();
   const std::vector<RangeMeasurement> &range_measurements =
       measurements->GetRangeMeasurements();
 
@@ -82,8 +83,8 @@ void Logger::logMeasurements(RelativeMeasurements *measurements,
     file << "Pose-Pose Measurements\n";
     file << meas << "\n";
   }
-  for (const auto &meas : pose_point_measurements) {
-    file << "Pose-Point Measurements\n";
+  for (const auto &meas : pose_landmark_measurements) {
+    file << "Pose-Landmark Measurements\n";
     file << meas << "\n";
   }
   for (const auto &meas : range_measurements) {
@@ -100,8 +101,10 @@ void Logger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
   CHECK_EQ(T.cols(), (d + 1) * n);
   std::ofstream file;
   file.open(logDirectory + filename);
-  if (!file.is_open())
+  if (!file.is_open()) {
+    LOG(WARNING) << "Cannot write to specified file: " << filename;
     return;
+  }
 
   auto getTranslationAndQuaternion =
       [&d](const Matrix &T) -> std::pair<Eigen::Vector3d, Eigen::Quaterniond> {

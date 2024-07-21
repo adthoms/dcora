@@ -142,10 +142,10 @@ struct PosePrior : PriorMeasurement {
 };
 
 /**
- * @brief A simple struct that contains the elements of a single point prior for
- * (robot, point).
+ * @brief A simple struct that contains the elements of a single landmark prior
+ * for (robot, landmark).
  */
-struct PointPrior : PriorMeasurement {
+struct LandmarkPrior : PriorMeasurement {
   // Translational measurement
   Vector t;
 
@@ -153,16 +153,16 @@ struct PointPrior : PriorMeasurement {
   double tau;
 
   // Default constructor
-  PointPrior()
-      : PriorMeasurement(MeasurementType::PointPrior, 0, 0, StateType::Point,
-                         false, 1.0) {}
+  LandmarkPrior()
+      : PriorMeasurement(MeasurementType::LandmarkPrior, 0, 0,
+                         StateType::Landmark, false, 1.0) {}
 
   // Basic constructor
-  PointPrior(size_t robot, size_t point, const Vector &priorTranslation,
-             double translationalPrecision, bool fixedWeight = false,
-             double weight = 1.0)
-      : PriorMeasurement(MeasurementType::PointPrior, robot, point,
-                         StateType::Point, fixedWeight, weight),
+  LandmarkPrior(size_t robot, size_t landmark, const Vector &priorTranslation,
+                double translationalPrecision, bool fixedWeight = false,
+                double weight = 1.0)
+      : PriorMeasurement(MeasurementType::LandmarkPrior, robot, landmark,
+                         StateType::Landmark, fixedWeight, weight),
         t(priorTranslation),
         tau(translationalPrecision) {}
 
@@ -171,7 +171,7 @@ struct PointPrior : PriorMeasurement {
     CHECK(t.size() == d);
   }
 
-  StateID getSrcID() const override { return PointID(r, p); }
+  StateID getSrcID() const override { return LandmarkID(r, p); }
 
   void print(std::ostream &os) const override {
     os << "t: " << std::endl << t << std::endl;
@@ -346,10 +346,11 @@ struct RelativePosePoseMeasurement : RelativeMeasurement {
 };
 
 /**
- * @brief A simple struct that contains the elements of a relative pose-point
- * measurement from (robot, state) pairs: (robot1, pose1) to (robot2, point2).
+ * @brief A simple struct that contains the elements of a relative pose-landmark
+ * measurement from (robot, state) pairs: (robot1, pose1) to (robot2,
+ * landmark2).
  */
-struct RelativePosePointMeasurement : RelativeMeasurement {
+struct RelativePoseLandmarkMeasurement : RelativeMeasurement {
   // Translational measurement
   Vector t;
 
@@ -357,24 +358,25 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
   double tau;
 
   // Default constructor
-  RelativePosePointMeasurement()
-      : RelativeMeasurement(MeasurementType::PosePoint, 0, 0, 0, 0,
-                            StateType::Pose, StateType::Point, false, 1.0) {}
+  RelativePoseLandmarkMeasurement()
+      : RelativeMeasurement(MeasurementType::PoseLandmark, 0, 0, 0, 0,
+                            StateType::Pose, StateType::Landmark, false, 1.0) {}
 
   // Basic constructor
-  RelativePosePointMeasurement(size_t firstRobot, size_t secondRobot,
-                               size_t firstPose, size_t secondPoint,
-                               const Vector &relativeTranslation,
-                               double translationalPrecision,
-                               bool fixedWeight = false, double weight = 1.0)
-      : RelativeMeasurement(MeasurementType::PosePoint, firstRobot, secondRobot,
-                            firstPose, secondPoint, StateType::Pose,
-                            StateType::Point, fixedWeight, weight),
+  RelativePoseLandmarkMeasurement(size_t firstRobot, size_t secondRobot,
+                                  size_t firstPose, size_t secondLandmark,
+                                  const Vector &relativeTranslation,
+                                  double translationalPrecision,
+                                  bool fixedWeight = false, double weight = 1.0)
+      : RelativeMeasurement(MeasurementType::PoseLandmark, firstRobot,
+                            secondRobot, firstPose, secondLandmark,
+                            StateType::Pose, StateType::Landmark, fixedWeight,
+                            weight),
         t(relativeTranslation),
         tau(translationalPrecision) {}
 
   // Copy constructor
-  RelativePosePointMeasurement(const RelativePosePointMeasurement &other)
+  RelativePoseLandmarkMeasurement(const RelativePoseLandmarkMeasurement &other)
       : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
                             other.p2, other.stateType1, other.stateType2,
                             other.fixedWeight, other.weight),
@@ -382,7 +384,7 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
         tau(other.tau) {}
 
   // Equality operator
-  bool operator==(const RelativePosePointMeasurement &other) const {
+  bool operator==(const RelativePoseLandmarkMeasurement &other) const {
     return std::tie(r1, r2, p1, p2, fixedWeight, weight, t, tau) ==
            std::tie(other.r1, other.r2, other.p1, other.p2, other.fixedWeight,
                     other.weight, other.t, other.tau);
@@ -395,10 +397,10 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
 
   StateID getSrcID() const override { return PoseID(r1, p1); }
 
-  StateID getDstID() const override { return PointID(r2, p2); }
+  StateID getDstID() const override { return LandmarkID(r2, p2); }
 
   EdgeID getEdgeID() const override {
-    return EdgeID(getSrcID(), getDstID(), MeasurementType::PosePoint);
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::PoseLandmark);
   }
 
   void print(std::ostream &os) const override {
@@ -462,8 +464,8 @@ struct RangeMeasurement : RelativeMeasurement {
   StateID getSrcID() const override {
     if (stateType1 == StateType::Pose)
       return PoseID(r1, p1);
-    else if (stateType1 == StateType::Point)
-      return PointID(r1, p1);
+    else if (stateType1 == StateType::Landmark)
+      return LandmarkID(r1, p1);
     else
       LOG(FATAL) << "StateType1 is " << StateTypeToString(stateType1) << " in "
                  << MeasurementTypeToString(measurementType) << "!";
@@ -472,8 +474,8 @@ struct RangeMeasurement : RelativeMeasurement {
   StateID getDstID() const override {
     if (stateType2 == StateType::Pose)
       return PoseID(r2, p2);
-    else if (stateType2 == StateType::Point)
-      return PointID(r2, p2);
+    else if (stateType2 == StateType::Landmark)
+      return LandmarkID(r2, p2);
     else
       LOG(FATAL) << "StateType2 is " << StateTypeToString(stateType2) << " in "
                  << MeasurementTypeToString(measurementType) << "!";
@@ -493,11 +495,11 @@ struct RangeMeasurement : RelativeMeasurement {
 };
 
 // Type-safe unions of relative measurements
-typedef std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,
-                     RangeMeasurement>
+typedef std::variant<RelativePosePoseMeasurement,
+                     RelativePoseLandmarkMeasurement, RangeMeasurement>
     RelativeMeasurementVariant;
 typedef std::variant<RelativePosePoseMeasurement *,
-                     RelativePosePointMeasurement *, RangeMeasurement *>
+                     RelativePoseLandmarkMeasurement *, RangeMeasurement *>
     RelativeMeasurementPointerVariant;
 
 /**
@@ -532,15 +534,15 @@ public:
     return pose_pose_measurements;
   }
 
-  std::vector<RelativePosePointMeasurement>
-  GetRelativePosePointMeasurements() const {
-    std::vector<RelativePosePointMeasurement> pose_point_measurements;
+  std::vector<RelativePoseLandmarkMeasurement>
+  GetRelativePoseLandmarkMeasurements() const {
+    std::vector<RelativePoseLandmarkMeasurement> pose_landmark_measurements;
     for (const auto &m : vec) {
-      if (std::holds_alternative<RelativePosePointMeasurement>(m))
-        pose_point_measurements.emplace_back(
-            std::get<RelativePosePointMeasurement>(m));
+      if (std::holds_alternative<RelativePoseLandmarkMeasurement>(m))
+        pose_landmark_measurements.emplace_back(
+            std::get<RelativePoseLandmarkMeasurement>(m));
     }
-    return pose_point_measurements;
+    return pose_landmark_measurements;
   }
 
   std::vector<RangeMeasurement> GetRangeMeasurements() const {
@@ -558,8 +560,8 @@ public:
     case MeasurementType::PosePose:
       addPosePoseMeasurement(relative_measurement);
       break;
-    case MeasurementType::PosePoint:
-      addPosePointMeasurement(relative_measurement);
+    case MeasurementType::PoseLandmark:
+      addPoseLandmarkMeasurement(relative_measurement);
       break;
     case MeasurementType::Range:
       addRangeMeasurement(relative_measurement);
@@ -589,7 +591,7 @@ private:
   /**
    * @brief Template function to cast a Relative Measurement object to a
    * specific type T, such as RelativePosePoseMeasurement,
-   * RelativePosePointMeasurement, or RangeMeasurement.
+   * RelativePoseLandmarkMeasurement, or RangeMeasurement.
    * @tparam T
    * @param relative_measurement
    * @return
@@ -598,7 +600,7 @@ private:
   T castRelativeMeasurement(const RelativeMeasurement &relative_measurement) {
     if constexpr (std::is_same_v<T, RelativePosePoseMeasurement>)
       return dynamic_cast<const T &>(relative_measurement);
-    else if constexpr (std::is_same_v<T, RelativePosePointMeasurement>)
+    else if constexpr (std::is_same_v<T, RelativePoseLandmarkMeasurement>)
       return dynamic_cast<const T &>(relative_measurement);
     else if constexpr (std::is_same_v<T, RangeMeasurement>)
       return dynamic_cast<const T &>(relative_measurement);
@@ -609,7 +611,7 @@ private:
   }
 
   /**
-   * Add a relative pose pose measurement.
+   * Add a relative pose-pose measurement.
    * @param relative_measurement
    */
   void addPosePoseMeasurement(const RelativeMeasurement &relative_measurement) {
@@ -620,15 +622,15 @@ private:
   }
 
   /**
-   * Add a relative pose point measurement.
+   * Add a relative pose-landmark measurement.
    * @param relative_measurement
    */
   void
-  addPosePointMeasurement(const RelativeMeasurement &relative_measurement) {
-    const RelativePosePointMeasurement &pose_point_measurement =
-        castRelativeMeasurement<RelativePosePointMeasurement>(
+  addPoseLandmarkMeasurement(const RelativeMeasurement &relative_measurement) {
+    const RelativePoseLandmarkMeasurement &pose_landmark_measurement =
+        castRelativeMeasurement<RelativePoseLandmarkMeasurement>(
             relative_measurement);
-    vec.push_back(pose_point_measurement);
+    vec.push_back(pose_landmark_measurement);
   }
 
   /**
@@ -648,7 +650,7 @@ private:
 struct Measurements {
   // Measurements
   std::vector<PosePrior> pose_priors;
-  std::vector<PointPrior> point_priors;
+  std::vector<LandmarkPrior> landmark_priors;
   RelativeMeasurements relative_measurements;
 
   // Ground truth initialization
@@ -665,8 +667,8 @@ struct Measurements {
     for (const auto &pose_prior : measurements.pose_priors) {
       os << pose_prior;
     }
-    for (const auto &point_prior : measurements.point_priors) {
-      os << point_prior;
+    for (const auto &landmark_prior : measurements.landmark_priors) {
+      os << landmark_prior;
     }
     os << "Relative Measurements:" << std::endl;
     os << measurements.relative_measurements << std::endl;

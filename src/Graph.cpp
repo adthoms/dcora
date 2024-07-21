@@ -87,7 +87,7 @@ void Graph::updateNumPosesAndLandmarks(const StateID &stateID) {
   if (stateID.isPose())
     n_ = std::max(n_, static_cast<unsigned int>(stateID.frame_id + 1));
   // Update num landmarks
-  if (stateID.isPoint())
+  if (stateID.isLandmark())
     b_ = std::max(b_, static_cast<unsigned int>(stateID.frame_id + 1));
 }
 
@@ -379,7 +379,7 @@ bool Graph::requireNeighborPose(const PoseID &pose_id) const {
   return nbr_shared_pose_ids_.find(pose_id) != nbr_shared_pose_ids_.end();
 }
 
-bool Graph::requireNeighborLandmark(const PointID &landmark_id) const {
+bool Graph::requireNeighborLandmark(const LandmarkID &landmark_id) const {
   return nbr_shared_landmark_ids_.find(landmark_id) !=
          nbr_shared_landmark_ids_.end();
 }
@@ -453,9 +453,9 @@ PoseSet Graph::activeNeighborPublicPoseIDs() const {
 
 LandmarkSet Graph::activeNeighborPublicLandmarkIDs() const {
   LandmarkSet output;
-  for (const auto &point_id : nbr_shared_landmark_ids_) {
-    if (isNeighborActive(point_id.robot_id)) {
-      output.emplace(point_id);
+  for (const auto &landmark_id : nbr_shared_landmark_ids_) {
+    if (isNeighborActive(landmark_id.robot_id)) {
+      output.emplace(landmark_id);
     }
   }
   return output;
@@ -648,7 +648,8 @@ bool Graph::constructQuadraticCostTermPGO() {
   // Populate AbT and Omega
   for (size_t k = 0; k < m; k++) {
     const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
-    CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
+    CHECK(
+        !std::holds_alternative<RelativePoseLandmarkMeasurement>(measVariant));
     CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
         std::get<RelativePosePoseMeasurement>(measVariant);
@@ -764,7 +765,8 @@ bool Graph::constructLinearCostTermPGO() {
 
   // Iterate over all shared pose-pose loop closures
   for (const auto &measVariant : measurements.vec) {
-    CHECK(!std::holds_alternative<RelativePosePointMeasurement>(measVariant));
+    CHECK(
+        !std::holds_alternative<RelativePoseLandmarkMeasurement>(measVariant));
     CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
         std::get<RelativePosePoseMeasurement>(measVariant);
@@ -840,16 +842,17 @@ bool Graph::constructQuadraticCostTermRASLAM() {
   const RelativeMeasurements &measurements = allMeasurements();
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
       measurements.GetRelativePosePoseMeasurements();
-  const std::vector<RelativePosePointMeasurement> &pose_point_measurements =
-      measurements.GetRelativePosePointMeasurements();
+  const std::vector<RelativePoseLandmarkMeasurement>
+      &pose_landmark_measurements =
+          measurements.GetRelativePoseLandmarkMeasurements();
   const std::vector<RangeMeasurement> &range_measurements =
       measurements.GetRangeMeasurements();
 
   // Set dimensions
   const size_t mPosePose = pose_pose_measurements.size();
-  const size_t mPosePoint = pose_point_measurements.size();
+  const size_t mPoseLandmark = pose_landmark_measurements.size();
   const size_t mRange = range_measurements.size();
-  const size_t mPose = mPosePose + mPosePoint;
+  const size_t mPose = mPosePose + mPoseLandmark;
   CHECK_LE(l_, mRange);
 
   /**
@@ -992,8 +995,8 @@ bool Graph::constructQuadraticCostTermRASLAM() {
     }
   }
   for (size_t k = mPosePose; k < mPose; k++) {
-    const RelativePosePointMeasurement &meas =
-        pose_point_measurements.at(k - mPosePose);
+    const RelativePoseLandmarkMeasurement &meas =
+        pose_landmark_measurements.at(k - mPosePose);
     size_t i = IDX_NOT_SET;
     size_t j = IDX_NOT_SET;
 
@@ -1197,8 +1200,9 @@ bool Graph::constructLinearCostTermRASLAM() {
   const RelativeMeasurements &measurements = sharedLoopClosures();
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
       measurements.GetRelativePosePoseMeasurements();
-  const std::vector<RelativePosePointMeasurement> &pose_point_measurements =
-      measurements.GetRelativePosePointMeasurements();
+  const std::vector<RelativePoseLandmarkMeasurement>
+      &pose_landmark_measurements =
+          measurements.GetRelativePoseLandmarkMeasurements();
   const std::vector<RangeMeasurement> &range_measurements =
       measurements.GetRangeMeasurements();
 
@@ -1531,8 +1535,8 @@ bool Graph::constructLinearCostTermRASLAM() {
   // Reset rotation weight matrix to zero
   OmegaRho.setZero();
 
-  // Iterate over all shared pose-point loop closures
-  for (const auto &meas : pose_point_measurements) {
+  // Iterate over all shared pose-landmark loop closures
+  for (const auto &meas : pose_landmark_measurements) {
     size_t i = IDX_NOT_SET;
     size_t j = IDX_NOT_SET;
 
@@ -1635,7 +1639,7 @@ bool Graph::constructLinearCostTermRASLAM() {
           updateLinearCostFromFixedNeighborPoseToLocalPose();
           G.pose(i) += L_pose;
         } else {
-          CHECK(localSrcStateID.isPoint());
+          CHECK(localSrcStateID.isLandmark());
           updateLinearCostFromFixedNeighborPoseToLocalLandmark();
           G.landmark(i) += L_landmark;
         }
@@ -1645,7 +1649,7 @@ bool Graph::constructLinearCostTermRASLAM() {
         G.unitSphere(l) += L_unit_sphere;
 
       } else {
-        CHECK(neighborDstStateID.isPoint());
+        CHECK(neighborDstStateID.isLandmark());
 
         // Neighbor's fixed state is a lifted landmark
         XcT_landmark.noalias() = XcT;
@@ -1655,7 +1659,7 @@ bool Graph::constructLinearCostTermRASLAM() {
           updateLinearCostFromFixedNeighborLandmarkToLocalPose();
           G.pose(i) += L_pose;
         } else {
-          CHECK(localSrcStateID.isPoint());
+          CHECK(localSrcStateID.isLandmark());
           updateLinearCostFromFixedNeighborLandmarkToLocalLandmark();
           G.landmark(i) += L_landmark;
         }
@@ -1700,13 +1704,13 @@ bool Graph::constructLinearCostTermRASLAM() {
           updateLinearCostFromFixedNeighborPoseToLocalPose();
           G.pose(j) += L_pose;
         } else {
-          CHECK(localDstStateID.isPoint());
+          CHECK(localDstStateID.isLandmark());
           updateLinearCostFromFixedNeighborPoseToLocalLandmark();
           G.landmark(j) += L_landmark;
         }
 
       } else {
-        CHECK(neighborSrcStateID.isPoint());
+        CHECK(neighborSrcStateID.isLandmark());
 
         // Neighbor's fixed state is a lifted landmark
         XcT_landmark.noalias() = XcT;
@@ -1716,7 +1720,7 @@ bool Graph::constructLinearCostTermRASLAM() {
           updateLinearCostFromFixedNeighborLandmarkToLocalPose();
           G.pose(j) += L_pose;
         } else {
-          CHECK(localDstStateID.isPoint());
+          CHECK(localDstStateID.isLandmark());
           updateLinearCostFromFixedNeighborLandmarkToLocalLandmark();
           G.landmark(j) += L_landmark;
         }
@@ -1750,7 +1754,7 @@ bool Graph::constructLinearCostTermRASLAM() {
         updateLinearCostFromFixedNeighborUnitSphereToLocalPose();
         G.pose(j) += L_pose;
       } else {
-        CHECK(localDstStateID.isPoint());
+        CHECK(localDstStateID.isLandmark());
         updateLinearCostFromFixedNeighborUnitSphereToLocalLandmark();
         G.landmark(j) += L_landmark;
       }
@@ -1816,7 +1820,7 @@ Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
             (neighbor_poses_.find(neighborPoseID) != neighbor_poses_.end());
       },
       [&, this]() {
-        const PointID neighborLandmarkID(neighborStateID);
+        const LandmarkID neighborLandmarkID(neighborStateID);
         has_neighbor_state = (neighbor_landmarks_.find(neighborLandmarkID) !=
                               neighbor_landmarks_.end());
       },
@@ -1852,13 +1856,14 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
         << neighborStateID.robot_id << " not found!";
     X = neighborPoseItr->second.pose();
   } break;
-  case StateType::Point: {
-    const PointID neighborLandmarkID(neighborStateID);
-    const auto neighborPointItr = neighbor_landmarks_.find(neighborLandmarkID);
-    CHECK(neighborPointItr != neighbor_landmarks_.end())
+  case StateType::Landmark: {
+    const LandmarkID neighborLandmarkID(neighborStateID);
+    const auto neighborLandmarkItr =
+        neighbor_landmarks_.find(neighborLandmarkID);
+    CHECK(neighborLandmarkItr != neighbor_landmarks_.end())
         << "Error: Fixed landmark variable of agent's neighbor "
         << neighborStateID.robot_id << " not found!";
-    X = neighborPointItr->second.translation();
+    X = neighborLandmarkItr->second.translation();
   } break;
   case StateType::UnitSphere: {
     const UnitSphereID neighborUnitSphereID(neighborStateID);
