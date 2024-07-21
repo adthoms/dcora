@@ -73,8 +73,8 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
   std::vector<size_t> l_cases = {0, 6, 0, 6};
   std::vector<size_t> b_cases = {0, 0, 7, 7};
   for (size_t i = 0; i < l_cases.size(); i++) {
-    size_t l = l_cases.at(i);
-    size_t b = b_cases.at(i);
+    int l = l_cases.at(i);
+    int b = b_cases.at(i);
     DCORA::LiftedRangeAidedArray var(r, d, n, l, b);
     // Test setter and getter methods
     for (int i = 0; i < n; ++i) {

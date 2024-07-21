@@ -312,8 +312,8 @@ private:
   bool is_oblique_var_empty_, is_landmark_var_empty_;
   // The actual variable content is stored inside a ROPTLIB::ProductElement
   std::unique_ptr<ROPTLIB::StieVariable> rotation_var_;
-  std::unique_ptr<ROPTLIB::ObliqueVariable> unit_sphere_var_;
   std::unique_ptr<ROPTLIB::EucVariable> translation_var_;
+  std::unique_ptr<ROPTLIB::ObliqueVariable> unit_sphere_var_;
   std::unique_ptr<ROPTLIB::EucVariable> landmark_var_;
   std::unique_ptr<ROPTLIB::ProductElement> varRA_;
 

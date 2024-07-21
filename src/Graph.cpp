@@ -1366,12 +1366,9 @@ bool Graph::constructLinearCostTermRASLAM() {
     const Matrix &AbRho = AbRhoT.transpose();
     const Matrix &Tc = TcT.transpose();
     const Matrix &Tb = TbT.transpose();
-    const Matrix &AcTau = AcTauT;
     const Matrix &AbTau = AbTauT;
-    const Matrix &Pc = PcT;
     const Matrix &Pb = PbT;
     const Matrix &D = DT;
-    const Matrix &Cc = CcT;
     const Matrix &Cb = CbT;
 
     // Update Q_cb block matrices for current measurement
