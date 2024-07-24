@@ -419,8 +419,9 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
 
   // Log initial trajectory
   if (mParams.logData) {
-    mLogger.logTrajectory(dimension(), num_poses(), T.getData(),
-                          "trajectory_initial.txt");
+    std::string filename =
+        "dcora_" + std::string(1, 'A' + getID()) + "_initial.txt";
+    mLogger.logTrajectory(dimension(), num_poses(), T.getData(), filename);
   }
 
   if (optimizationHalted)
