@@ -20,6 +20,7 @@
 #include <functional>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "Manifolds/Euclidean/Euclidean.h"
@@ -192,7 +193,7 @@ Matrix projectToObliqueManifold(const Matrix &M);
  *
  *   P = A * SymBlockDiag(B^T * C)
  *
- * where A, B, and C are r × dn matrices (cf. eq. (5) in the SE-Sync tech
+ * where A, B, and C are r × kn matrices (cf. eq. (5) in the SE-Sync tech
  * report).
  * @param A
  * @param B
@@ -202,7 +203,42 @@ Matrix projectToObliqueManifold(const Matrix &M);
  * @param n
  */
 Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
-                           unsigned int r, unsigned int d, unsigned int n);
+                           unsigned int r, unsigned int k, unsigned int n);
+
+/**
+ * @brief Helper function to determine if a sparse symmetric matrix S is
+ * positive semi-definite (PSD). Return true if the matrix is PSD, false
+ * otherwise.
+ * @param S
+ * @return
+ */
+bool isSparseSymmetricMatrixPSD(const SparseMatrix &S);
+
+/**
+ * @brief Helper function to calculate the minimum eigen pair {λ, v} of a
+ * sparse symmetric matrix S using the shift-and-invert mode, where σ is the
+ * shift.
+ * @param S
+ * @param sigma
+ * @return
+ */
+std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
+                                                  double sigma);
+
+/**
+ * @brief Helper function to construct the dual certificate matrix S(X) for PGO.
+ * The matrix is regularized via: S(X) + λI, where λ:=lambda.
+ * @param X
+ * @param Q
+ * @param d
+ * @param n
+ * @param lambda
+ * @return
+ */
+SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
+                                               const SparseMatrix &Q,
+                                               unsigned int d, unsigned int n,
+                                               double lambda = 0);
 
 /**
  * @brief Given an element Y in M and a matrix V in T_X(R^{r × dn}) (that is, a

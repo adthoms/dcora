@@ -12,8 +12,11 @@
 #include <DCORA/DCORA_robust.h>
 #include <DCORA/DCORA_utils.h>
 
+#include <Eigen/CholmodSupport>
 #include <Eigen/Geometry>
 #include <Eigen/SPQRSupport>
+#include <Spectra/MatOp/SparseSymShiftSolve.h>
+#include <Spectra/SymEigsShiftSolver.h>
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -1559,21 +1562,96 @@ Matrix projectToObliqueManifold(const Matrix &M) {
 }
 
 Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
-                           unsigned int r, unsigned int d, unsigned int n) {
+                           unsigned int r, unsigned int k, unsigned int n) {
   /*
   The following implementation is adapted from:
   CORA: https://github.com/MarineRoboticsGroup/cora
   */
-  Matrix R(r, d * n);
-  Matrix P(d, d);
-  Matrix S(d, d);
+  Matrix R(r, k * n);
+  Matrix P(k, k);
+  Matrix S(k, k);
   for (unsigned int i = 0; i < n; ++i) {
-    auto start_col = static_cast<Eigen::Index>(i * d);
-    P = BT.block(start_col, 0, d, r) * C.block(0, start_col, r, d);
+    auto start_col = static_cast<Eigen::Index>(i * k);
+    P = BT.block(start_col, 0, k, r) * C.block(0, start_col, r, k);
     S = .5 * (P + P.transpose());
-    R.block(0, start_col, r, d) = A.block(0, start_col, r, d) * S;
+    R.block(0, start_col, r, k) = A.block(0, start_col, r, k) * S;
   }
   return R;
+}
+
+bool isSparseSymmetricMatrixPSD(const SparseMatrix &S) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+  Eigen::CholmodSupernodalLLT<SparseMatrix> MChol;
+  MChol.cholmod().quick_return_if_not_posdef = 1;
+  MChol.cholmod().print = 0;
+  MChol.compute(S);
+  return MChol.info() == Eigen::Success;
+}
+
+using SpectraSparseSymShiftSolve =
+    Spectra::SparseSymShiftSolve<double, Eigen::Lower, Eigen::RowMajor>;
+std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
+                                                  double sigma) {
+  CHECK_LE(sigma, 0.0)
+      << "Error: The minimum eigen pair should only be computed for matrices "
+         "for which a sparse Cholesky factorization was unsuccessful, thus "
+         "implying the minimum eigenvalues is less than zero";
+  CHECK(S.isApprox(S.transpose()));
+  SpectraSparseSymShiftSolve op(S);
+  Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(op, 1, 6,
+                                                                    sigma);
+
+  eigsolver.init();
+  eigsolver.compute(Spectra::SortRule::LargestMagn);
+  if (eigsolver.info() != Spectra::CompInfo::Successful)
+    LOG(FATAL) << "Error: Could not compute the minimum eigenvalue of sparse "
+                  "symmetric matrix S.";
+
+  double min_eigenvalue = eigsolver.eigenvalues()[0];
+  CHECK_LE(min_eigenvalue, 0.0)
+      << "Error: Minimum eigenvalue is not less than or equal to zero. Check "
+         "that matrix S is symmetric and positive semidefinite.";
+  return {min_eigenvalue, eigsolver.eigenvectors().col(0)};
+}
+
+SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
+                                               const SparseMatrix &Q,
+                                               unsigned int d, unsigned int n,
+                                               double lambda) {
+  /*
+  The following implementation is adapted from:
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
+  */
+
+  // Compute Lambda blocks
+  unsigned int dh = d + 1;
+  Matrix QXt = Q * X.transpose();
+  Matrix Lambda_blocks = Matrix::Zero(dh, n * dh);
+#pragma omp parallel for
+  for (unsigned int i = 0; i < n; ++i) {
+    Matrix P =
+        QXt.block(i * dh, 0, d, X.rows()) * X.block(0, i * dh, X.rows(), d);
+    Lambda_blocks.block(0, i * dh, d, d) = .5 * (P + P.transpose());
+  }
+
+  // Compute Lambda from Lambda blocks
+  std::vector<Eigen::Triplet<double>> elements;
+  elements.reserve(dh * dh * n);
+  for (unsigned int i = 0; i < n; ++i)
+    for (unsigned int r = 0; r < dh; ++r)
+      for (unsigned int c = 0; c < dh; ++c)
+        elements.emplace_back(i * dh + r, i * dh + c,
+                              Lambda_blocks(r, i * dh + c));
+
+  SparseMatrix Lambda(dh * n, dh * n);
+  Lambda.setFromTriplets(elements.begin(), elements.end());
+
+  // Compute dual certificate matrix with regularization
+  const SparseMatrix I = Matrix::Identity(dh * n, dh * n).sparseView();
+  return Q - Lambda + lambda * I;
 }
 
 Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
