@@ -99,9 +99,9 @@ Matrix QuadraticProblem::RieGradSE(const Matrix &Y, unsigned int r,
                                    unsigned int d, unsigned int n) const {
   LiftedSEVariable Var(r, d, n);
   Var.setData(Y);
-  LiftedSEVector RGrad(r, d, n);
   LiftedSEVector EGrad(r, d, n);
   EucGrad(Var.var(), EGrad.vec());
+  LiftedSEVector RGrad(r, d, n);
   projectToTangentSpace(Var.var(), EGrad.vec(), RGrad.vec());
   return RGrad.getData();
 }
@@ -112,14 +112,52 @@ Matrix QuadraticProblem::RieGradRA(const Matrix &Y, unsigned int r,
   LiftedRAVariable Var(r, d, n, l, b);
   Var.setData(Y);
   LiftedRAVector EGrad(r, d, n, l, b);
-  LiftedRAVector RGrad(r, d, n, l, b);
   EucGrad(Var.var(), EGrad.vec());
+  LiftedRAVector RGrad(r, d, n, l, b);
   projectToTangentSpace(Var.var(), EGrad.vec(), RGrad.vec());
   return RGrad.getData();
 }
 
 double QuadraticProblem::RieGradNorm(const Matrix &Y) const {
   return RieGrad(Y).norm();
+}
+
+Matrix QuadraticProblem::Retract(const Matrix &Y, const Matrix &V) const {
+  // Get problem dimensions
+  unsigned int r = relaxation_rank();
+  unsigned int d = dimension();
+  unsigned int n = num_poses();
+  unsigned int l = num_unit_spheres();
+  unsigned int b = num_landmarks();
+
+  // Delegate to specific Riemannian gradient based on manifold type
+  return use_se_manifold_ ? RetractSE(Y, V, r, d, n)
+                          : RetractRA(Y, V, r, d, n, l, b);
+}
+
+Matrix QuadraticProblem::RetractSE(const Matrix &Y, const Matrix &V,
+                                   unsigned int r, unsigned int d,
+                                   unsigned int n) const {
+  LiftedSEVariable inVar(r, d, n);
+  inVar.setData(Y);
+  LiftedSEVector inVec(r, d, n);
+  inVec.setData(V);
+  LiftedSEVariable outVar(r, d, n);
+  M_SE->getManifold()->Retraction(inVar.var(), inVec.vec(), outVar.var());
+  return outVar.getData();
+}
+
+Matrix QuadraticProblem::RetractRA(const Matrix &Y, const Matrix &V,
+                                   unsigned int r, unsigned int d,
+                                   unsigned int n, unsigned int l,
+                                   unsigned int b) const {
+  LiftedRAVariable inVar(r, d, n, l, b);
+  inVar.setData(Y);
+  LiftedRAVector inVec(r, d, n, l, b);
+  inVec.setData(V);
+  LiftedRAVariable outVar(r, d, n, l, b);
+  M_RA->getManifold()->Retraction(inVar.var(), inVec.vec(), outVar.var());
+  return outVar.getData();
 }
 
 void QuadraticProblem::projectToTangentSpace(ROPTLIB::Variable *x,

@@ -146,6 +146,14 @@ public:
    */
   double RieGradNorm(const Matrix &Y) const;
 
+  /**
+   * @brief Compute the retraction of tangent vector V at Y
+   * @param Y point on the manifold (matrix form)
+   * @param V tangent vector at point Y in the manifold's tangent space (matrix
+   * form)
+   */
+  Matrix Retract(const Matrix &Y, const Matrix &V) const;
+
 private:
   // The graph that represents the optimization problem
   std::shared_ptr<Graph> graph_;
@@ -182,6 +190,35 @@ private:
    */
   Matrix RieGradRA(const Matrix &Y, unsigned int r, unsigned int d,
                    unsigned int n, unsigned int l, unsigned int b) const;
+
+  /**
+   * @brief Helper function to compute the retraction of tangent vector V at Y
+   * in the SE domain. See Retract for more details.
+   * @param Y
+   * @param V
+   * @param r
+   * @param d
+   * @param n
+   * @return
+   */
+  Matrix RetractSE(const Matrix &Y, const Matrix &V, unsigned int r,
+                   unsigned int d, unsigned int n) const;
+
+  /**
+   * @brief Helper function to compute the retraction of tangent vector V at Y
+   * in the RA domain. See Retract for more details.
+   * @param Y
+   * @param V
+   * @param r
+   * @param d
+   * @param n
+   * @param l
+   * @param b
+   * @return
+   */
+  Matrix RetractRA(const Matrix &Y, const Matrix &V, unsigned int r,
+                   unsigned int d, unsigned int n, unsigned int l,
+                   unsigned int b) const;
 
   /**
    * @brief Helper function to project vector inVec onto the tangent space of
