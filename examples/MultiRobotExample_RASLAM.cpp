@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
 
   unsigned int d, r;
   d = dataset.dim;
-  r = 5;
+  r = d;
   bool acceleration = true;
   bool verbose = false;
   unsigned numIters = 1000;
