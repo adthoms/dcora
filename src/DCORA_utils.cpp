@@ -52,6 +52,9 @@ std::string InitializationMethodToString(InitializationMethod method) {
   case InitializationMethod::GNC_TLS: {
     return "GNC_TLS";
   }
+  case InitializationMethod::Random: {
+    return "Random";
+  }
   }
   return "";
 }
@@ -1565,7 +1568,7 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
                            unsigned int r, unsigned int k, unsigned int n) {
   /*
   The following implementation is adapted from:
-  CORA: https://github.com/MarineRoboticsGroup/cora
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   */
   Matrix R(r, k * n);
   Matrix P(k, k);
@@ -1579,10 +1582,36 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
   return R;
 }
 
+bool fastVerification(const SparseMatrix &S, double eta, double *theta,
+                      Vector *v, double *shift) {
+  // Regularize dual certificate matrix
+  unsigned int k = S.rows();
+  const SparseMatrix I = Matrix::Identity(k, k).sparseView();
+  const SparseMatrix M = S + eta * I;
+
+  // Check if regularized dual certificate matrix is positive semi-definite
+  bool isPSD = isSparseSymmetricMatrixPSD(M);
+  if (!isPSD) {
+    // Compute the minimum eigen pair
+    auto [min_eigenvalue, min_eigenvector] =
+        computeMinimumEigenPair(M, *shift, eta);
+
+    // Calculate curvature along estimated minimum eigenvector
+    *theta = min_eigenvector.dot(S * min_eigenvector);
+
+    // Set minimum eigen vector
+    *v = min_eigenvector;
+
+    // Set shift for next iteration
+    *shift = min_eigenvalue;
+  }
+  return isPSD;
+}
+
 bool isSparseSymmetricMatrixPSD(const SparseMatrix &S) {
   /*
   The following implementation is adapted from:
-  CORA: https://github.com/MarineRoboticsGroup/cora
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   */
   Eigen::CholmodSupernodalLLT<SparseMatrix> MChol;
   MChol.cholmod().quick_return_if_not_posdef = 1;
@@ -1594,33 +1623,54 @@ bool isSparseSymmetricMatrixPSD(const SparseMatrix &S) {
 using SpectraSparseSymShiftSolve =
     Spectra::SparseSymShiftSolve<double, Eigen::Lower, Eigen::RowMajor>;
 std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
-                                                  double sigma) {
+                                                  double sigma, double eta) {
   CHECK_LE(sigma, 0.0)
       << "Error: The minimum eigen pair should only be computed for matrices "
          "for which a sparse Cholesky factorization was unsuccessful, thus "
-         "implying the minimum eigenvalues is less than zero";
+         "implying the minimum eigenvalue is less than zero";
   CHECK(S.isApprox(S.transpose()));
-  SpectraSparseSymShiftSolve op(S);
-  Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(op, 1, 6,
-                                                                    sigma);
 
-  eigsolver.init();
-  eigsolver.compute(Spectra::SortRule::LargestMagn);
-  if (eigsolver.info() != Spectra::CompInfo::Successful)
-    LOG(FATAL) << "Error: Could not compute the minimum eigenvalue of sparse "
-                  "symmetric matrix S.";
+  int max_iter = 10;
+  double min_eigenvalue;
+  Vector min_eigenvector;
+  for (int i = 0; i < max_iter; i++) {
+    SpectraSparseSymShiftSolve op(S);
+    Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(op, 1, 6,
+                                                                      sigma);
 
-  double min_eigenvalue = eigsolver.eigenvalues()[0];
+    eigsolver.init();
+    eigsolver.compute(Spectra::SortRule::LargestMagn);
+    if (eigsolver.info() == Spectra::CompInfo::Successful) {
+      min_eigenvalue = eigsolver.eigenvalues()[0];
+      min_eigenvector = eigsolver.eigenvectors().col(0);
+      break;
+    } else {
+      LOG(WARNING)
+          << "Warning: Could not compute minimum eigen pair with shift sigma = "
+          << sigma << ". Halving shift and repeating computation.";
+      sigma /= 2;
+    }
+
+    if (i == max_iter - 1) {
+      double min_eigenvalue_within_tol = -2 * eta;
+      LOG(WARNING)
+          << "Warning: Minimum eigen pair computation was unsuccessful. "
+             "Solving minium eigen pair using two times eta = "
+          << min_eigenvalue_within_tol;
+      sigma = min_eigenvalue_within_tol;
+    }
+  }
+
   CHECK_LE(min_eigenvalue, 0.0)
-      << "Error: Minimum eigenvalue is not less than or equal to zero. Check "
-         "that matrix S is symmetric and positive semidefinite.";
-  return {min_eigenvalue, eigsolver.eigenvectors().col(0)};
+      << "Error: Calculated minimum eigenvalue is not less than zero. Try "
+         "adjusting the numerical tolerance for minimum eigenvalue "
+         "nonnegativity.";
+  return {min_eigenvalue, min_eigenvector};
 }
 
 SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
                                                const SparseMatrix &Q,
-                                               unsigned int d, unsigned int n,
-                                               double lambda) {
+                                               unsigned int d, unsigned int n) {
   /*
   The following implementation is adapted from:
   SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
@@ -1649,9 +1699,8 @@ SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
   SparseMatrix Lambda(dh * n, dh * n);
   Lambda.setFromTriplets(elements.begin(), elements.end());
 
-  // Compute dual certificate matrix with regularization
-  const SparseMatrix I = Matrix::Identity(dh * n, dh * n).sparseView();
-  return Q - Lambda + lambda * I;
+  // Compute dual certificate matrix
+  return Q - Lambda;
 }
 
 Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
@@ -1659,7 +1708,7 @@ Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
                                             unsigned int n) {
   /*
   The following implementation is adapted from:
-  CORA: https://github.com/MarineRoboticsGroup/cora
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   */
   return V - symBlockDiagProduct(Y, Y.transpose(), V, r, d, n);
 }
@@ -1667,7 +1716,7 @@ Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
 Matrix projectToObliqueManifoldTangentSpace(const Matrix &Y, const Matrix &V) {
   /*
   The following implementation is adapted from:
-  CORA: https://github.com/MarineRoboticsGroup/cora
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   */
   Vector inner_prods = (Y.array() * V.array()).colwise().sum();
   Matrix scaled_cols = Y.array().rowwise() * inner_prods.transpose().array();

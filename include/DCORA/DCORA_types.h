@@ -40,7 +40,7 @@ typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
 /**
  * @brief Algorithms for initializing PGO
  */
-enum class InitializationMethod { Odometry, Chordal, GNC_TLS };
+enum class InitializationMethod { Odometry, Chordal, GNC_TLS, Random };
 
 /**
  * @brief Graph types

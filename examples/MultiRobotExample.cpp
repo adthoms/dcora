@@ -120,57 +120,60 @@ int main(int argc, char **argv) {
   bool logData = true;
   unsigned int r_min = 5;
   unsigned int r_max = 100;
-  double shift = -100;
+  double min_eig_num_tol = 1e-6;
+  double gradient_tolerance = 1e-6;
+  double preconditioned_gradient_tolerance = 1e-6;
+  double shift = -20;
   double RGradNormTol = 0.1;
-  DCORA::InitializationMethod init_method =
-      DCORA::InitializationMethod::Odometry;
-  bool rbcd_only = true;
+  DCORA::InitializationMethod init_method = DCORA::InitializationMethod::Random;
+  bool rbcd_only = false;
 
   /**
    * @brief DC2-PGO Algorithm
    */
-  DCORA::Matrix TInit;
+
+  // Initialize current state estimate
+  DCORA::Matrix Xcurr = DCORA::Matrix::Zero(r_max, n * (d + 1));
   switch (init_method) {
   case DCORA::InitializationMethod::Odometry: {
-    std::vector<DCORA::RelativePosePoseMeasurement> odometry_central;
+    std::vector<DCORA::RelativePosePoseMeasurement> odometryCentral;
     for (auto mIn : dataset) {
-      if (mIn.p1 + 1 == mIn.p2) {
-        odometry_central.push_back(mIn);
-      }
+      if (mIn.p1 + 1 != mIn.p2)
+        continue;
+
+      odometryCentral.push_back(mIn);
     }
-    DCORA::PoseArray TOdom = DCORA::odometryInitialization(odometry_central);
-    TInit = TOdom.getData();
+    DCORA::PoseArray TOdom = DCORA::odometryInitialization(odometryCentral);
+    Xcurr.topRows(d) = TOdom.getData();
     break;
   }
   case DCORA::InitializationMethod::Chordal: {
     DCORA::PoseArray TChordal = DCORA::chordalInitialization(dataset);
-    TInit = TChordal.getData();
+    Xcurr.topRows(d) = TChordal.getData();
     break;
   }
-  default: {
-    DCORA::Matrix M = DCORA::Matrix::Random(d, (d + 1) * n);
-    TInit = DCORA::projectToSEMatrix(M, d, d, n);
+  case DCORA::InitializationMethod::Random: {
+    DCORA::Matrix M = DCORA::Matrix::Random(r_min, (d + 1) * n);
+    Xcurr.topRows(r_min) = DCORA::projectToSEMatrix(M, r_min, d, n);
     break;
   }
+  default:
+    LOG(FATAL) << "Error: Invalid initialization method: "
+               << InitializationMethodToString(init_method) << "!";
   }
 
-  // Initialize current state estimate
-  DCORA::Matrix Xcurr;
-
+  unsigned int totalIter = 0;
   for (unsigned int r = r_min; r < r_max; ++r) {
-    // All agents share a special, common matrix called the 'lifting matrix'
-    DCORA::Matrix lifting_matrix = DCORA::fixedStiefelVariable(r, d);
-
     // Construct the centralized problem (used for evaluation)
-    std::shared_ptr<DCORA::Graph> pose_graph_curr_rank =
+    std::shared_ptr<DCORA::Graph> poseGraphCurrRank =
         std::make_shared<DCORA::Graph>(0, r, d);
-    pose_graph_curr_rank->setMeasurements(dataset);
-    DCORA::QuadraticProblem problemCentralCurrRank(pose_graph_curr_rank);
+    poseGraphCurrRank->setMeasurements(dataset);
+    DCORA::QuadraticProblem problemCentralCurrRank(poseGraphCurrRank);
 
-    std::shared_ptr<DCORA::Graph> pose_graph_next_rank =
+    std::shared_ptr<DCORA::Graph> poseGraphNextRank =
         std::make_shared<DCORA::Graph>(0, r + 1, d);
-    pose_graph_next_rank->setMeasurements(dataset);
-    DCORA::QuadraticProblem problemCentralNextRank(pose_graph_next_rank);
+    poseGraphNextRank->setMeasurements(dataset);
+    DCORA::QuadraticProblem problemCentralNextRank(poseGraphNextRank);
 
     // Initialize agents
     std::vector<DCORA::PGOAgent *> agents;
@@ -183,7 +186,14 @@ int main(int argc, char **argv) {
       options.logData = logData;
 
       auto *agent = new DCORA::PGOAgent(robot, options);
-      agent->setLiftingMatrix(lifting_matrix);
+
+      // All agents share a special, common matrix called the 'lifting matrix'
+      // which the first agent will generate
+      if (robot > 0) {
+        DCORA::Matrix M;
+        agents[0]->getLiftingMatrix(&M);
+        agent->setLiftingMatrix(M);
+      }
       agent->setMeasurements(odometry[robot], private_loop_closures[robot],
                              shared_loop_closure[robot]);
       agent->initialize();
@@ -191,9 +201,6 @@ int main(int argc, char **argv) {
     }
 
     // Set X
-    if (r == r_min)
-      Xcurr = lifting_matrix * TInit;
-
     for (unsigned robot = 0; robot < (unsigned)num_robots; ++robot) {
       unsigned startIdx = robot * num_poses_per_robot;
       unsigned endIdx = (robot + 1) * num_poses_per_robot; // non-inclusive
@@ -264,7 +271,7 @@ int main(int argc, char **argv) {
       }
       DCORA::Matrix RGrad = problemCentralCurrRank.RieGrad(Xopt);
       double RGradNorm = RGrad.norm();
-      std::cout << std::setprecision(5) << "Iter = " << iter << " | "
+      std::cout << std::setprecision(5) << "Iter = " << totalIter << " | "
                 << "robot = " << selectedRobotPtr->getID() << " | "
                 << "cost = " << 2 * problemCentralCurrRank.f(Xopt) << " | "
                 << "gradnorm = " << RGradNorm << std::endl;
@@ -292,6 +299,7 @@ int main(int argc, char **argv) {
         selectedRobot = std::max_element(gradNorms.begin(), gradNorms.end()) -
                         gradNorms.begin();
       }
+      totalIter++;
     }
 
     if (rbcd_only) {
@@ -307,15 +315,25 @@ int main(int argc, char **argv) {
     }
 
     // Construct corresponding dual certificate matrix
-    double lambda = 0.1;
-    const DCORA::SparseMatrix &Q = pose_graph_curr_rank->quadraticMatrix();
-    const DCORA::SparseMatrix dual_certificate_matrix =
-        DCORA::constructDualCertificateMatrixPGO(Xopt, Q, d, n, lambda);
+    const DCORA::SparseMatrix &Q = poseGraphCurrRank->quadraticMatrix();
+    const DCORA::SparseMatrix S =
+        DCORA::constructDualCertificateMatrixPGO(Xopt, Q, d, n);
 
     // Check if dual certificate matrix is PSD
-    if (DCORA::isSparseSymmetricMatrixPSD(dual_certificate_matrix)) {
-      LOG(INFO) << "Z = (X*)^T(X*) is a global minimizer! Outputting agent "
-                   "trajectories";
+    double theta;
+    DCORA::Vector min_eigenvector;
+    bool global_opt = DCORA::fastVerification(S, min_eig_num_tol, &theta,
+                                              &min_eigenvector, &shift);
+
+    // Check eigenvalue convergence
+    if (!global_opt && theta >= -min_eig_num_tol / 2)
+      LOG(FATAL) << "Error: Escape direction computation did not converge to "
+                    "desired precision!";
+
+    if (global_opt) {
+      LOG(INFO)
+          << "Z = (X*)^T(X*) is a global minimizer! Outputting rounded agent "
+             "trajectories.";
       // Share global anchor for rounding
       DCORA::Matrix M;
       agents[0]->getSharedPose(0, &M);
@@ -324,37 +342,25 @@ int main(int argc, char **argv) {
         agentPtr->reset();
       }
       break;
-    }
-    LOG(INFO) << "State estimate at rank " << r
-              << " is not a global minimizer. Proceeding to next rank.";
-
-    // Compute minimum eigen pair
-    auto [eigenValue, eigenVector] =
-        DCORA::computeMinimumEigenPair(dual_certificate_matrix, shift);
-    shift = eigenValue;
-
-    // Lift first-order critical point to next rank
-    DCORA::Matrix X_plus = DCORA::Matrix::Zero(r + 1, n * (d + 1));
-    X_plus.block(0, 0, r, n * (d + 1)) = Xopt;
-
-    // Construct second-order decent direction
-    DCORA::Matrix X_dot_plus = DCORA::Matrix::Zero(r + 1, n * (d + 1));
-    X_dot_plus.row(r) = eigenVector.transpose();
-
-    // Descend from suboptimal point Xopt
-    double alpha = 1.0;
-    DCORA::Matrix X_retract =
-        problemCentralNextRank.Retract(X_plus, alpha * X_dot_plus);
-    while (problemCentralNextRank.f(X_retract) >=
-               problemCentralNextRank.f(X_plus) ||
-           problemCentralNextRank.RieGradNorm(X_retract) == 0) {
-      alpha = alpha / 2;
-      X_retract = problemCentralNextRank.Retract(X_plus, alpha * X_dot_plus);
+    } else {
+      LOG(INFO) << "Saddle point detected at rank " << r
+                << "! Curvature along escape direction: " << theta;
     }
 
-    // Set current X for next rank
-    Xcurr.conservativeResize(Xcurr.rows() + 1, Eigen::NoChange);
-    Xcurr = X_retract;
+    DCORA::Matrix X;
+    bool escape_success = problemCentralNextRank.escapeSaddle(
+        Xopt, theta, min_eigenvector, gradient_tolerance,
+        preconditioned_gradient_tolerance, &X);
+    if (escape_success) {
+      // Update initialization point for next level in the Staircase
+      Xcurr.topRows(r + 1) = X;
+    } else {
+      LOG(WARNING) << "Warning: Backtracking line search failed to escape from "
+                      "Saddle point. Try decreasing the preconditioned "
+                      "Gradient norm tolerance and/or the numerical tolerance "
+                      "for minimum eigenvalue nonnegativity.";
+      break;
+    }
   }
 
   exit(0);

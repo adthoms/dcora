@@ -206,6 +206,24 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
                            unsigned int r, unsigned int k, unsigned int n);
 
 /**
+ * @brief Given a symmetric sparse matrix S, this function returns a Boolean
+ * value indicating whether the regularized matrix M := S + eta * I is
+ * positive-semidefinite. In the event that M is *not* PSD, this function
+ * additionally computes a direction of negative curvature x of S, and its
+ * associated Rayleight quotient theta := x'Sx < 0 using a shift-and-invert mode
+ * eigen solver. See the original implementation in SE-Sync for details, noting
+ * that the shift-and-invert mode eigen solver is unique to DCORA.
+ * @param S
+ * @param eta
+ * @param theta
+ * @param v
+ * @param shift
+ * @return
+ */
+bool fastVerification(const SparseMatrix &S, double eta, double *theta,
+                      Vector *v, double *shift);
+
+/**
  * @brief Helper function to determine if a sparse symmetric matrix S is
  * positive semi-definite (PSD). Return true if the matrix is PSD, false
  * otherwise.
@@ -217,28 +235,28 @@ bool isSparseSymmetricMatrixPSD(const SparseMatrix &S);
 /**
  * @brief Helper function to calculate the minimum eigen pair {λ, v} of a
  * sparse symmetric matrix S using the shift-and-invert mode, where σ is the
- * shift.
+ * shift. This function uses a heuristic where by σ is halved if the solver is
+ * unsuccessful. This reduction occurs for a set number of iterations, where the
+ * minimum allowable shift is then set to -2 * eta.
  * @param S
  * @param sigma
+ * @param eta
  * @return
  */
 std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
-                                                  double sigma);
+                                                  double sigma, double eta);
 
 /**
  * @brief Helper function to construct the dual certificate matrix S(X) for PGO.
- * The matrix is regularized via: S(X) + λI, where λ:=lambda.
  * @param X
  * @param Q
  * @param d
  * @param n
- * @param lambda
  * @return
  */
 SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
                                                const SparseMatrix &Q,
-                                               unsigned int d, unsigned int n,
-                                               double lambda = 0);
+                                               unsigned int d, unsigned int n);
 
 /**
  * @brief Given an element Y in M and a matrix V in T_X(R^{r × dn}) (that is, a
