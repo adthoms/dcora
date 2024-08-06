@@ -221,8 +221,45 @@ private:
                    unsigned int b) const;
 
   /**
-   * @brief Helper function to project vector inVec onto the tangent space of
-   * the manifold at x, yielding outVec
+   * @brief Helper function to compute the preconditioner.
+   * @param Y
+   * @param V
+   * @return
+   */
+  Matrix PreCondition(const Matrix &Y, const Matrix &V) const;
+
+  /**
+   * @brief Helper function to compute the preconditioner in the SE domain. See
+   * PreCondition for details.
+   * @param Y
+   * @param V
+   * @param r
+   * @param d
+   * @param n
+   * @return
+   */
+  Matrix PreConditionSE(const Matrix &Y, const Matrix &V, unsigned int r,
+                        unsigned int d, unsigned int n) const;
+
+  /**
+   * @brief Helper function to compute the preconditioner in the RA domain. See
+   * PreCondition for details.
+   * @param Y
+   * @param V
+   * @param r
+   * @param d
+   * @param n
+   * @param l
+   * @param b
+   * @return
+   */
+  Matrix PreConditionRA(const Matrix &Y, const Matrix &V, unsigned int r,
+                        unsigned int d, unsigned int n, unsigned int l,
+                        unsigned int b) const;
+
+  /**
+   * @brief Helper function to project vector inVec onto the tangent space
+   * of the manifold at x, yielding outVec
    * @param x
    * @param inVec
    * @param outVec

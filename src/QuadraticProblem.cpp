@@ -160,6 +160,44 @@ Matrix QuadraticProblem::RetractRA(const Matrix &Y, const Matrix &V,
   return outVar.getData();
 }
 
+Matrix QuadraticProblem::PreCondition(const Matrix &Y, const Matrix &V) const {
+  // Get problem dimensions
+  unsigned int r = relaxation_rank();
+  unsigned int d = dimension();
+  unsigned int n = num_poses();
+  unsigned int l = num_unit_spheres();
+  unsigned int b = num_landmarks();
+
+  // Delegate to specific preconditioner based on manifold type
+  return use_se_manifold_ ? PreConditionSE(Y, V, r, d, n)
+                          : PreConditionRA(Y, V, r, d, n, l, b);
+}
+
+Matrix QuadraticProblem::PreConditionSE(const Matrix &Y, const Matrix &V,
+                                        unsigned int r, unsigned int d,
+                                        unsigned int n) const {
+  LiftedSEVariable inVar(r, d, n);
+  inVar.setData(Y);
+  LiftedSEVector inVec(r, d, n);
+  inVec.setData(V);
+  LiftedSEVector outVec(r, d, n);
+  PreConditioner(inVar.var(), inVec.vec(), outVec.vec());
+  return outVec.getData();
+}
+
+Matrix QuadraticProblem::PreConditionRA(const Matrix &Y, const Matrix &V,
+                                        unsigned int r, unsigned int d,
+                                        unsigned int n, unsigned int l,
+                                        unsigned int b) const {
+  LiftedRAVariable inVar(r, d, n, l, b);
+  inVar.setData(Y);
+  LiftedRAVector inVec(r, d, n, l, b);
+  inVec.setData(V);
+  LiftedRAVector outVec(r, d, n, l, b);
+  PreConditioner(inVar.var(), inVec.vec(), outVec.vec());
+  return outVec.getData();
+}
+
 void QuadraticProblem::projectToTangentSpace(ROPTLIB::Variable *x,
                                              ROPTLIB::Vector *inVec,
                                              ROPTLIB::Vector *outVec) const {
