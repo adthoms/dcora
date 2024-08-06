@@ -154,6 +154,21 @@ public:
    */
   Matrix Retract(const Matrix &Y, const Matrix &V) const;
 
+  /**
+   * @brief Helper function used in the Riemannian Staircase to escape from a
+   * saddle point. Returns true if successful, false otherwise. See the original
+   * implementation in SE-Sync for details.
+   * @param Xopt
+   * @param theta
+   * @param v
+   * @param gradient_tolerance
+   * @param X
+   * @return
+   */
+  bool escapeSaddle(const Matrix &Xopt, double theta, const Vector &v,
+                    double gradient_tolerance,
+                    double preconditioned_gradient_tolerance, Matrix *X);
+
 private:
   // The graph that represents the optimization problem
   std::shared_ptr<Graph> graph_;

@@ -135,6 +135,95 @@ Matrix QuadraticProblem::Retract(const Matrix &Y, const Matrix &V) const {
                           : RetractRA(Y, V, r, d, n, l, b);
 }
 
+bool QuadraticProblem::escapeSaddle(const Matrix &Xopt, double theta,
+                                    const Vector &v, double gradient_tolerance,
+                                    double preconditioned_gradient_tolerance,
+                                    Matrix *X) {
+  // Get problem dimensions
+  unsigned int r = relaxation_rank();
+  unsigned int k = problem_dimension();
+  CHECK_EQ(Xopt.rows(), r - 1);
+  CHECK_EQ(Xopt.cols(), k);
+
+  // Lift first-order critical point to next rank
+  Matrix X_plus = DCORA::Matrix::Zero(r, k);
+  X_plus.topRows(r - 1) = Xopt;
+
+  // Construct second-order decent direction
+  Matrix X_dot_plus = DCORA::Matrix::Zero(r, k);
+  X_dot_plus.bottomRows<1>() = v.transpose();
+
+  /*
+  The following implementation is adapted from:
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
+  */
+
+  // Set the initial step length according to Algorithm 7 in DC2-PGO tech
+  // report. Retain minimum step length from SE-Sync.
+  double alpha = 1.0;
+  double alpha_min = 1e-6;
+
+  // Vectors of trial stepsizes and corresponding function values
+  std::vector<double> alphas;
+  std::vector<double> fvals;
+
+  // Function value at current iterate (saddle point)
+  double FX_plus = f(X_plus);
+
+  // Backtracking line search
+  Matrix Xtest;
+  while (alpha >= alpha_min) {
+    // Retract along the given tangent vector using the given stepsize
+    Xtest = Retract(X_plus, alpha * X_dot_plus);
+
+    // Ensure that the trial point Xtest has a lower function value than
+    // the current iterate X, and that the gradient at Xtest is
+    // sufficiently large that we will not automatically trigger the
+    // gradient tolerance stopping criterion at the next iteration
+    double FXtest = f(Xtest);
+    Matrix grad_FXtest = RieGrad(Xtest);
+    double grad_FXtest_norm = grad_FXtest.norm();
+    double preconditioned_grad_FXtest_norm =
+        PreCondition(Xtest, grad_FXtest).norm();
+
+    // Record trial stepsize and function value
+    alphas.push_back(alpha);
+    fvals.push_back(FXtest);
+
+    if ((FXtest < FX_plus) && (grad_FXtest_norm > gradient_tolerance) &&
+        (preconditioned_grad_FXtest_norm > preconditioned_gradient_tolerance)) {
+      // Accept this trial point and return success
+      *X = Xtest;
+      return true;
+    }
+    alpha /= 2;
+  }
+
+  // If control reaches here, we failed to find a trial point that satisfied
+  // *both* the function decrease *and* gradient bounds.  In order to make
+  // forward progress, we will fall back to accepting the trial point that
+  // simply minimized the objective value, provided that it strictly *decreased*
+  // the objective from the current (saddle) point
+
+  // Find minimum function value from among the trial points
+  auto fmin_iter = std::min_element(fvals.begin(), fvals.end());
+  auto min_idx = std::distance(fvals.begin(), fmin_iter);
+
+  double f_min = fvals.at(min_idx);
+  double a_min = alphas.at(min_idx);
+
+  if (f_min < FX_plus) {
+    // If this trial point strictly decreased the objective value, accept it and
+    // return success
+    *X = Retract(X_plus, a_min * X_dot_plus);
+    return true;
+  } else {
+    // NO trial point decreased the objective value: we were unable to escape
+    // the saddle point!
+    return false;
+  }
+}
+
 Matrix QuadraticProblem::RetractSE(const Matrix &Y, const Matrix &V,
                                    unsigned int r, unsigned int d,
                                    unsigned int n) const {
