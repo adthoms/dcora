@@ -499,7 +499,7 @@ void PGOAgent::reset() {
   if (mParams.logData) {
     // Save measurements
     RelativeMeasurements m = mPoseGraph->allMeasurements();
-    mLogger.logMeasurements(&m, "measurements.txt");
+    mLogger.logMeasurements(m, "measurements.txt");
 
     // Save trajectory estimates after rounding
     Matrix T;

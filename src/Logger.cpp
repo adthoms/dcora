@@ -19,9 +19,9 @@ namespace DCORA {
 Logger::Logger(std::string logDir) : logDirectory(std::move(logDir)) {}
 
 void Logger::logMeasurements(
-    std::vector<RelativePosePoseMeasurement> *measurements,
+    const std::vector<RelativePosePoseMeasurement> &measurements,
     const std::string &filename) {
-  if (measurements->empty())
+  if (measurements.empty())
     return;
 
   std::ofstream file;
@@ -29,7 +29,7 @@ void Logger::logMeasurements(
   if (!file.is_open())
     return;
 
-  size_t d = measurements->at(0).R.rows();
+  size_t d = measurements.at(0).R.rows();
   if (d == 2)
     return;
 
@@ -37,7 +37,7 @@ void Logger::logMeasurements(
   file << "robot_src,pose_src,robot_dst,pose_dst,qx,qy,qz,qw,tx,ty,tz,kappa,"
           "tau,is_known_inlier,weight\n";
 
-  for (RelativePosePoseMeasurement m : *measurements) {
+  for (const auto &m : measurements) {
     // Convert rotation matrix to quaternion
     Eigen::Matrix3d R = m.R;
     Eigen::Quaternion<double> quat(R);
@@ -61,9 +61,9 @@ void Logger::logMeasurements(
   file.close();
 }
 
-void Logger::logMeasurements(RelativeMeasurements *measurements,
+void Logger::logMeasurements(const RelativeMeasurements &measurements,
                              const std::string &filename) {
-  if (measurements->vec.empty())
+  if (measurements.vec.empty())
     return;
 
   std::ofstream file;
@@ -72,12 +72,12 @@ void Logger::logMeasurements(RelativeMeasurements *measurements,
     return;
 
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
-      measurements->GetRelativePosePoseMeasurements();
+      measurements.GetRelativePosePoseMeasurements();
   const std::vector<RelativePoseLandmarkMeasurement>
       &pose_landmark_measurements =
-          measurements->GetRelativePoseLandmarkMeasurements();
+          measurements.GetRelativePoseLandmarkMeasurements();
   const std::vector<RangeMeasurement> &range_measurements =
-      measurements->GetRangeMeasurements();
+      measurements.GetRangeMeasurements();
 
   for (const auto &meas : pose_pose_measurements) {
     file << "Pose-Pose Measurements\n";
@@ -123,7 +123,7 @@ void Logger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
   };
 
   file << "# pose_index x y z qx qy qz qw\n";
-  for (size_t i = 0; i < n; ++i) {
+  for (unsigned int i = 0; i < n; ++i) {
     Matrix Ti = T.block(0, i * (d + 1), d, d + 1);
     auto [t, quat] = getTranslationAndQuaternion(Ti);
     file << i << " " << std::fixed << std::setprecision(9);

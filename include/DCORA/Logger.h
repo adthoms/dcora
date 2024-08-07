@@ -49,15 +49,16 @@ public:
    * @param measurements
    * @param filename
    */
-  void logMeasurements(std::vector<RelativePosePoseMeasurement> *measurements,
-                       const std::string &filename);
+  void
+  logMeasurements(const std::vector<RelativePosePoseMeasurement> &measurements,
+                  const std::string &filename);
 
   /**
    * @brief Log relative measurements to file
    * @param measurements
    * @param filename
    */
-  void logMeasurements(RelativeMeasurements *measurements,
+  void logMeasurements(const RelativeMeasurements &measurements,
                        const std::string &filename);
 
 private:
