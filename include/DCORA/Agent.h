@@ -328,7 +328,13 @@ public:
    */
   inline unsigned relaxation_rank() const { return mPoseGraph->r(); }
 
-  // TODO(AT): Add supporting getters for graph dims l,b,k
+  /**
+   * @brief Get problem dimension
+   * @return
+   */
+  inline unsigned problem_dimension() const { return mPoseGraph->k(); }
+
+  // TODO(AT): Add supporting getters for graph dims l,b
 
   /**
    * @brief Get current instance number

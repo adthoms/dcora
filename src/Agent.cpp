@@ -269,9 +269,19 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       LOG(INFO) << "Computing local chordal initialization.";
       if (!mPoseGraph->isPGOCompatible())
         LOG(FATAL) << "Error: Chordal initialization requires all relative "
-                      "measurement to be pose-pose measurements!";
+                      "measurements to be pose-pose measurements!";
       const RelativeMeasurements m = mPoseGraph->localMeasurements();
       T = chordalInitialization(m.GetRelativePosePoseMeasurements());
+      break;
+    }
+    case (InitializationMethod::Random): {
+      LOG(INFO) << "Computing local random initialization.";
+      Matrix M = DCORA::Matrix::Random(dimension(), problem_dimension());
+      if (mPoseGraph->isPGOCompatible()) {
+        T.setData(projectToSEMatrix(M, dimension(), dimension(), num_poses()));
+      } else {
+        // TODO(AT): implement for RA-SLAM
+      }
       break;
     }
     case (InitializationMethod::GNC_TLS): {
@@ -290,7 +300,7 @@ void PGOAgent::initialize(const PoseArray *TInitPtr) {
       PoseArray TOdom = odometryInitialization(mPoseGraph->odometry());
       if (!mPoseGraph->isPGOCompatible())
         LOG(FATAL) << "Error: GNC_TLS initialization requires all relative "
-                      "measurement to be pose-pose measurements!";
+                      "measurements to be pose-pose measurements!";
       const RelativeMeasurements m = mPoseGraph->localMeasurements();
       std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
           m.GetRelativePosePoseMeasurements();
