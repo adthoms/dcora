@@ -12,16 +12,8 @@
 #include <DCORA/Agent.h>
 #include <DCORA/DCORA_solver.h>
 #include <DCORA/DCORA_types.h>
+#include <DCORA/QuadraticOptimizer.h>
 #include <DCORA/QuadraticProblem.h>
-
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <sstream>   // std::stringstream
-#include <stdexcept> // std::runtime_error
-#include <string>
-#include <utility> // std::pair
-#include <vector>
 
 int main(int argc, char **argv) {
   /**
@@ -38,10 +30,141 @@ int main(int argc, char **argv) {
 
   std::cout << "Single robot RA-SLAM demo. " << std::endl;
 
-  DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(argv[1]);
+  // Load PyFG dataset and get centralized measurements
+  const DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(argv[1]);
+  const DCORA::Measurements global_measurements =
+      DCORA::getGlobalMeasurements(dataset);
+  const DCORA::RelativeMeasurements &measurements =
+      global_measurements.relative_measurements;
+  const DCORA::RangeAidedArray &ground_truth_init =
+      *global_measurements.ground_truth_init;
 
-  // TODO(Alex): Implement remaining RA-SLAM demo similar to
-  // SingleRobotExample.cpp
+  /**
+   * @brief Settings
+   */
+
+  // Set problem dimensions
+  unsigned int d = ground_truth_init.d();
+  unsigned int n = ground_truth_init.n();
+  unsigned int l = ground_truth_init.l();
+  unsigned int b = ground_truth_init.b();
+
+  // set minimum and maximum rank
+  unsigned int r_min = d;
+  unsigned int r_max = 10;
+
+  // Set optimization parameters
+  DCORA::ROptParameters params;
+  params.verbose = false;
+  params.RTR_iterations = 200;
+  params.RTR_tCG_iterations = 200;
+
+  // Logging
+  bool logData = true;
+  std::string logDirectory = "/home/alex/data/dcora_dpgo_examples/"
+                             "dcora_examples/single_robot_example_ra_slam/";
+  DCORA::Logger logger(logDirectory);
+
+  // Hyperparameters
+  double min_eig_num_tol = 1e-4;
+  double gradient_tolerance = 1e-4;
+  double preconditioned_gradient_tolerance = 1e-4;
+  double shift = -10;
+
+  /**
+   * @brief CORA Algorithm
+   */
+
+  // Initialize current state estimate
+  DCORA::Matrix Xcurr = DCORA::Matrix::Zero(r_max, (d + 1) * n + l + b);
+
+  // TODO(Alex): Add other initialization methods
+  const DCORA::Matrix &XGroundTruth = ground_truth_init.getData();
+  Xcurr.topRows(d) = XGroundTruth;
+
+  for (unsigned int r = r_min; r < r_max; ++r) {
+    // Construct the centralized problem
+    std::shared_ptr<DCORA::Graph> graphCurrRank =
+        std::make_shared<DCORA::Graph>(0, r, d,
+                                       DCORA::GraphType::RangeAidedSLAMGraph);
+    graphCurrRank->setMeasurements(measurements);
+    DCORA::QuadraticProblem problemCentralCurrRank(graphCurrRank);
+
+    std::shared_ptr<DCORA::Graph> graphNextRank =
+        std::make_shared<DCORA::Graph>(0, r + 1, d,
+                                       DCORA::GraphType::RangeAidedSLAMGraph);
+    graphNextRank->setMeasurements(measurements);
+    DCORA::QuadraticProblem problemCentralNextRank(graphNextRank);
+
+    // Perform Riemannian optimization
+    DCORA::QuadraticOptimizer optimizer(&problemCentralCurrRank, params);
+    DCORA::Matrix Xopt = optimizer.optimize(Xcurr.topRows(r));
+    LOG(INFO) << "Objective value: " << problemCentralCurrRank.f(Xopt);
+
+    // Construct corresponding dual certificate matrix
+    const DCORA::SparseMatrix &Q = graphCurrRank->quadraticMatrix();
+    const DCORA::SparseMatrix S =
+        DCORA::constructDualCertificateMatrixRASLAM(Xopt, Q, d, n, l, b);
+
+    // Check if dual certificate matrix is PSD
+    double theta;
+    DCORA::Vector min_eigenvector;
+    bool global_opt = DCORA::fastVerification(S, min_eig_num_tol, shift, &theta,
+                                              &min_eigenvector);
+
+    // Check eigenvalue convergence
+    if (!global_opt && theta >= -min_eig_num_tol / 2)
+      LOG(FATAL) << "Error: Escape direction computation did not converge to "
+                    "desired precision!";
+
+    if (global_opt) {
+      LOG(INFO) << "Z = (X*)^T(X*) is a global minimizer!";
+
+      // Set second-order critical-point for rounding
+      DCORA::LiftedRangeAidedArray X(r, d, n, l, b);
+      X.setData(Xopt);
+      const DCORA::LiftedPoseArray &Xposes = *X.GetLiftedPoseArray();
+
+      // Set global anchor to first lifted pose
+      const DCORA::LiftedPose Xa = DCORA::LiftedPose(Xposes.pose(0));
+
+      // Get rounded trajectory
+      DCORA::PoseArray T(d, n);
+      T.setData(Xa.rotation().transpose() * Xposes.getData());
+      DCORA::Vector t0 = Xa.rotation().transpose() * Xa.translation();
+      for (unsigned i = 0; i < n; ++i) {
+        T.rotation(i) = DCORA::projectToRotationGroup(T.rotation(i));
+        T.translation(i) = T.translation(i) - t0;
+      }
+
+      // Log rounded trajectory
+      if (logData) {
+        LOG(INFO) << "Outputting rounded centralized trajectory.";
+        logger.logTrajectory(d, n, T.getData(), "dcora_0.txt");
+      }
+
+      break;
+    } else {
+      LOG(INFO) << "Saddle point detected at rank " << r
+                << "! Curvature along escape direction: " << theta;
+    }
+
+    DCORA::Matrix X;
+    bool isSecondOrder = true; // centralized problem is second order
+    bool escape_success = problemCentralNextRank.escapeSaddle(
+        Xopt, theta, min_eigenvector, gradient_tolerance,
+        preconditioned_gradient_tolerance, &X, isSecondOrder);
+    if (escape_success) {
+      // Update initialization point for next level in the Staircase
+      Xcurr.topRows(r + 1) = X;
+    } else {
+      LOG(WARNING) << "Warning: Backtracking line search failed to escape from "
+                      "Saddle point. Try decreasing the preconditioned "
+                      "Gradient norm tolerance and/or the numerical tolerance "
+                      "for minimum eigenvalue nonnegativity.";
+      break;
+    }
+  }
 
   exit(0);
 }
