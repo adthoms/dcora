@@ -138,7 +138,7 @@ Matrix QuadraticProblem::Retract(const Matrix &Y, const Matrix &V) const {
 bool QuadraticProblem::escapeSaddle(const Matrix &Xopt, double theta,
                                     const Vector &v, double gradient_tolerance,
                                     double preconditioned_gradient_tolerance,
-                                    Matrix *X) {
+                                    Matrix *X, bool isSecondOrder) {
   // Get problem dimensions
   unsigned int r = relaxation_rank();
   unsigned int k = problem_dimension();
@@ -158,10 +158,16 @@ bool QuadraticProblem::escapeSaddle(const Matrix &Xopt, double theta,
   SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   */
 
-  // Set the initial step length according to Algorithm 7 in DC2-PGO tech
-  // report. Retain minimum step length from SE-Sync.
-  double alpha = 1.0;
+  // Retain minimum step length from SE-Sync.
   double alpha_min = 1e-6;
+
+  // Apply conditions for local second-order model as in SE-Sync if applicable,
+  // else set the initial step length according to Algorithm 7 in the DC2-PGO
+  // tech report.
+  double alpha =
+      isSecondOrder
+          ? std::max(16 * alpha_min, 100 * gradient_tolerance / fabs(theta))
+          : 1.0;
 
   // Vectors of trial stepsizes and corresponding function values
   std::vector<double> alphas;

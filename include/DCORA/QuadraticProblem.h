@@ -151,6 +151,7 @@ public:
    * @param Y point on the manifold (matrix form)
    * @param V tangent vector at point Y in the manifold's tangent space (matrix
    * form)
+   * @return
    */
   Matrix Retract(const Matrix &Y, const Matrix &V) const;
 
@@ -162,12 +163,15 @@ public:
    * @param theta
    * @param v
    * @param gradient_tolerance
+   * @param preconditioned_gradient_tolerance
    * @param X
+   * @param isSecondOrder
    * @return
    */
   bool escapeSaddle(const Matrix &Xopt, double theta, const Vector &v,
                     double gradient_tolerance,
-                    double preconditioned_gradient_tolerance, Matrix *X);
+                    double preconditioned_gradient_tolerance, Matrix *X,
+                    bool isSecondOrder = false);
 
 private:
   // The graph that represents the optimization problem
