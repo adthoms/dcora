@@ -1020,7 +1020,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 
         // Calculate unit sphere variable
         const Vector unit_vector =
-            (state2_translation - state1_translation).normalized();
+            (state1_translation - state2_translation).normalized();
         const Point unit_sphere_var = Point(unit_vector);
 
         // Populate ground truth
