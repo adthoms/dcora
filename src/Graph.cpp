@@ -10,6 +10,8 @@
  * -------------------------------------------------------------------------- */
 
 #include <DCORA/Graph.h>
+#include <Spectra/MatOp/SparseSymMatProd.h>
+#include <Spectra/SymEigsSolver.h>
 #include <glog/logging.h>
 
 namespace DCORA {
@@ -1897,8 +1899,10 @@ bool Graph::constructPreconditioner() {
   timer_.tic();
   // Update preconditioner
   SparseMatrix P = quadraticMatrix();
+  double reg =
+      isPGOCompatible() ? 1e-1 : computePreconditionerRegularization(P);
   for (int i = 0; i < P.rows(); ++i) {
-    P.coeffRef(i, i) += 1e-1;
+    P.coeffRef(i, i) += reg;
   }
   auto solver = std::make_shared<CholmodSolver>();
   solver->compute(P);
@@ -1908,6 +1912,48 @@ bool Graph::constructPreconditioner() {
   ms_construct_precon_ = timer_.toc();
   // LOG(INFO) << "Construct precon ms: " << ms_construct_precon_;
   return true;
+}
+
+using SpectraSymMatProd =
+    Spectra::SparseSymMatProd<double, Eigen::Lower, Eigen::RowMajor>;
+double Graph::computePreconditionerRegularization(const SparseMatrix &P) {
+  // Set default regularization term
+  double reg = 1e-1;
+
+  // Compute the largest eigenvalue of P
+  SpectraSymMatProd op(P);
+  Spectra::SymEigsSolver<SpectraSymMatProd> eigsolver(op, 1, 6);
+  eigsolver.init();
+  eigsolver.compute(Spectra::SortRule::LargestAlge);
+
+  // Return default regularization term if computation unsuccessful
+  if (eigsolver.info() != Spectra::CompInfo::Successful) {
+    LOG(WARNING) << "Could not compute the largest eigenvalue of P. Using "
+                    "a default preconditioner regularization term of : "
+                 << reg;
+    return reg;
+  }
+
+  /**
+   * @brief Setting preconditioner regularization term
+   *
+   * Assuming that the smallest eigenvalue of P is 0 and the largest
+   * eigenvalue of P is sigma_max, we want to limit the condition number of:
+   *
+   *     (P + reg*I)^-1
+   *
+   * to be less than or equal to target_precondition_number. Thus, we set:
+   *
+   *     reg = sigma_max / (target_precondition_number - 1)
+   *
+   */
+  double target_precondition_number = 1e6;
+  double max_eigenvalue = eigsolver.eigenvalues()[0];
+  reg = max_eigenvalue / (target_precondition_number - 1);
+  LOG(INFO) << "Largest eigenvalue of P computed successfully. Setting "
+               "preconditioner regularization term to: "
+            << reg;
+  return reg;
 }
 
 } // namespace DCORA

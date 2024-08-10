@@ -563,6 +563,14 @@ protected:
    * @return
    */
   bool constructPreconditioner();
+  /**
+   * @brief Helper function for computing the regularization term reg for the
+   * regularized Cholesky preconditioner of P so that (P + reg*I)^-1 has a
+   * suitable condition number
+   * @param P
+   * @return
+   */
+  double computePreconditionerRegularization(const SparseMatrix &P);
 
 private:
   // Mapping Edge ID to the corresponding index in the vector of measurements
