@@ -215,13 +215,13 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
  * that the shift-and-invert mode eigen solver is unique to DCORA.
  * @param S
  * @param eta
+ * @param shift
  * @param theta
  * @param v
- * @param shift
  * @return
  */
-bool fastVerification(const SparseMatrix &S, double eta, double *theta,
-                      Vector *v, double *shift);
+bool fastVerification(const SparseMatrix &S, double eta, double shift,
+                      double *theta, Vector *v);
 
 /**
  * @brief Helper function to determine if a sparse symmetric matrix S is
