@@ -1703,6 +1703,57 @@ SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
   return Q - Lambda;
 }
 
+SparseMatrix
+constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
+                                     unsigned int d, unsigned int n,
+                                     unsigned int l, unsigned int b) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+
+  // Compute Stiefel Lambda blocks
+  unsigned int rot_mat_size = d * n;
+  Matrix QXt = Q * X.transpose();
+  Matrix stiefel_Lambda_blocks = Matrix::Zero(d, rot_mat_size);
+#pragma omp parallel for
+  for (unsigned int i = 0; i < n; ++i) {
+    Matrix P =
+        QXt.block(i * d, 0, d, X.rows()) * X.block(0, i * d, X.rows(), d);
+    stiefel_Lambda_blocks.block(0, i * d, d, d) = .5 * (P + P.transpose());
+  }
+
+  // Compute Oblique Lambda blocks
+  Vector oblique_Lambda_blocks =
+      (X.block(0, rot_mat_size, X.rows(), l).transpose().array() *
+       QXt.block(rot_mat_size, 0, l, X.rows()).array())
+          .rowwise()
+          .sum();
+
+  // Compute Lambda from Lambda blocks
+  std::vector<Eigen::Triplet<double>> elements;
+  elements.reserve(d * rot_mat_size + l);
+
+  // Add the symmetric diagonal blocks for the Stiefel constraints
+  for (unsigned int i = 0; i < n; ++i)
+    for (unsigned int r = 0; r < d; ++r)
+      for (unsigned int c = 0; c < d; ++c)
+        elements.emplace_back(i * d + r, i * d + c,
+                              stiefel_Lambda_blocks(r, i * d + c));
+
+  // Add the diagonal block for the Oblique constraints
+  for (auto i = 0; i < l; ++i)
+    elements.emplace_back(rot_mat_size + i, rot_mat_size + i,
+                          oblique_Lambda_blocks(i));
+
+  unsigned int k = rot_mat_size + l + n + b;
+  SparseMatrix Lambda(k, k);
+  Lambda.setFromTriplets(elements.begin(), elements.end());
+
+  // Compute dual certificate matrix
+  return Q - Lambda;
+}
+
 Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
                                             unsigned int r, unsigned int d,
                                             unsigned int n) {

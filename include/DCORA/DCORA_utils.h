@@ -259,6 +259,22 @@ SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
                                                unsigned int d, unsigned int n);
 
 /**
+ * @brief Helper function to construct the dual certificate matrix S(X) for
+ * RA-SLAM.
+ * @param X
+ * @param Q
+ * @param d
+ * @param n
+ * @param l
+ * @param b
+ * @return
+ */
+SparseMatrix
+constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
+                                     unsigned int d, unsigned int n,
+                                     unsigned int l, unsigned int b);
+
+/**
  * @brief Given an element Y in M and a matrix V in T_X(R^{r × dn}) (that is, a
  * (r × dn)-dimensional matrix V considered as an element of the tangent space
  * to the *entire* ambient Euclidean space at X), this function computes and
