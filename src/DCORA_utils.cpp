@@ -499,10 +499,10 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
       [](const std::string &sym) -> std::pair<unsigned int, unsigned int> {
     unsigned int robotID;
     unsigned int stateID;
-    if (sym[0] == 'L') {
+    if (sym[0] == LANDMARK_SYMBOL) {
       // Symbol is a landmark
       if (std::isupper(sym[1])) {
-        if (sym[1] == 'M') {
+        if (sym[1] == MAP_ID) {
           // Landmark is associated with the map, though does not obey PyFG
           // formatting.
           LOG(WARNING)
@@ -511,16 +511,16 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                  "'L#'.";
         }
         // Landmark is associated with a robot according to PyFG formatting
-        robotID = static_cast<unsigned int>(sym[1] - 'A');
+        robotID = static_cast<unsigned int>(sym[1] - FIRST_AGENT_ID);
         stateID = std::stoi(sym.substr(2));
       } else {
         // Landmark is associated with the map
-        robotID = static_cast<unsigned int>('M' - 'A');
+        robotID = static_cast<unsigned int>(MAP_ID - FIRST_AGENT_ID);
         stateID = std::stoi(sym.substr(1));
       }
     } else if (std::isupper(sym[0])) {
       // Symbol is a pose
-      robotID = static_cast<unsigned int>(sym[0] - 'A');
+      robotID = static_cast<unsigned int>(sym[0] - FIRST_AGENT_ID);
       stateID = std::stoi(sym.substr(1));
     } else {
       LOG(FATAL) << "Error: could not read robot and state ID from symbol: "
@@ -530,7 +530,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
   };
 
   auto getStateTypeFromSymbol = [](const std::string &sym) -> StateType {
-    if (sym[0] == 'L')
+    if (sym[0] == LANDMARK_SYMBOL)
       return StateType::Landmark;
     else if (std::isupper(sym[0]))
       return StateType::Pose;

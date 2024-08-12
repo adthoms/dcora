@@ -430,7 +430,7 @@ void PGOAgent::initializeInGlobalFrame(const Pose &T_world_robot) {
   // Log initial trajectory
   if (mParams.logData) {
     std::string filename =
-        "dcora_" + std::string(1, 'A' + getID()) + "_initial.txt";
+        "dcora_" + std::string(1, FIRST_AGENT_ID + getID()) + "_initial.txt";
     mLogger.logTrajectory(dimension(), num_poses(), T.getData(), filename);
   }
 
@@ -514,7 +514,8 @@ void PGOAgent::reset() {
     // Save trajectory estimates after rounding
     Matrix T;
     if (getTrajectoryInGlobalFrame(&T)) {
-      std::string filename = "dcora_" + std::string(1, 'A' + getID()) + ".txt";
+      std::string filename =
+          "dcora_" + std::string(1, FIRST_AGENT_ID + getID()) + ".txt";
       mLogger.logTrajectory(dimension(), num_poses(), T, filename);
       LOG(INFO) << "Saved optimized trajectory to " << mParams.logDirectory;
     } else {

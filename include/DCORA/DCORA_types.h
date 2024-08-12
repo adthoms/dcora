@@ -36,6 +36,9 @@ typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrix;
 typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SparseMatrix;
 typedef Eigen::CholmodDecomposition<SparseMatrix> CholmodSolver;
 typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
+constexpr char FIRST_AGENT_ID = 'A';
+constexpr char MAP_ID = 'M';
+constexpr char LANDMARK_SYMBOL = 'L';
 
 /**
  * @brief Algorithms for initializing PGO
