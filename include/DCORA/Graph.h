@@ -540,7 +540,8 @@ protected:
   setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
                                size_t *i, size_t *j);
   /**
-   * @brief Helper function to determine if a state is owned by an inactive
+   * @brief Helper function to determine if a state (which is either the source
+   * or destination state of a relative measurement) is owned by an inactive
    * neighbor. Return true if the neighbor is inactive and if the query
    * neighborStateID belongs to the neighbor. If the neighbor is active, return
    * false. If the neighbor is inactive but the query neighborStateID does not
@@ -553,7 +554,7 @@ protected:
   /**
    * @brief Helper function to return the lifted data matrix of the fixed public
    * variable (associated with neighborStateID) owned by a neighbor of this
-   * agent. Supported fixed variables include lifted poses and lifted landmarks
+   * agent. Supported fixed variables include poses, landmarks, and unit spheres
    * @param neighborStateID
    * @return
    */

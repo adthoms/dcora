@@ -221,17 +221,17 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
 
     // Add local shared pose/landmark to graph
     executeStateDependantFunctionals(
-        [&, this]() { loc_shared_pose_ids_.emplace(factor.r1, factor.p1); },
-        [&, this]() { loc_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { loc_shared_pose_ids_.emplace(factor.getSrcID()); },
+        [&, this]() { loc_shared_landmark_ids_.emplace(factor.getSrcID()); },
         factor.stateType1);
 
     // Add neighbor shared pose/landmark to graph
     executeStateDependantFunctionals(
-        [&, this]() { nbr_shared_pose_ids_.emplace(factor.r2, factor.p2); },
-        [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { nbr_shared_pose_ids_.emplace(factor.getDstID()); },
+        [&, this]() { nbr_shared_landmark_ids_.emplace(factor.getDstID()); },
         factor.stateType2);
 
-    // add local shared unit-sphere to graph
+    // Add local shared unit-sphere to graph
     if (factor.measurementType == MeasurementType::Range) {
       const RangeMeasurement &range_factor =
           dynamic_cast<const RangeMeasurement &>(factor);
@@ -251,14 +251,14 @@ void Graph::addSharedLoopClosure(const RelativeMeasurement &factor) {
 
     // Add local shared pose/landmark to graph
     executeStateDependantFunctionals(
-        [&, this]() { loc_shared_pose_ids_.emplace(factor.r2, factor.p2); },
-        [&, this]() { loc_shared_landmark_ids_.emplace(factor.r2, factor.p2); },
+        [&, this]() { loc_shared_pose_ids_.emplace(factor.getDstID()); },
+        [&, this]() { loc_shared_landmark_ids_.emplace(factor.getDstID()); },
         factor.stateType2);
 
     // Add neighbor shared pose/landmark to graph
     executeStateDependantFunctionals(
-        [&, this]() { nbr_shared_pose_ids_.emplace(factor.r1, factor.p1); },
-        [&, this]() { nbr_shared_landmark_ids_.emplace(factor.r1, factor.p1); },
+        [&, this]() { nbr_shared_pose_ids_.emplace(factor.getSrcID()); },
+        [&, this]() { nbr_shared_landmark_ids_.emplace(factor.getSrcID()); },
         factor.stateType1);
 
     // Add neighbor shared unit-sphere to graph
@@ -597,6 +597,10 @@ bool Graph::constructG() {
 }
 
 bool Graph::constructQuadraticCostTermPGO() {
+  if (!isPGOCompatible())
+    LOG(FATAL) << "Error: Graph is not compatible with PGO. Cannot construct "
+                  "quadratic cost term!";
+
   // Set measurements
   const RelativeMeasurements &measurements = allMeasurements();
 
@@ -649,12 +653,8 @@ bool Graph::constructQuadraticCostTermPGO() {
 
   // Populate AbT and Omega
   for (size_t k = 0; k < m; k++) {
-    const RelativeMeasurementVariant &measVariant = measurements.vec.at(k);
-    CHECK(
-        !std::holds_alternative<RelativePoseLandmarkMeasurement>(measVariant));
-    CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
-        std::get<RelativePosePoseMeasurement>(measVariant);
+        std::get<RelativePosePoseMeasurement>(measurements.vec.at(k));
     size_t i = IDX_NOT_SET;
     size_t j = IDX_NOT_SET;
 
@@ -671,6 +671,7 @@ bool Graph::constructQuadraticCostTermPGO() {
       return false;
     else if (are_indices_set == std::nullopt)
       continue;
+    CHECK(i != IDX_NOT_SET || j != IDX_NOT_SET);
 
     // Populate incidence matrix
     if (i != IDX_NOT_SET) {
@@ -702,6 +703,10 @@ bool Graph::constructQuadraticCostTermPGO() {
 }
 
 bool Graph::constructLinearCostTermPGO() {
+  if (!isPGOCompatible())
+    LOG(FATAL) << "Error: Graph is not compatible with PGO. Cannot construct "
+                  "linear cost term!";
+
   // Set measurements
   const RelativeMeasurements &measurements = sharedLoopClosures();
 
@@ -767,9 +772,6 @@ bool Graph::constructLinearCostTermPGO() {
 
   // Iterate over all shared pose-pose loop closures
   for (const auto &measVariant : measurements.vec) {
-    CHECK(
-        !std::holds_alternative<RelativePoseLandmarkMeasurement>(measVariant));
-    CHECK(!std::holds_alternative<RangeMeasurement>(measVariant));
     const RelativePosePoseMeasurement &meas =
         std::get<RelativePosePoseMeasurement>(measVariant);
     size_t i = IDX_NOT_SET;
@@ -840,6 +842,11 @@ bool Graph::constructLinearCostTermPGO() {
 }
 
 bool Graph::constructQuadraticCostTermRASLAM() {
+  if (isPGOCompatible())
+    LOG(FATAL)
+        << "Error: Graph is not compatible with RA-SLAM. Cannot construct "
+           "quadratic cost term!";
+
   // Set measurements
   const RelativeMeasurements &measurements = allMeasurements();
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
@@ -889,9 +896,9 @@ bool Graph::constructQuadraticCostTermRASLAM() {
    * In our implementation, we calculate the submatrices of Q_p and Q_r
    * separately and then combine them to form Q. For book keeping, we we use a
    * matrix-centric approach and update Q_p and Q_r for all measurements,
-   * indexing the contribution of each measurement using agent b's state and
-   * unit sphere IDs. For convenience, we drop subscript b for remaining
-   * formalisms.
+   * indexing the contribution of each measurement using agent b's pose,
+   * landmark, and unit sphere IDs. For convenience, we drop subscript b for
+   * remaining formalisms.
    */
 
   /**
@@ -972,6 +979,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
       return false;
     else if (are_indices_set == std::nullopt)
       continue;
+    CHECK(i != IDX_NOT_SET || j != IDX_NOT_SET);
 
     // Populate incidence and data matrices
     if (i != IDX_NOT_SET) {
@@ -1012,6 +1020,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
       return false;
     else if (are_indices_set == std::nullopt)
       continue;
+    CHECK(i != IDX_NOT_SET || j != IDX_NOT_SET);
 
     // Populate incidence and data matrices
     if (i != IDX_NOT_SET) {
@@ -1112,6 +1121,7 @@ bool Graph::constructQuadraticCostTermRASLAM() {
       return false;
     else if (are_indices_set == std::nullopt)
       continue;
+    CHECK(i != IDX_NOT_SET || j != IDX_NOT_SET);
 
     // Populate incidence matrix with range incidences that connect to pose
     // and/or landmark translations
@@ -1198,6 +1208,11 @@ bool Graph::constructQuadraticCostTermRASLAM() {
 }
 
 bool Graph::constructLinearCostTermRASLAM() {
+  if (isPGOCompatible())
+    LOG(FATAL)
+        << "Error: Graph is not compatible with RA-SLAM. Cannot construct "
+           "linear cost term!";
+
   // Set measurements
   const RelativeMeasurements &measurements = sharedLoopClosures();
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
@@ -1289,12 +1304,12 @@ bool Graph::constructLinearCostTermRASLAM() {
    *   XcT_landmark: [r × 1]
    *
    * Explicit functions have been created to generate the following mappings
-   * from the fixed neighbor state to the lifted linear cost depending on the
-   * local state:
+   * from the fixed neighbor state to the linear cost depending on the local
+   * state:
    *
    *   ------------------------------------------------
-   *   | Fixed Neighbor |    Local    |    Lifted     |
-   *   |     State      |    State    |  Linear Cost  |
+   *   | Fixed Neighbor |    Local    |  Linear Cost  |
+   *   |     State      |    State    |               |
    *   ------------------------------------------------
    *   | Pose           | Pose        | L_pose        |
    *   | Pose           | Unit Sphere | L_unit_sphere |
@@ -1308,7 +1323,7 @@ bool Graph::constructLinearCostTermRASLAM() {
    *
    * For book keeping, we look at the contribution of each measurement and
    * update G via the addition of these contributions. See Section "Lambda
-   * functions for calculating linear cost contributions for details
+   * functions for calculating linear cost contributions" for details
    */
   Matrix XcT_pose = Matrix::Zero(r_, d_ + 1);
   Matrix XcT_unit_sphere = Matrix::Zero(r_, 1);
@@ -1386,12 +1401,12 @@ bool Graph::constructLinearCostTermRASLAM() {
   };
 
   auto updateLinearCostFromFixedNeighborPoseToLocalPose = [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
     // Partition rotation and translation components
     auto [XcT_pose_rot, XcT_pose_trans] =
         partitionSEMatrix(XcT_pose, r_, d_, 1);
-
-    // Update Q_cb block matrices for current measurement
-    updateQuadraticCostSubmatrices();
 
     // Assign linear cost
     L_pose.topLeftCorner(r_, d_) =
@@ -1400,13 +1415,25 @@ bool Graph::constructLinearCostTermRASLAM() {
         XcT_pose_rot * Q_cb_13 + XcT_pose_trans * Q_cb_33;
   };
 
-  auto updateLinearCostFromFixedNeighborPoseToLocalLandmark = [&]() -> void {
+  auto updateLinearCostFromFixedNeighborPoseToLocalUnitSphere = [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
     // Partition rotation and translation components
     auto [XcT_pose_rot, XcT_pose_trans] =
         partitionSEMatrix(XcT_pose, r_, d_, 1);
 
+    // Assign linear cost
+    L_unit_sphere.noalias() = XcT_pose_rot * Q_cb_12 + XcT_pose_trans * Q_cb_32;
+  };
+
+  auto updateLinearCostFromFixedNeighborPoseToLocalLandmark = [&]() -> void {
     // Update Q_cb block matrices for current measurement
     updateQuadraticCostSubmatrices();
+
+    // Partition rotation and translation components
+    auto [XcT_pose_rot, XcT_pose_trans] =
+        partitionSEMatrix(XcT_pose, r_, d_, 1);
 
     // Assign linear cost
     L_landmark.noalias() = XcT_pose_rot * Q_cb_13 + XcT_pose_trans * Q_cb_33;
@@ -1419,6 +1446,15 @@ bool Graph::constructLinearCostTermRASLAM() {
     // Assign linear cost
     L_pose.topLeftCorner(r_, d_) = XcT_landmark * Q_cb_31;
     L_pose.topRightCorner(r_, 1) = XcT_landmark * Q_cb_33;
+  };
+
+  auto updateLinearCostFromFixedNeighborLandmarkToLocalUnitSphere =
+      [&]() -> void {
+    // Update Q_cb block matrices for current measurement
+    updateQuadraticCostSubmatrices();
+
+    // Assign linear cost
+    L_unit_sphere.noalias() = XcT_landmark * Q_cb_32;
   };
 
   auto updateLinearCostFromFixedNeighborLandmarkToLocalLandmark =
@@ -1435,7 +1471,7 @@ bool Graph::constructLinearCostTermRASLAM() {
     updateQuadraticCostSubmatrices();
 
     // Assign linear cost
-    L_pose.topLeftCorner(r_, d_) = Matrix::Zero(r_, d_);
+    L_pose.topLeftCorner(r_, d_) = XcT_unit_sphere * Q_cb_21;
     L_pose.topRightCorner(r_, 1) = XcT_unit_sphere * Q_cb_23;
   };
 
@@ -1446,27 +1482,6 @@ bool Graph::constructLinearCostTermRASLAM() {
 
     // Assign linear cost
     L_landmark.noalias() = XcT_unit_sphere * Q_cb_23;
-  };
-
-  auto updateLinearCostFromFixedNeighborPoseToLocalUnitSphere = [&]() -> void {
-    // Partition rotation and translation components
-    auto [XcT_pose_rot, XcT_pose_trans] =
-        partitionSEMatrix(XcT_pose, r_, d_, 1);
-
-    // Update Q_cb block matrices for current measurement
-    updateQuadraticCostSubmatrices();
-
-    // Assign linear cost
-    L_unit_sphere.noalias() = XcT_pose_trans * Q_cb_32;
-  };
-
-  auto updateLinearCostFromFixedNeighborLandmarkToLocalUnitSphere =
-      [&]() -> void {
-    // Update Q_cb block matrices for current measurement
-    updateQuadraticCostSubmatrices();
-
-    // Assign linear cost
-    L_unit_sphere.noalias() = XcT_landmark * Q_cb_32;
   };
 
   // Iterate over all shared pose-pose loop closures
@@ -1620,7 +1635,7 @@ bool Graph::constructLinearCostTermRASLAM() {
       CbT(1, 1) = -1; // Leaving node i of agent b
       CcT(1, 1) = +1; // Entering node j of agent c
 
-      // Update selection matrices
+      // Update selection matrices (unit sphere variable is owned by agent b)
       PbT(1, 1) = 1;
       PcT(1, 1) = 0;
 
@@ -1688,7 +1703,7 @@ bool Graph::constructLinearCostTermRASLAM() {
       CbT(1, 1) = +1; // Entering node j of agent b
       CcT(1, 1) = -1; // Leaving node i of agent c
 
-      // Update selection matrices
+      // Update selection matrices (unit sphere variable is owned by agent c)
       PbT(1, 1) = 0;
       PcT(1, 1) = 1;
 
@@ -1829,9 +1844,7 @@ Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
   if (isNeighborActive(neighborStateID.robot_id)) {
     // Measurement with active neighbor
     if (!has_neighbor_state) {
-      LOG(WARNING) << "Missing active neighbor state "
-                   << neighborStateID.robot_id << ", "
-                   << neighborStateID.frame_id;
+      LOG(WARNING) << "Missing active neighbor state: " << neighborStateID;
       return false;
     }
   } else {
@@ -1851,8 +1864,8 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
     const PoseID neighborPoseID(neighborStateID);
     const auto neighborPoseItr = neighbor_poses_.find(neighborPoseID);
     CHECK(neighborPoseItr != neighbor_poses_.end())
-        << "Error: Fixed pose variable of agent's neighbor "
-        << neighborStateID.robot_id << " not found!";
+        << "Error: Fixed pose variable of agent's neighbor state "
+        << neighborStateID << " not found!";
     X = neighborPoseItr->second.pose();
   } break;
   case StateType::Landmark: {
@@ -1860,8 +1873,8 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
     const auto neighborLandmarkItr =
         neighbor_landmarks_.find(neighborLandmarkID);
     CHECK(neighborLandmarkItr != neighbor_landmarks_.end())
-        << "Error: Fixed landmark variable of agent's neighbor "
-        << neighborStateID.robot_id << " not found!";
+        << "Error: Fixed landmark variable of agent's neighbor state "
+        << neighborStateID << " not found!";
     X = neighborLandmarkItr->second.translation();
   } break;
   case StateType::UnitSphere: {
@@ -1869,8 +1882,8 @@ Graph::getNeighborFixedVariableLiftedData(const StateID &neighborStateID) {
     const auto neighborUnitSphereItr =
         neighbor_unit_spheres_.find(neighborUnitSphereID);
     CHECK(neighborUnitSphereItr != neighbor_unit_spheres_.end())
-        << "Error: Fixed unit sphere variable of agent's neighbor "
-        << neighborStateID.robot_id << " not found!";
+        << "Error: Fixed unit sphere variable of agent's neighbor state "
+        << neighborStateID << " not found!";
     X = neighborUnitSphereItr->second.translation();
     CHECK_LE(X.norm() - 1, 1e-6) << "Error: Unit sphere is not normalized!";
   } break;
@@ -1910,7 +1923,6 @@ bool Graph::constructPreconditioner() {
     return false;
   precon_.emplace(solver);
   ms_construct_precon_ = timer_.toc();
-  // LOG(INFO) << "Construct precon ms: " << ms_construct_precon_;
   return true;
 }
 
@@ -1940,17 +1952,18 @@ double Graph::computePreconditionerRegularization(const SparseMatrix &P) {
    * Assuming that the smallest eigenvalue of P is 0 and the largest
    * eigenvalue of P is sigma_max, we want to limit the condition number of:
    *
-   *     (P + reg*I)^-1
+   *   (P + reg*I)^-1
    *
    * to be less than or equal to target_precondition_number. Thus, we set:
    *
-   *     reg = sigma_max / (target_precondition_number - 1)
+   *   reg = sigma_max / (target_precondition_number - 1)
    *
    */
   double target_precondition_number = 1e6;
   double max_eigenvalue = eigsolver.eigenvalues()[0];
   reg = max_eigenvalue / (target_precondition_number - 1);
-  LOG(INFO) << "Largest eigenvalue of P computed successfully. Setting "
+  LOG(INFO) << "Largest eigenvalue " << max_eigenvalue
+            << " of P computed successfully. Setting "
                "preconditioner regularization term to: "
             << reg;
   return reg;

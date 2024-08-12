@@ -115,8 +115,8 @@ LiftedRAVariable::LiftedRAVariable(unsigned int r, unsigned int d,
       b_(b),
       is_oblique_var_empty_(false),
       is_landmark_var_empty_(false),
-      rotation_var_(std::make_unique<ROPTLIB::StieVariable>(r_, d_)),
-      translation_var_(std::make_unique<ROPTLIB::EucVariable>(r_, n)),
+      rotation_var_(std::make_unique<ROPTLIB::StieVariable>(r, d)),
+      translation_var_(std::make_unique<ROPTLIB::EucVariable>(r, n)),
       unit_sphere_var_([&] {
         if (l > 0) {
           return std::make_unique<ROPTLIB::ObliqueVariable>(r, l);

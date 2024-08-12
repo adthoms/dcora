@@ -773,7 +773,7 @@ struct LocalToGlobalStateDicts {
  * @brief A simple struct that contains the elements of a PyFG dataset.
  */
 struct PyFGDataset {
-  unsigned int dim;                 // Problem dimension
+  unsigned int dim;                 // Dimension (2 or 3)
   std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
 
   // Ordered maps of robot id to number of states

@@ -1250,7 +1250,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
     std::set<unsigned int> pose_ids;
     std::set<unsigned int> landmark_ids;
 
-    // add priors
+    // Add priors
     for (const auto &pose_prior : pyfg_dataset.measurements.pose_priors) {
       if (pose_prior.r == robot_id) {
         measurements.pose_priors.push_back(pose_prior);
@@ -1265,7 +1265,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
       }
     }
 
-    // add relative measurements
+    // Add relative measurements
     for (const auto &m : pyfg_dataset.measurements.relative_measurements.vec) {
       std::visit(
           [&](auto &&m) {
@@ -1286,7 +1286,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
           m);
     }
 
-    // check for monotonically increasing sets of consecutive IDs
+    // Check for monotonically increasing sets of consecutive IDs
     auto areStateIDsConsecutive = [](const std::set<unsigned int> &ids) {
       auto it = std::adjacent_find(ids.begin(), ids.end(),
                                    [](int a, int b) { return a + 1 != b; });
@@ -1299,7 +1299,7 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
       LOG(FATAL) << "Error: Landmark IDs are not consecutive for robot "
                  << robot_id << "!";
 
-    // get first IDs for reindexing
+    // Get first IDs for reindexing
     const unsigned int first_pose_id = *pose_ids.begin();
     const unsigned int first_landmark_id = *landmark_ids.begin();
     if (first_pose_id != 0)
@@ -1311,11 +1311,11 @@ RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset) {
     robot_first_pose_id[robot_id] = first_pose_id;
     robot_first_landmark_id[robot_id] = first_landmark_id;
 
-    // emplace
+    // Emplace
     robot_measurements[robot_id] = measurements;
   }
 
-  // reindex state IDs from zero
+  // Reindex state IDs from zero
   for (auto &[robot_id, measurements] : robot_measurements) {
     for (auto &pose_prior : measurements.pose_priors) {
       pose_prior.p -= robot_first_pose_id[robot_id];
@@ -1583,13 +1583,13 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
 }
 
 bool fastVerification(const SparseMatrix &S, double eta, double shift,
-                      double *theta, Vector *v) {
+                      double *theta, Vector *x) {
   // Regularize dual certificate matrix
   unsigned int k = S.rows();
   const SparseMatrix I = Matrix::Identity(k, k).sparseView();
   const SparseMatrix M = S + eta * I;
 
-  // Check if regularized dual certificate matrix is positive semi-definite
+  // Check if regularized dual certificate matrix is positive-semidefinite
   bool isPSD = isSparseSymmetricMatrixPSD(M);
   if (!isPSD) {
     // Compute the minimum eigen pair
@@ -1600,7 +1600,7 @@ bool fastVerification(const SparseMatrix &S, double eta, double shift,
     *theta = min_eigenvector.dot(S * min_eigenvector);
 
     // Set minimum eigen vector
-    *v = min_eigenvector;
+    *x = min_eigenvector;
   }
   return isPSD;
 }
@@ -1787,27 +1787,27 @@ Matrix fixedObliqueVariable(unsigned r, unsigned l) {
 }
 
 Matrix randomStiefelVariable(unsigned r, unsigned d) {
-  if (d == 0) {
+  if (d == 0)
     return Matrix::Zero(r, 0);
-  }
+
   ROPTLIB::StieVariable var(r, d);
   var.RandInManifold();
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, d);
 }
 
 Matrix randomEuclideanVariable(unsigned r, unsigned b) {
-  if (b == 0) {
+  if (b == 0)
     return Matrix::Zero(r, 0);
-  }
+
   ROPTLIB::EucVariable var(r, b);
   var.RandInManifold();
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, b);
 }
 
 Matrix randomObliqueVariable(unsigned r, unsigned l) {
-  if (l == 0) {
+  if (l == 0)
     return Matrix::Zero(r, 0);
-  }
+
   ROPTLIB::ObliqueVariable var(r, l);
   var.RandInManifold();
   return Eigen::Map<Matrix>(const_cast<double *>(var.ObtainReadData()), r, l);
@@ -1888,9 +1888,9 @@ partitionRAMatrix(const Matrix &X, unsigned int r, unsigned int d,
 Matrix createSEMatrix(const Matrix &X_SE_R, const Matrix &X_SE_t) {
   size_t r = X_SE_R.rows();
   size_t n = X_SE_t.cols();
-  if (n == 0) {
+  if (n == 0)
     return Matrix::Zero(r, 0);
-  }
+
   size_t d = X_SE_R.cols() / n;
   CHECK_EQ(X_SE_R.rows(), X_SE_t.rows());
   CHECK_EQ(X_SE_R.cols() + X_SE_t.cols(), (d + 1) * n);

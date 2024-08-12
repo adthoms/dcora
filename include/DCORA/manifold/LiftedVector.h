@@ -63,7 +63,7 @@ protected:
 
 /**
  * @brief This class acts as container for ROPTLIB::ProductElement vectors for
- * RA-SLAM synchronization
+ * RA-SLAM
  */
 class LiftedRAVector {
 public:
@@ -72,7 +72,7 @@ public:
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param l number of ranges
+   * @param l number of unit spheres
    * @param b number of landmarks
    */
   LiftedRAVector(unsigned int r, unsigned int d, unsigned int n, unsigned int l,

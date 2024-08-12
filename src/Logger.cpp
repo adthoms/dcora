@@ -26,12 +26,18 @@ void Logger::logMeasurements(
 
   std::ofstream file;
   file.open(logDirectory + filename);
-  if (!file.is_open())
+  if (!file.is_open()) {
+    LOG(WARNING) << "Cannot log pose-pose measurements to specified file: "
+                 << filename;
     return;
+  }
 
   size_t d = measurements.at(0).R.rows();
-  if (d == 2)
+  if (d == 2) {
+    LOG(WARNING)
+        << "logMeasurements for pose-pose measurements only supports 3D data.";
     return;
+  }
 
   // Insert header row
   file << "robot_src,pose_src,robot_dst,pose_dst,qx,qy,qz,qw,tx,ty,tz,kappa,"
@@ -68,8 +74,11 @@ void Logger::logMeasurements(const RelativeMeasurements &measurements,
 
   std::ofstream file;
   file.open(logDirectory + filename);
-  if (!file.is_open())
+  if (!file.is_open()) {
+    LOG(WARNING) << "Cannot log relative measurements to specified file: "
+                 << filename;
     return;
+  }
 
   const std::vector<RelativePosePoseMeasurement> &pose_pose_measurements =
       measurements.GetRelativePosePoseMeasurements();
@@ -102,7 +111,7 @@ void Logger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
   std::ofstream file;
   file.open(logDirectory + filename);
   if (!file.is_open()) {
-    LOG(WARNING) << "Cannot write to specified file: " << filename;
+    LOG(WARNING) << "Cannot log trajectory to specified file: " << filename;
     return;
   }
 

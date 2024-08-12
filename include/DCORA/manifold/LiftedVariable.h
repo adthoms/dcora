@@ -157,7 +157,7 @@ public:
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param l number of ranges
+   * @param l number of unit spheres
    * @param b number of landmarks
    */
   LiftedRAVariable(unsigned int r, unsigned int d, unsigned int n,

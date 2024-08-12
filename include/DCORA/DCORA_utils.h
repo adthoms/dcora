@@ -199,7 +199,7 @@ Matrix projectToObliqueManifold(const Matrix &M);
  * @param B
  * @param C
  * @param r
- * @param d
+ * @param k
  * @param n
  */
 Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
@@ -217,15 +217,15 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
  * @param eta
  * @param shift
  * @param theta
- * @param v
+ * @param x
  * @return
  */
 bool fastVerification(const SparseMatrix &S, double eta, double shift,
-                      double *theta, Vector *v);
+                      double *theta, Vector *x);
 
 /**
  * @brief Helper function to determine if a sparse symmetric matrix S is
- * positive semi-definite (PSD). Return true if the matrix is PSD, false
+ * positive-semidefinite (PSD). Return true if the matrix is PSD, false
  * otherwise.
  * @param S
  * @return
@@ -237,7 +237,7 @@ bool isSparseSymmetricMatrixPSD(const SparseMatrix &S);
  * sparse symmetric matrix S using the shift-and-invert mode, where σ is the
  * shift. This function uses a heuristic where by σ is halved if the solver is
  * unsuccessful. This reduction occurs for a set number of iterations, where the
- * minimum allowable shift is then set to -2 * eta.
+ * minimum allowable shift is then set to -2 × eta.
  * @param S
  * @param sigma
  * @param eta

@@ -196,6 +196,18 @@ struct ROPTResult {
   double elapsedMs;                // elapsed time in milliseconds
   ROPTLIB::tCGstatusSet tCGStatus; // status of truncated conjugate gradient
                                    // (only used by trust region solver)
+
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const ROPTResult &result) {
+    os << "Riemannian optimization results: " << std::endl;
+    os << "Success: " << result.success << std::endl;
+    os << "Initial objective value: " << result.fInit << std::endl;
+    os << "Initial gradient norm: " << result.gradNormInit << std::endl;
+    os << "Optimized objective value: " << result.fOpt << std::endl;
+    os << "Optimized gradient norm: " << result.gradNormOpt << std::endl;
+    os << "Elapsed time (ms): " << result.elapsedMs << std::endl;
+    return os;
+  }
 };
 
 // Each state is uniquely determined by the robot ID and frame ID
