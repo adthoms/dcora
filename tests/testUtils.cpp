@@ -267,3 +267,24 @@ TEST(testDCORA, testCreateRAMatrix) {
     }
   }
 }
+
+TEST(testDCORA, testProjectSolutionRASLAM) {
+  int r = 5;
+  int d = 3;
+  int n = 10;
+  std::vector<int> l_cases = {0, 6, 0, 6};
+  std::vector<int> b_cases = {0, 0, 7, 7};
+  for (int i = 0; i < l_cases.size(); i++) {
+    int l = l_cases.at(i);
+    int b = b_cases.at(i);
+    int k = (d + 1) * n + l + b;
+    DCORA::Matrix M = DCORA::Matrix::Random(r, k);
+    DCORA::Matrix X = DCORA::projectToRAMatrix(M, r, d, n, l, b);
+    DCORA::Matrix X_project = DCORA::projectSolutionRASLAM(X, r, d, n, l, b);
+    ASSERT_EQ(X_project.rows(), d);
+    ASSERT_EQ(X_project.cols(), k);
+    // Check that the projection is within the feasible set
+    ASSERT_TRUE(
+        X_project.isApprox(DCORA::projectToRAMatrix(X_project, d, d, n, l, b)));
+  }
+}

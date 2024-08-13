@@ -1751,6 +1751,55 @@ constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
   return Q - Lambda;
 }
 
+Matrix projectSolutionRASLAM(const Matrix &X, unsigned int r, unsigned int d,
+                             unsigned int n, unsigned int l, unsigned int b) {
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
+  CHECK_EQ(X.rows(), r);
+  CHECK_EQ(X.cols(), (d + 1) * n + l + b);
+
+  // Compute thin SVD of X^T
+  const Matrix &XT = X.transpose();
+  Eigen::JacobiSVD<Matrix> svd(XT, Eigen::ComputeThinU);
+
+  // Get Ud and Sd
+  const Matrix &Ud = svd.matrixU().leftCols(d);
+  DiagonalMatrix Sd(d);
+  DiagonalMatrix::DiagonalVectorType &diagonal = Sd.diagonal();
+  for (unsigned int i = 0; i < d; ++i)
+    diagonal(i) = svd.singularValues()(i);
+
+  // Construct rank-d truncated SVD for X
+  RangeAidedArray Xproject(d, n, l, b);
+  Xproject.setData((Ud * Sd).transpose());
+
+  // Calculate determinants of the rotation blocks
+  unsigned int num_positive_det = 0;
+  for (unsigned int i = 0; i < n; ++i)
+    if (Xproject.rotation(i).determinant() > 0)
+      ++num_positive_det;
+
+  // Reflect solution if less than half of the total number of rotation blocks
+  // have the incorrect sign
+  if (num_positive_det < n / 2) {
+    Matrix R = Matrix::Identity(d, d);
+    R(d - 1, d - 1) = -1;
+    Xproject.setData(R * Xproject.getData());
+  }
+
+  // Project rotations to SO(d)
+  for (unsigned int i = 0; i < n; ++i)
+    Xproject.rotation(i) = projectToRotationGroup(Xproject.rotation(i));
+
+  // Project unit spheres to OB(d)
+  for (unsigned int i = 0; i < l; ++i)
+    Xproject.unitSphere(i) = projectToObliqueManifold(Xproject.unitSphere(i));
+
+  return Xproject.getData();
+}
+
 Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
                                             unsigned int r, unsigned int d,
                                             unsigned int n) {

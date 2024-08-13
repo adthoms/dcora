@@ -273,6 +273,20 @@ SparseMatrix
 constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
                                      unsigned int d, unsigned int n,
                                      unsigned int l, unsigned int b);
+/**
+ * @brief Helper function to project a rank-r RA-SLAM solution to a rank-d
+ * solution within the feasible set of the MAP RA-SLAM formulation. See
+ * Algorithm 3 in the CORA arxiv paper.
+ * @param X
+ * @param r
+ * @param d
+ * @param n
+ * @param l
+ * @param b
+ * @return
+ */
+Matrix projectSolutionRASLAM(const Matrix &X, unsigned int r, unsigned int d,
+                             unsigned int n, unsigned int l, unsigned int b);
 
 /**
  * @brief Given an element Y in M and a matrix V in T_X(R^{r × dn}) (that is, a
