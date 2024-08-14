@@ -1,5 +1,4 @@
-# Distributed and Certifiably Correct Range-Aided SLAM (DCORA)
-
+# Distributed Certifiably Correct Range-Aided SLAM (DCORA)
 
 ## Building
 
@@ -18,17 +17,18 @@ make
 
 ## Usage
 
-The built executables are located in directory build/bin. For a minimal demo of distributed RA-SLAM on one of the benchmark datasets, inside the build directory run:
+The built executables are located in directory build/bin. For a minimal demo of DC2-PGO on one of the benchmark g2o datasets, inside the build directory run:
 ```bash
 ./bin/multi-robot-example 5 ../data/smallGrid3D.g2o
+```
+For a minimal demo of CORA on one of the benchmark pyfg datasets, inside the build directory run:
+```bash
+./bin/SingleRobotExample_RASLAM ../data/tiers.pyfg
 ```
 
 ## Contributing
 
-Any contributions should pass all checks in our `.pre-commit-config.yaml` file. To install the pre-commit hooks, run `pre-commit install` in the root directory of this repository.
-
-You may need to install some dependencies to get the pre-commit hooks to work.
-
+Any contributions should pass all checks in our `.pre-commit-config.yaml` file. To install the pre-commit hooks, run `pre-commit install` in the root directory of this repository. You may need to install some dependencies to get the pre-commit hooks to work.
 ```bash
 pip install pre-commit
 sudo apt-get install cppcheck
