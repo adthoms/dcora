@@ -15,10 +15,9 @@
 
 TEST(testDCORA, LineGraph) {
   unsigned int id = 0;
-  unsigned int d, r;
-  d = 3;
-  r = 3;
-  DCORA::AgentParameters options(d, r, 1);
+  unsigned int d = 3;
+  unsigned int r = 3;
+  DCORA::AgentParameters options(d, r);
 
   DCORA::Matrix R = DCORA::Matrix::Identity(d, d);
   DCORA::Matrix t = DCORA::Matrix::Random(d, 1);

@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
   unsigned int d, r;
   d = (!dataset.empty() ? dataset[0].t.size() : 0);
   r = d;
-  DCORA::AgentParameters options(d, r, 1);
+  DCORA::AgentParameters options(d, r);
   options.verbose = true;
   options.logDirectory = "/home/alex/data/dcora_dpgo_examples/"
                          "dcora_examples/single_robot_example_pgo/";

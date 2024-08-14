@@ -205,27 +205,12 @@ public:
   /**
    * @brief Set neighbor states
    * @param pose_dict
-   * @param landmark_dict
    * @param unit_sphere_dict
+   * @param landmark_dict
    */
   void setNeighborStates(const PoseDict &pose_dict,
-                         const LandmarkDict &landmark_dict,
-                         const UnitSphereDict &unit_sphere_dict);
-  /**
-   * @brief Set neighbor poses
-   * @param pose_dict
-   */
-  void setNeighborPoses(const PoseDict &pose_dict);
-  /**
-   * @brief Set neighbor landmarks
-   * @param landmark_dict
-   */
-  void setNeighborLandmarks(const LandmarkDict &landmark_dict);
-  /**
-   * @brief Set neighbor unit spheres
-   * @param unit_sphere_dict
-   */
-  void setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict);
+                         const UnitSphereDict &unit_sphere_dict,
+                         const LandmarkDict &landmark_dict);
   /**
    * @brief Get quadratic cost matrix
    * @return

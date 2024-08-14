@@ -61,6 +61,12 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  // Create set of robot IDs
+  // Note: this example assume consecutive robot IDs from 0 to num_robots - 1
+  std::set<unsigned int> robot_IDs;
+  for (unsigned int i = 0; i <= (num_robots - 1); ++i)
+    robot_IDs.insert(i);
+
   // Create mapping from global pose index to local pose index
   std::map<unsigned, DCORA::PoseID> PoseMap;
   for (unsigned robot = 0; robot < (unsigned)num_robots; ++robot) {
@@ -179,7 +185,7 @@ int main(int argc, char **argv) {
     std::vector<DCORA::Agent *> agents;
     for (unsigned robot = 0; robot < static_cast<unsigned int>(num_robots);
          ++robot) {
-      DCORA::AgentParameters options(d, r, num_robots);
+      DCORA::AgentParameters options(d, r, robot_IDs);
       options.acceleration = acceleration;
       options.verbose = verbose;
       options.logDirectory = logDirectory;
@@ -231,11 +237,10 @@ int main(int argc, char **argv) {
         if (robotPtr->getID() == selectedRobot)
           continue;
         DCORA::PoseDict sharedPoses;
-        if (!robotPtr->getSharedPoseDict(&sharedPoses)) {
+        if (!robotPtr->getSharedStateDicts(&sharedPoses))
           continue;
-        }
         selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
-        selectedRobotPtr->updateNeighborPoses(robotPtr->getID(), sharedPoses);
+        selectedRobotPtr->updateNeighborStates(robotPtr->getID(), sharedPoses);
       }
 
       // When using acceleration, selected robot also requests auxiliary poses
@@ -244,12 +249,11 @@ int main(int argc, char **argv) {
           if (robotPtr->getID() == selectedRobot)
             continue;
           DCORA::PoseDict auxSharedPoses;
-          if (!robotPtr->getAuxSharedPoseDict(&auxSharedPoses)) {
+          if (!robotPtr->getSharedStateDicts(&auxSharedPoses))
             continue;
-          }
           selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
-          selectedRobotPtr->updateAuxNeighborPoses(robotPtr->getID(),
-                                                   auxSharedPoses);
+          selectedRobotPtr->updateNeighborStates(robotPtr->getID(),
+                                                 auxSharedPoses, acceleration);
         }
       }
 

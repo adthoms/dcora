@@ -333,27 +333,12 @@ void Graph::setPrior(unsigned index, const LiftedPoint &ti) {
 }
 
 void Graph::setNeighborStates(const PoseDict &pose_dict,
-                              const LandmarkDict &landmark_dict,
-                              const UnitSphereDict &unit_sphere_dict) {
+                              const UnitSphereDict &unit_sphere_dict,
+                              const LandmarkDict &landmark_dict) {
   neighbor_poses_ = pose_dict;
-  neighbor_landmarks_ = landmark_dict;
   neighbor_unit_spheres_ = unit_sphere_dict;
+  neighbor_landmarks_ = landmark_dict;
   G_.reset(); // Setting neighbor states requires re-computing linear matrix
-}
-
-void Graph::setNeighborPoses(const PoseDict &pose_dict) {
-  neighbor_poses_ = pose_dict;
-  G_.reset();
-}
-
-void Graph::setNeighborLandmarks(const LandmarkDict &landmark_dict) {
-  neighbor_landmarks_ = landmark_dict;
-  G_.reset();
-}
-
-void Graph::setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict) {
-  neighbor_unit_spheres_ = unit_sphere_dict;
-  G_.reset();
 }
 
 bool Graph::hasNeighbor(unsigned int robot_id) const {

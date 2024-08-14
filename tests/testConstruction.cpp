@@ -15,10 +15,9 @@
 
 TEST(testDCORA, Construction) {
   unsigned int id = 1;
-  unsigned int d, r;
-  d = 3;
-  r = 3;
-  DCORA::AgentParameters options(d, r, 1);
+  unsigned int d = 3;
+  unsigned int r = 3;
+  DCORA::AgentParameters options(d, r);
 
   DCORA::Agent agent(id, options);
 

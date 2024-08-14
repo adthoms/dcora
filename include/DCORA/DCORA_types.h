@@ -36,9 +36,10 @@ typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrix;
 typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SparseMatrix;
 typedef Eigen::CholmodDecomposition<SparseMatrix> CholmodSolver;
 typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
-constexpr char FIRST_AGENT_ID = 'A';
-constexpr char MAP_ID = 'M';
+constexpr char FIRST_AGENT_SYMBOL = 'A';
+constexpr char MAP_SYMBOL = 'M';
 constexpr char LANDMARK_SYMBOL = 'L';
+constexpr unsigned int MAP_ID = static_cast<unsigned int>(MAP_SYMBOL);
 
 /**
  * @brief Algorithms for initializing PGO
@@ -109,6 +110,13 @@ const std::map<std::string, PyFGType> PyFGStringToType{
  * @return
  */
 std::string InitializationMethodToString(InitializationMethod method);
+
+/**
+ * @brief Convert graph type to string
+ * @param type
+ * @return
+ */
+std::string GraphTypeToString(const GraphType &type);
 
 /**
  * @brief Convert state type to string

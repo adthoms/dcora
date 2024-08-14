@@ -59,6 +59,18 @@ std::string InitializationMethodToString(InitializationMethod method) {
   return "";
 }
 
+std::string GraphTypeToString(const GraphType &type) {
+  switch (type) {
+  case GraphType::PoseGraph: {
+    return "PoseGraph";
+  }
+  case GraphType::RangeAidedSLAMGraph: {
+    return "RangeAidedSLAMGraph";
+  }
+  }
+  return "";
+}
+
 std::string StateTypeToString(const StateType &type) {
   switch (type) {
   case StateType::None: {
@@ -262,14 +274,14 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
 
       // Compute precisions
 
-      // Compute and store the optimal (information-divergence-minimizing) value
-      // of the parameter tau
+      // Compute and store the optimal (information-divergence-minimizing)
+      // value of the parameter tau
       Eigen::Matrix3d TranCov;
       TranCov << I11, I12, I13, I12, I22, I23, I13, I23, I33;
       measurement.tau = 3 / TranCov.inverse().trace();
 
-      // Compute and store the optimal (information-divergence-minimizing value
-      // of the parameter kappa
+      // Compute and store the optimal (information-divergence-minimizing
+      // value of the parameter kappa
 
       Eigen::Matrix3d RotCov;
       RotCov << I44, I45, I46, I45, I55, I56, I46, I56, I66;
@@ -425,9 +437,9 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         } else {
           LOG(WARNING) << "Warning: attempted to parse covariance matrix. i: "
                        << i << " j:" << j << " val:" << val;
-          LOG(FATAL)
-              << "Error: could not read covariance matrix from string stream: "
-              << strstrm.str() << "!";
+          LOG(FATAL) << "Error: could not read covariance matrix from string "
+                        "stream: "
+                     << strstrm.str() << "!";
         }
       }
     }
@@ -502,7 +514,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
     if (sym[0] == LANDMARK_SYMBOL) {
       // Symbol is a landmark
       if (std::isupper(sym[1])) {
-        if (sym[1] == MAP_ID) {
+        if (sym[1] == MAP_SYMBOL) {
           // Landmark is associated with the map, though does not obey PyFG
           // formatting.
           LOG(WARNING)
@@ -511,16 +523,16 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                  "'L#'.";
         }
         // Landmark is associated with a robot according to PyFG formatting
-        robotID = static_cast<unsigned int>(sym[1] - FIRST_AGENT_ID);
+        robotID = static_cast<unsigned int>(sym[1] - FIRST_AGENT_SYMBOL);
         stateID = std::stoi(sym.substr(2));
       } else {
         // Landmark is associated with the map
-        robotID = static_cast<unsigned int>(MAP_ID - FIRST_AGENT_ID);
+        robotID = static_cast<unsigned int>(MAP_SYMBOL - FIRST_AGENT_SYMBOL);
         stateID = std::stoi(sym.substr(1));
       }
     } else if (std::isupper(sym[0])) {
       // Symbol is a pose
-      robotID = static_cast<unsigned int>(sym[0] - FIRST_AGENT_ID);
+      robotID = static_cast<unsigned int>(sym[0] - FIRST_AGENT_SYMBOL);
       stateID = std::stoi(sym.substr(1));
     } else {
       LOG(FATAL) << "Error: could not read robot and state ID from symbol: "
@@ -789,7 +801,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
       }
       break;
     case LANDMARK_PRIOR_3D:
-      // VERTEX_XYZ:PRIOR ts sym x y z cov_11 cov_12 cov_13 cov_22 cov_23 cov_33
+      // VERTEX_XYZ:PRIOR ts sym x y z cov_11 cov_12 cov_13 cov_22 cov_23
+      // cov_33
       if (strstrm >> timestamp >> sym1) {
         // Read string stream
         const Vector t = readVector(strstrm, 3);
@@ -1642,9 +1655,9 @@ std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
       min_eigenvector = eigsolver.eigenvectors().col(0);
       break;
     } else {
-      LOG(WARNING)
-          << "Warning: Could not compute minimum eigen pair with shift sigma = "
-          << sigma << ". Halving shift and repeating computation.";
+      LOG(WARNING) << "Warning: Could not compute minimum eigen pair with "
+                      "shift sigma = "
+                   << sigma << ". Halving shift and repeating computation.";
       sigma /= 2;
     }
 
@@ -1739,7 +1752,7 @@ constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
                               stiefel_Lambda_blocks(r, i * d + c));
 
   // Add the diagonal block for the Oblique constraints
-  for (auto i = 0; i < l; ++i)
+  for (unsigned int i = 0; i < l; ++i)
     elements.emplace_back(rot_mat_size + i, rot_mat_size + i,
                           oblique_Lambda_blocks(i));
 

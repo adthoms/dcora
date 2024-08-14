@@ -17,10 +17,9 @@
 #include "gtest/gtest.h"
 
 TEST(testDCORA, OptimizationThreadBasic) {
-  unsigned int d, r;
-  d = 3;
-  r = 3;
-  DCORA::AgentParameters options(d, r, 1);
+  unsigned int d = 3;
+  unsigned int r = 3;
+  DCORA::AgentParameters options(d, r);
 
   DCORA::Agent agent(0, options);
 
@@ -37,10 +36,9 @@ TEST(testDCORA, OptimizationThreadBasic) {
 
 TEST(testDCORA, OptimizationThreadTriangleGraph) {
   unsigned int id = 0;
-  unsigned int d, r;
-  d = 3;
-  r = 3;
-  DCORA::AgentParameters options(d, r, 1);
+  unsigned int d = 3;
+  unsigned int r = 3;
+  DCORA::AgentParameters options(d, r);
   DCORA::Agent agent(id, options);
 
   DCORA::Matrix Tw0 = DCORA::Matrix::Identity(d + 1, d + 1);
