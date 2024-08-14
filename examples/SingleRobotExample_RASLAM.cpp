@@ -17,10 +17,8 @@
 
 int main(int argc, char **argv) {
   /**
-  ###########################################
-  Parse input dataset
-  ###########################################
-  */
+   * @brief Parse User Input
+   */
 
   if (argc < 2) {
     std::cout << "Single robot RA-SLAM demo. " << std::endl;
@@ -51,13 +49,15 @@ int main(int argc, char **argv) {
 
   // set minimum and maximum rank
   unsigned int r_min = d;
-  unsigned int r_max = 10;
+  unsigned int r_max = 20;
 
   // Set optimization parameters
   DCORA::ROptParameters params;
   params.verbose = false;
   params.RTR_iterations = 200;
   params.RTR_tCG_iterations = 200;
+  params.gradnorm_tol = 1e-4;
+  params.RGD_stepsize = 1e-5;
 
   // Logging
   bool logData = true;
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
   double min_eig_num_tol = 1e-4;
   double gradient_tolerance = 1e-4;
   double preconditioned_gradient_tolerance = 1e-4;
-  double shift = -10;
+  double shift = -2;
 
   /**
    * @brief CORA Algorithm
@@ -79,8 +79,15 @@ int main(int argc, char **argv) {
   DCORA::Matrix Xcurr = DCORA::Matrix::Zero(r_max, (d + 1) * n + l + b);
 
   // TODO(Alex): Add other initialization methods
-  const DCORA::Matrix &XGroundTruth = ground_truth_init.getData();
-  Xcurr.topRows(d) = XGroundTruth;
+  Xcurr.topRows(d) = ground_truth_init.getData();
+
+  // Log ground truth trajectory
+  if (logData) {
+    DCORA::Matrix TGroundTruth =
+        ground_truth_init.GetLiftedPoseArray()->getData();
+    LOG(INFO) << "Outputting ground truth centralized trajectory.";
+    logger.logTrajectory(d, n, TGroundTruth, "dcora_gt.txt");
+  }
 
   for (unsigned int r = r_min; r < r_max; ++r) {
     // Construct the centralized problem
@@ -99,7 +106,8 @@ int main(int argc, char **argv) {
     // Perform Riemannian optimization
     DCORA::QuadraticOptimizer optimizer(&problemCentralCurrRank, params);
     DCORA::Matrix Xopt = optimizer.optimize(Xcurr.topRows(r));
-    LOG(INFO) << "Objective value: " << problemCentralCurrRank.f(Xopt);
+    LOG(INFO) << "Objective value at rank " << r << ": "
+              << problemCentralCurrRank.f(Xopt);
 
     // Construct corresponding dual certificate matrix
     const DCORA::SparseMatrix &Q = graphCurrRank->quadraticMatrix();
@@ -120,26 +128,38 @@ int main(int argc, char **argv) {
     if (global_opt) {
       LOG(INFO) << "Z = (X*)^T(X*) is a global minimizer!";
 
-      // Set second-order critical-point for rounding
-      DCORA::LiftedRangeAidedArray X(r, d, n, l, b);
-      X.setData(Xopt);
-      const DCORA::LiftedPoseArray &Xposes = *X.GetLiftedPoseArray();
+      // Project solution
+      const DCORA::Matrix Xproject =
+          (r == d) ? Xopt : DCORA::projectSolutionRASLAM(Xopt, r, d, n, l, b);
 
-      // Set global anchor to first lifted pose
-      const DCORA::LiftedPose Xa = DCORA::LiftedPose(Xposes.pose(0));
+      // Refine solution
+      std::shared_ptr<DCORA::Graph> graphRankD = std::make_shared<DCORA::Graph>(
+          0, d, d, DCORA::GraphType::RangeAidedSLAMGraph);
+      graphRankD->setMeasurements(measurements);
+      DCORA::QuadraticProblem problemCentralRankD(graphRankD);
 
-      // Get rounded trajectory
-      DCORA::PoseArray T(d, n);
-      T.setData(Xa.rotation().transpose() * Xposes.getData());
-      DCORA::Vector t0 = Xa.rotation().transpose() * Xa.translation();
-      for (unsigned i = 0; i < n; ++i) {
-        T.rotation(i) = DCORA::projectToRotationGroup(T.rotation(i));
-        T.translation(i) = T.translation(i) - t0;
-      }
+      DCORA::QuadraticOptimizer optimizer(&problemCentralRankD, params);
+      const DCORA::Matrix Xrefine = optimizer.optimize(Xproject);
 
-      // Log rounded trajectory
       if (logData) {
         LOG(INFO) << "Outputting rounded centralized trajectory.";
+
+        // Set refined solution for trajectory output
+        DCORA::RangeAidedArray X(d, n, l, b);
+        X.setData(Xrefine);
+
+        // Set global anchor to first lifted pose
+        const DCORA::LiftedPoseArray &Xposes = *X.GetLiftedPoseArray();
+        const DCORA::LiftedPose Xa = DCORA::LiftedPose(Xposes.pose(0));
+
+        // Get rounded trajectory
+        DCORA::PoseArray T(d, n);
+        T.setData(Xa.rotation().transpose() * Xposes.getData());
+        const DCORA::Vector t0 = Xa.rotation().transpose() * Xa.translation();
+        for (unsigned int i = 0; i < n; ++i)
+          T.translation(i) = T.translation(i) - t0;
+
+        // Log rounded trajectory
         logger.logTrajectory(d, n, T.getData(), "dcora_0.txt");
       }
 
