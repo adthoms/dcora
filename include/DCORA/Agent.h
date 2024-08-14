@@ -41,9 +41,9 @@
 namespace DCORA {
 
 /**
- * @brief This class contains parameter settings for PGOAgent
+ * @brief This class contains parameter settings for Agent
  */
-class PGOAgentParameters {
+class AgentParameters {
 public:
   // Problem dimension
   unsigned d;
@@ -110,17 +110,17 @@ public:
   std::string logDirectory;
 
   // Default constructor
-  PGOAgentParameters(unsigned dIn, unsigned rIn, unsigned numRobotsIn = 1,
-                     ROptParameters local_opt_params = ROptParameters(),
-                     bool accel = false, unsigned restartInt = 30,
-                     RobustCostParameters costParams = RobustCostParameters(),
-                     int robust_opt_num_weight_updates = 10,
-                     int robust_opt_num_resets = 0,
-                     int robust_opt_inner_iters = 30,
-                     double robust_opt_min_convergence_ratio = 0.8,
-                     unsigned robust_init_min_inliers = 2,
-                     unsigned maxIters = 500, double changeTol = 5e-3,
-                     bool v = false, bool log = false, std::string logDir = "")
+  AgentParameters(unsigned dIn, unsigned rIn, unsigned numRobotsIn = 1,
+                  ROptParameters local_opt_params = ROptParameters(),
+                  bool accel = false, unsigned restartInt = 30,
+                  RobustCostParameters costParams = RobustCostParameters(),
+                  int robust_opt_num_weight_updates = 10,
+                  int robust_opt_num_resets = 0,
+                  int robust_opt_inner_iters = 30,
+                  double robust_opt_min_convergence_ratio = 0.8,
+                  unsigned robust_init_min_inliers = 2, unsigned maxIters = 500,
+                  double changeTol = 5e-3, bool v = false, bool log = false,
+                  std::string logDir = "")
       : d(dIn),
         r(rIn),
         numRobots(numRobotsIn),
@@ -144,9 +144,9 @@ public:
         logDirectory(std::move(logDir)) {}
 
   inline friend std::ostream &operator<<(std::ostream &os,
-                                         const PGOAgentParameters &params) {
+                                         const AgentParameters &params) {
     // clang-format off
-    os << "PGOAgent parameters: " << std::endl;
+    os << "Agent parameters: " << std::endl;
     os << "Dimension: " << params.d << std::endl;
     os << "Relaxation rank: " << params.r << std::endl;
     os << "Number of robots: " << params.numRobots << std::endl;
@@ -176,11 +176,11 @@ public:
 };
 
 /**
- * @brief Defines the possible states of a PGOAgent. Each state can only
+ * @brief Defines the possible states of an Agent. Each state can only
  * transition to the state below
  */
-enum PGOAgentState {
-  WAIT_FOR_DATA,           // waiting to receive pose graph
+enum AgentState {
+  WAIT_FOR_DATA,           // waiting to receive graph
   WAIT_FOR_INITIALIZATION, // waiting to initialize trajectory estimate
   INITIALIZED,             // trajectory initialized and ready to update
 };
@@ -188,12 +188,12 @@ enum PGOAgentState {
 /**
  * @brief Status of an agent to be shared with its peers
  */
-struct PGOAgentStatus {
+struct AgentStatus {
   // Unique ID of this agent
   unsigned agentID;
 
   // Current state of this agent
-  PGOAgentState state;
+  AgentState state;
 
   // Current problem instance number
   unsigned instanceNumber;
@@ -208,11 +208,11 @@ struct PGOAgentStatus {
   double relativeChange;
 
   // Constructor
-  explicit PGOAgentStatus(unsigned id = 0,
-                          PGOAgentState s = PGOAgentState::WAIT_FOR_DATA,
-                          unsigned instance = 0, unsigned iteration = 0,
-                          bool ready_to_terminate = false,
-                          double relative_change = 0)
+  explicit AgentStatus(unsigned id = 0,
+                       AgentState s = AgentState::WAIT_FOR_DATA,
+                       unsigned instance = 0, unsigned iteration = 0,
+                       bool ready_to_terminate = false,
+                       double relative_change = 0)
       : agentID(id),
         state(s),
         instanceNumber(instance),
@@ -221,8 +221,8 @@ struct PGOAgentStatus {
         relativeChange(relative_change) {}
 
   inline friend std::ostream &operator<<(std::ostream &os,
-                                         const PGOAgentStatus &status) {
-    os << "PGOAgent status: " << std::endl;
+                                         const AgentStatus &status) {
+    os << "Agent status: " << std::endl;
     os << "ID: " << status.agentID << std::endl;
     os << "State: " << status.state << std::endl;
     os << "Instance number: " << status.instanceNumber << std::endl;
@@ -234,25 +234,25 @@ struct PGOAgentStatus {
 } __attribute__((aligned(32)));
 
 /**
- * @brief This class implements a single robot in the distributed pose graph
- * optimization problem
+ * @brief This class implements a single robot in the distributed pose graph or
+ * RA-SLAM optimization problem
  */
-class PGOAgent {
+class Agent {
 public:
   /**
    * @brief Constructor
    * @param ID
    * @param params
    */
-  PGOAgent(unsigned ID, const PGOAgentParameters &params);
+  Agent(unsigned ID, const AgentParameters &params);
 
   /**
    * @brief Destructor
    */
-  ~PGOAgent();
+  ~Agent();
 
   /**
-   * @brief Set measurements (pose graph) for this agent
+   * @brief Set measurements for this agent
    * @param inputOdometry
    * @param inputPrivateLoopClosures
    * @param inputSharedLoopClosures
@@ -263,7 +263,7 @@ public:
       const std::vector<RelativePosePoseMeasurement> &inputSharedLoopClosures);
 
   /**
-   * @brief Add a single measurement to this agent's pose graph. Do nothing if
+   * @brief Add a single measurement to this agent's graph. Do nothing if
    * the input factor already exists.
    * @param factor
    */
@@ -300,7 +300,7 @@ public:
   bool iterate(bool doOptimization = true);
 
   /**
-   * @brief Reset this agent to have empty pose graph
+   * @brief Reset this agent to have an empty graph
    */
   virtual void reset();
 
@@ -314,25 +314,25 @@ public:
    * @brief Return number of poses of this robot
    * @return
    */
-  inline unsigned num_poses() const { return mPoseGraph->n(); }
+  inline unsigned num_poses() const { return mGraph->n(); }
 
   /**
    * @brief Get dimension
    * @return
    */
-  inline unsigned dimension() const { return mPoseGraph->d(); }
+  inline unsigned dimension() const { return mGraph->d(); }
 
   /**
    * @brief Get relaxation rank
    * @return
    */
-  inline unsigned relaxation_rank() const { return mPoseGraph->r(); }
+  inline unsigned relaxation_rank() const { return mGraph->r(); }
 
   /**
    * @brief Get problem dimension
    * @return
    */
-  inline unsigned problem_dimension() const { return mPoseGraph->k(); }
+  inline unsigned problem_dimension() const { return mGraph->k(); }
 
   // TODO(AT): Add supporting getters for graph dims l,b
 
@@ -352,7 +352,7 @@ public:
    * @brief Get the current status of this agent
    * @return
    */
-  inline PGOAgentStatus getStatus() {
+  inline AgentStatus getStatus() {
     mStatus.agentID = getID();
     mStatus.state = mState;
     mStatus.instanceNumber = instance_number();
@@ -373,7 +373,7 @@ public:
    * @param neighborID
    * @return
    */
-  inline PGOAgentStatus getNeighborStatus(unsigned neighborID) const {
+  inline AgentStatus getNeighborStatus(unsigned neighborID) const {
     CHECK(hasNeighborStatus(neighborID));
     return mTeamStatus.at(neighborID);
   }
@@ -382,13 +382,13 @@ public:
    * @brief Set the status of a neighbor
    * @param status
    */
-  inline void setNeighborStatus(const PGOAgentStatus &status) {
+  inline void setNeighborStatus(const AgentStatus &status) {
     mTeamStatus[status.agentID] = status;
   }
 
   /**
-   * @brief Return true if the input robot is a neighbor (i.e., has inter-robot
-   * loop closure with this robot)
+   * @brief Return true if the input robot is a neighbor (i.e., has shared loop
+   * closure with this robot)
    * @return
    */
   bool hasNeighbor(unsigned neighborID) const;
@@ -445,8 +445,8 @@ public:
    * @brief Get a single public pose of this robot. Note that currently, this
    * method does not check that the requested pose is a public pose. Return true
    * if the requested pose exists
-   * @param index: index of the requested pose
-   * @param Mout: actual value of the pose
+   * @param index index of the requested pose
+   * @param Mout actual value of the pose
    * @return
    */
   bool getSharedPose(unsigned index, Matrix *Mout);
@@ -614,21 +614,21 @@ protected:
   LiftedPoseArray X;
 
   // Parameter settings
-  const PGOAgentParameters mParams;
+  const AgentParameters mParams;
 
   // Current state of this agent
-  PGOAgentState mState;
+  AgentState mState;
 
   // Current status of this agent (to be shared with others)
-  PGOAgentStatus mStatus;
+  AgentStatus mStatus;
 
   // Robust cost function
   RobustCost mRobustCost;
 
-  // Pointer to pose graph
-  std::shared_ptr<Graph> mPoseGraph;
+  // Pointer to graph
+  std::shared_ptr<Graph> mGraph;
 
-  // Current PGO instance
+  // Current optimization instance
   unsigned mInstanceNumber;
 
   // Current global iteration counter (this is only meaningful in synchronous
@@ -654,13 +654,13 @@ protected:
   Logger mLogger;
 
   // Store status of peer agents
-  std::unordered_map<unsigned, PGOAgentStatus> mTeamStatus;
+  std::unordered_map<unsigned, AgentStatus> mTeamStatus;
 
   // Store if robots are actively participating in optimization
   std::vector<bool> mTeamRobotActive;
 
-  // Request to publish public poses
-  bool mPublishPublicPosesRequested = false;
+  // Request to publish public states
+  bool mPublishPublicStatesRequested = false;
 
   // Request to publish in asynchronous mode
   bool mPublishAsynchronousRequested = false;
@@ -684,14 +684,12 @@ protected:
   // this robot by loop closure
   PoseDict neighborPoseDict;
 
-  // Implement locking to synchronize read & write of trajectory estimate
-  // TODO(AT): Rename as mStatesMutex as all states should be locked
-  std::mutex mPosesMutex;
+  // Implement locking to synchronize read & write of state estimate
+  std::mutex mStatesMutex;
 
-  // Implement locking to synchronize read & write of shared poses from
+  // Implement locking to synchronize read & write of shared states from
   // neighbors
-  // TODO(AT): Rename as mNeighborPosesMutex as all states should be locked
-  std::mutex mNeighborPosesMutex;
+  std::mutex mNeighborStatesMutex;
 
   // Implement locking on measurements
   std::mutex mMeasurementsMutex;
@@ -734,8 +732,7 @@ protected:
                                       Pose *T_world_robot);
 
   /**
-   * @brief Spawn a separate thread that optimizes the local pose graph in a
-   * loop
+   * @brief Spawn a separate thread that optimizes the local graph in a loop
    */
   void runOptimizationLoop();
 
@@ -768,7 +765,7 @@ protected:
                                   double *residual) const;
 
   /**
-   * @brief Set weight for measurement in the pose graph. Return false if the
+   * @brief Set weight for measurement in the graph. Return false if the
    * specified public measurement does not exist
    * @param edgeID
    * @param weight

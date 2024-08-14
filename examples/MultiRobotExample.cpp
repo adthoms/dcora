@@ -176,16 +176,16 @@ int main(int argc, char **argv) {
     DCORA::QuadraticProblem problemCentralNextRank(poseGraphNextRank);
 
     // Initialize agents
-    std::vector<DCORA::PGOAgent *> agents;
+    std::vector<DCORA::Agent *> agents;
     for (unsigned robot = 0; robot < static_cast<unsigned int>(num_robots);
          ++robot) {
-      DCORA::PGOAgentParameters options(d, r, num_robots);
+      DCORA::AgentParameters options(d, r, num_robots);
       options.acceleration = acceleration;
       options.verbose = verbose;
       options.logDirectory = logDirectory;
       options.logData = logData;
 
-      auto *agent = new DCORA::PGOAgent(robot, options);
+      auto *agent = new DCORA::Agent(robot, options);
 
       // All agents share a special, common matrix called the 'lifting matrix'
       // which the first agent will generate
@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
     unsigned selectedRobot = 0;
     std::cout << "Running " << numIters << " iterations..." << std::endl;
     for (unsigned iter = 0; iter < numIters; ++iter) {
-      DCORA::PGOAgent *selectedRobotPtr = agents[selectedRobot];
+      DCORA::Agent *selectedRobotPtr = agents[selectedRobot];
 
       // Non-selected robots perform an iteration
       for (auto *robotPtr : agents) {

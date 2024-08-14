@@ -20,9 +20,9 @@ TEST(testDCORA, OptimizationThreadBasic) {
   unsigned int d, r;
   d = 3;
   r = 3;
-  DCORA::PGOAgentParameters options(d, r, 1);
+  DCORA::AgentParameters options(d, r, 1);
 
-  DCORA::PGOAgent agent(0, options);
+  DCORA::Agent agent(0, options);
 
   ASSERT_FALSE(agent.isOptimizationRunning());
 
@@ -40,8 +40,8 @@ TEST(testDCORA, OptimizationThreadTriangleGraph) {
   unsigned int d, r;
   d = 3;
   r = 3;
-  DCORA::PGOAgentParameters options(d, r, 1);
-  DCORA::PGOAgent agent(id, options);
+  DCORA::AgentParameters options(d, r, 1);
+  DCORA::Agent agent(id, options);
 
   DCORA::Matrix Tw0 = DCORA::Matrix::Identity(d + 1, d + 1);
 

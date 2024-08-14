@@ -44,14 +44,14 @@ int main(int argc, char **argv) {
 
   /**
   ###########################################
-  Set parameters for PGOAgent
+  Set parameters for Agent
   ###########################################
   */
 
   unsigned int d, r;
   d = (!dataset.empty() ? dataset[0].t.size() : 0);
   r = d;
-  DCORA::PGOAgentParameters options(d, r, 1);
+  DCORA::AgentParameters options(d, r, 1);
   options.verbose = true;
   options.logDirectory = "/home/alex/data/dcora_dpgo_examples/"
                          "dcora_examples/single_robot_example_pgo/";
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   ###########################################
   */
 
-  auto *agent = new DCORA::PGOAgent(0, options);
+  auto *agent = new DCORA::Agent(0, options);
   agent->setMeasurements(odometry, private_loop_closures, shared_loop_closure);
   agent->initialize();
 
