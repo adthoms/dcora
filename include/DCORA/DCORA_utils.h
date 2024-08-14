@@ -20,6 +20,7 @@
 #include <functional>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "Manifolds/Euclidean/Euclidean.h"
@@ -98,15 +99,31 @@ int getDimFromPyfgFirstLine(const std::string &filename);
 PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
+ * @brief Helper function to get the local-to-global state indexes from a PyFG
+ * dataset
+ * @param pyfg_dataset
+ * @return
+ */
+LocalToGlobalStateDicts
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset);
+
+/**
+ * @brief Helper function to globally reindex a PyFG dataset's measurements
+ * @param pyfg_dataset
+ * @return
+ */
+Measurements getGlobalMeasurements(const PyFGDataset &pyfg_dataset);
+
+/**
  * @brief Helper function to partition a PyFG dataset's measurements among its
  * robots
  * @param pyfg_dataset
  * @return
  */
-RobotMeasurements GetRobotMeasurements(const PyFGDataset &pyfg_dataset);
+RobotMeasurements getRobotMeasurements(const PyFGDataset &pyfg_dataset);
 
 /**
- * @brief Execute functionals based on state type
+ * @brief Execute functionals based on source and destination state type
  * @param poseFunction
  * @param pointFunction
  * @param state_type
@@ -125,24 +142,6 @@ void executeStateDependantFunctionals(std::function<void()> poseFunction,
 void get_dimension_and_num_poses(
     const std::vector<RelativePosePoseMeasurement> &measurements,
     size_t *dimension, size_t *num_poses);
-
-/**
- * @brief Helper function to construct connection laplacian matrix in SE(d)
- * @param measurements
- * @param AT
- * @param OmegaT
- */
-void constructOrientedConnectionIncidenceMatrixSE(
-    const std::vector<RelativePosePoseMeasurement> &measurements,
-    SparseMatrix *AT, DiagonalMatrix *OmegaT);
-
-/**
- * @brief Helper function to construct connection laplacian matrix in SE(d)
- * @param measurements
- * @return
- */
-SparseMatrix constructConnectionLaplacianSE(
-    const std::vector<RelativePosePoseMeasurement> &measurements);
 
 /**
  * @brief Given a vector of relative pose measurements, this function computes
@@ -188,6 +187,131 @@ Matrix projectToStiefelManifold(const Matrix &M);
  * @return Orthogonal projection of M to the Oblique manifold
  */
 Matrix projectToObliqueManifold(const Matrix &M);
+
+/**
+ * @brief Helper function to compute and return the product
+ *
+ *   P = A * SymBlockDiag(B^T * C)
+ *
+ * where A, B, and C are r × kn matrices (cf. eq. (5) in the SE-Sync tech
+ * report).
+ * @param A
+ * @param B
+ * @param C
+ * @param r
+ * @param k
+ * @param n
+ */
+Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
+                           unsigned int r, unsigned int k, unsigned int n);
+
+/**
+ * @brief Given a symmetric sparse matrix S, this function returns a Boolean
+ * value indicating whether the regularized matrix M := S + eta * I is
+ * positive-semidefinite. In the event that M is *not* PSD, this function
+ * additionally computes a direction of negative curvature x of S, and its
+ * associated Rayleight quotient theta := x'Sx < 0 using a shift-and-invert mode
+ * eigen solver. See the original implementation in SE-Sync for details, noting
+ * that the shift-and-invert mode eigen solver is unique to DCORA.
+ * @param S
+ * @param eta
+ * @param shift
+ * @param theta
+ * @param x
+ * @return
+ */
+bool fastVerification(const SparseMatrix &S, double eta, double shift,
+                      double *theta, Vector *x);
+
+/**
+ * @brief Helper function to determine if a sparse symmetric matrix S is
+ * positive-semidefinite (PSD). Return true if the matrix is PSD, false
+ * otherwise.
+ * @param S
+ * @return
+ */
+bool isSparseSymmetricMatrixPSD(const SparseMatrix &S);
+
+/**
+ * @brief Helper function to calculate the minimum eigen pair {λ, v} of a
+ * sparse symmetric matrix S using the shift-and-invert mode, where σ is the
+ * shift. This function uses a heuristic where by σ is halved if the solver is
+ * unsuccessful. This reduction occurs for a set number of iterations, where the
+ * minimum allowable shift is then set to -2 × eta.
+ * @param S
+ * @param sigma
+ * @param eta
+ * @return
+ */
+std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
+                                                  double sigma, double eta);
+
+/**
+ * @brief Helper function to construct the dual certificate matrix S(X) for PGO.
+ * @param X
+ * @param Q
+ * @param d
+ * @param n
+ * @return
+ */
+SparseMatrix constructDualCertificateMatrixPGO(const Matrix &X,
+                                               const SparseMatrix &Q,
+                                               unsigned int d, unsigned int n);
+
+/**
+ * @brief Helper function to construct the dual certificate matrix S(X) for
+ * RA-SLAM.
+ * @param X
+ * @param Q
+ * @param d
+ * @param n
+ * @param l
+ * @param b
+ * @return
+ */
+SparseMatrix
+constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
+                                     unsigned int d, unsigned int n,
+                                     unsigned int l, unsigned int b);
+/**
+ * @brief Helper function to project a rank-r RA-SLAM solution to a rank-d
+ * solution within the feasible set of the MAP RA-SLAM formulation. See
+ * Algorithm 3 in the CORA arxiv paper.
+ * @param X
+ * @param r
+ * @param d
+ * @param n
+ * @param l
+ * @param b
+ * @return
+ */
+Matrix projectSolutionRASLAM(const Matrix &X, unsigned int r, unsigned int d,
+                             unsigned int n, unsigned int l, unsigned int b);
+
+/**
+ * @brief Given an element Y in M and a matrix V in T_X(R^{r × dn}) (that is, a
+ * (r × dn)-dimensional matrix V considered as an element of the tangent space
+ * to the *entire* ambient Euclidean space at X), this function computes and
+ * returns the projection of V onto T_X(M), the tangent space of M at X (cf.
+ * eq. (42) in the SE-Sync tech report). Matrices Y and V are r × dn
+ * @param Y
+ * @param V
+ * @param r
+ * @param d
+ * @param n
+ */
+Matrix projectToStiefelManifoldTangentSpace(const Matrix &Y, const Matrix &V,
+                                            unsigned int r, unsigned int d,
+                                            unsigned int n);
+
+/**
+ * @brief Projects a matrix V in R^{r × l} onto the tangent space T_Y(M) of
+ * the oblique manifold at Y in R^{r × l}.
+ * @param V
+ * @param Y
+ * @return
+ */
+Matrix projectToObliqueManifoldTangentSpace(const Matrix &Y, const Matrix &V);
 
 /**
  * @brief Generate a fixed element of the Stiefel element
@@ -341,6 +465,30 @@ Matrix createRAMatrix(const Matrix &X_SE_R, const Matrix &X_OB,
  * @param mem_size
  */
 void copyEigenMatrixToROPTLIBVariable(const Matrix &Y, ROPTLIB::Variable *var,
-                                      double mem_size);
+                                      size_t mem_size);
+
+/**
+ * @brief Project matrix M to the SE manifold
+ * @param M
+ * @param r
+ * @param d
+ * @param n
+ * @return
+ */
+Matrix projectToSEMatrix(const Matrix &M, unsigned int r, unsigned int d,
+                         unsigned int n);
+
+/**
+ * @brief Project matrix M to the RA manifold
+ * @param M
+ * @param r
+ * @param d
+ * @param n
+ * @param l
+ * @param b
+ * @return
+ */
+Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
+                         unsigned int n, unsigned int l, unsigned int b);
 
 } // namespace DCORA

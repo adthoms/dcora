@@ -34,22 +34,27 @@ int main(int argc, char **argv) {
   std::cout << "Multi-robot RA-SLAM demo. " << std::endl;
 
   DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(argv[1]);
+  DCORA::Measurements global_measurements =
+      DCORA::getGlobalMeasurements(dataset);
   DCORA::RobotMeasurements robot_measurements =
-      DCORA::GetRobotMeasurements(dataset);
+      DCORA::getRobotMeasurements(dataset);
 
-  unsigned int n, d, r;
+  unsigned int d, r;
   d = dataset.dim;
-  n = dataset.num_poses;
-  r = 5;
+  r = d;
   bool acceleration = true;
   bool verbose = false;
   unsigned numIters = 1000;
 
+  std::shared_ptr<DCORA::Graph> global_graph = std::make_shared<DCORA::Graph>(
+      0, r, d, DCORA::GraphType::RangeAidedSLAMGraph);
+  global_graph->setMeasurements(global_measurements.relative_measurements);
+
   // TODO(Alex): Used for debugging purposes for Graph Milestone.
   for (const auto &[robot_id, measurements] : robot_measurements) {
-    std::shared_ptr<DCORA::Graph> graph =
-        std::make_shared<DCORA::Graph>(robot_id, r, d);
-    graph->setMeasurements(measurements.relative_measurements);
+    std::shared_ptr<DCORA::Graph> agent_graph = std::make_shared<DCORA::Graph>(
+        robot_id, r, d, DCORA::GraphType::RangeAidedSLAMGraph);
+    agent_graph->setMeasurements(measurements.relative_measurements);
   }
 
   // TODO(Alex): Implement remaining RA-SLAM demo similar to

@@ -30,6 +30,8 @@ void LiftedArray::setData(const Matrix &X) {
   X_ = X;
 }
 
+void LiftedArray::setDataToZero() { X_.setZero(); }
+
 Eigen::Ref<Vector> LiftedArray::translation(unsigned int index) {
   CHECK_LT(index, n_);
   auto Xi = X_.block(0, index * dim_, r_, dim_);
@@ -76,6 +78,11 @@ LiftedPoseArray::LiftedPoseArray(unsigned int r, unsigned int d, unsigned int n)
   }
 }
 
+void LiftedPoseArray::setRandomData() {
+  Matrix M = Matrix::Random(r_, (d_ + 1) * n_);
+  X_ = projectToSEMatrix(M, r_, d_, n_);
+}
+
 void LiftedPoseArray::checkData() const {
   for (unsigned i = 0; i < n_; ++i) {
     checkStiefelMatrix(rotation(i));
@@ -120,8 +127,8 @@ LiftedRangeAidedArray::LiftedRangeAidedArray(unsigned int r, unsigned int d,
       l_(l),
       b_(b),
       poses_(std::make_unique<LiftedPoseArray>(r, d, n)),
-      ranges_(std::make_unique<LiftedRangeArray>(r, d, l)),
-      landmarks_(std::make_unique<LiftedLandmarkArray>(r, d, b)) {}
+      unit_spheres_(std::make_unique<LiftedPointArray>(r, d, l)),
+      landmarks_(std::make_unique<LiftedPointArray>(r, d, b)) {}
 
 LiftedRangeAidedArray::LiftedRangeAidedArray(const LiftedRangeAidedArray &other)
     : LiftedRangeAidedArray(other.r(), other.d(), other.n(), other.l(),
@@ -137,17 +144,17 @@ LiftedRangeAidedArray::operator=(const LiftedRangeAidedArray &other) {
   l_ = other.l();
   b_ = other.b();
   poses_ = std::make_unique<LiftedPoseArray>(r_, d_, n_);
-  ranges_ = std::make_unique<LiftedRangeArray>(r_, d_, l_);
-  landmarks_ = std::make_unique<LiftedLandmarkArray>(r_, d_, b_);
+  unit_spheres_ = std::make_unique<LiftedPointArray>(r_, d_, l_);
+  landmarks_ = std::make_unique<LiftedPointArray>(r_, d_, b_);
   poses_->setData(other.GetLiftedPoseArray()->getData());
-  ranges_->setData(other.GetLiftedRangeArray()->getData());
+  unit_spheres_->setData(other.GetLiftedUnitSphereArray()->getData());
   landmarks_->setData(other.GetLiftedLandmarkArray()->getData());
   return *this;
 }
 
 Matrix LiftedRangeAidedArray::getData() const {
   auto [X_SE_R, X_SE_t] = partitionSEMatrix(poses_->getData(), r_, d_, n_);
-  return createRAMatrix(X_SE_R, ranges_->getData(), X_SE_t,
+  return createRAMatrix(X_SE_R, unit_spheres_->getData(), X_SE_t,
                         landmarks_->getData());
 }
 
@@ -156,8 +163,74 @@ void LiftedRangeAidedArray::setData(const Matrix &X) {
   CHECK_EQ(X.cols(), (d_ + 1) * n_ + l_ + b_);
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(X, r_, d_, n_, l_, b_);
   poses_->setData(createSEMatrix(X_SE_R, X_SE_t));
-  ranges_->setData(X_OB);
+  unit_spheres_->setData(X_OB);
   landmarks_->setData(X_E);
+}
+
+void LiftedRangeAidedArray::setRandomData() {
+  Matrix M = Matrix::Random(r_, (d_ + 1) * n_);
+  Matrix X_SE_rand = projectToSEMatrix(M, r_, d_, n_);
+  Matrix X_OB_rand = randomObliqueVariable(r_, l_);
+  Matrix X_E_rand = randomEuclideanVariable(r_, b_);
+  poses_->setData(X_SE_rand);
+  unit_spheres_->setData(X_OB_rand);
+  landmarks_->setData(X_E_rand);
+}
+
+Eigen::Ref<Matrix> LiftedRangeAidedArray::pose(unsigned int index) {
+  CHECK_LT(index, n_);
+  return poses_->pose(index);
+}
+
+Matrix LiftedRangeAidedArray::pose(unsigned int index) const {
+  CHECK_LT(index, n_);
+  return poses_->pose(index);
+}
+
+Eigen::Ref<Matrix> LiftedRangeAidedArray::rotation(unsigned int index) {
+  CHECK_LT(index, n_);
+  return poses_->rotation(index);
+}
+
+Matrix LiftedRangeAidedArray::rotation(unsigned int index) const {
+  CHECK_LT(index, n_);
+  return poses_->rotation(index);
+}
+
+Eigen::Ref<Vector> LiftedRangeAidedArray::translation(unsigned int index) {
+  CHECK_LT(index, n_);
+  return poses_->translation(index);
+}
+
+Vector LiftedRangeAidedArray::translation(unsigned int index) const {
+  CHECK_LT(index, n_);
+  return poses_->translation(index);
+}
+
+Eigen::Ref<Vector> LiftedRangeAidedArray::unitSphere(unsigned int index) {
+  CHECK_LT(index, l_);
+  return unit_spheres_->translation(index);
+}
+
+Vector LiftedRangeAidedArray::unitSphere(unsigned int index) const {
+  CHECK_LT(index, l_);
+  return unit_spheres_->translation(index);
+}
+
+Eigen::Ref<Vector> LiftedRangeAidedArray::landmark(unsigned int index) {
+  CHECK_LT(index, b_);
+  return landmarks_->translation(index);
+}
+
+Vector LiftedRangeAidedArray::landmark(unsigned int index) const {
+  CHECK_LT(index, b_);
+  return landmarks_->translation(index);
+}
+
+void LiftedRangeAidedArray::setDataToZero() {
+  poses_->setDataToZero();
+  unit_spheres_->setDataToZero();
+  landmarks_->setDataToZero();
 }
 
 Pose::Pose(const Matrix &T) : Pose(T.rows()) {

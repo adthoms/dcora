@@ -17,11 +17,13 @@
 #include <Eigen/CholmodSupport>
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
+#include <glog/logging.h>
 
 #include <map>
 #include <memory>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 
 #include <boost/functional/hash.hpp>
@@ -34,25 +36,33 @@ typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic> DiagonalMatrix;
 typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SparseMatrix;
 typedef Eigen::CholmodDecomposition<SparseMatrix> CholmodSolver;
 typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
+constexpr char FIRST_AGENT_ID = 'A';
+constexpr char MAP_ID = 'M';
+constexpr char LANDMARK_SYMBOL = 'L';
 
 /**
  * @brief Algorithms for initializing PGO
  */
-enum class InitializationMethod { Odometry, Chordal, GNC_TLS };
+enum class InitializationMethod { Odometry, Chordal, GNC_TLS, Random };
+
+/**
+ * @brief Graph types
+ */
+enum class GraphType { PoseGraph, RangeAidedSLAMGraph };
 
 /**
  * @brief State types
  */
-enum class StateType { None, Pose, Point };
+enum class StateType { None, Pose, Landmark, UnitSphere };
 
 /**
  * @brief Measurement types
  */
 enum class MeasurementType {
   PosePrior,
-  PointPrior,
+  LandmarkPrior,
   PosePose,
-  PosePoint,
+  PoseLandmark,
   Range
 };
 
@@ -186,6 +196,18 @@ struct ROPTResult {
   double elapsedMs;                // elapsed time in milliseconds
   ROPTLIB::tCGstatusSet tCGStatus; // status of truncated conjugate gradient
                                    // (only used by trust region solver)
+
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const ROPTResult &result) {
+    os << "Riemannian optimization results: " << std::endl;
+    os << "Success: " << result.success << std::endl;
+    os << "Initial objective value: " << result.fInit << std::endl;
+    os << "Initial gradient norm: " << result.gradNormInit << std::endl;
+    os << "Optimized objective value: " << result.fOpt << std::endl;
+    os << "Optimized gradient norm: " << result.gradNormOpt << std::endl;
+    os << "Elapsed time (ms): " << result.elapsedMs << std::endl;
+    return os;
+  }
 };
 
 // Each state is uniquely determined by the robot ID and frame ID
@@ -206,19 +228,61 @@ public:
             frame_id == other.frame_id);
   }
   bool isPose() const { return state_type == StateType::Pose; }
-  bool isPoint() const { return state_type == StateType::Point; }
+  bool isLandmark() const { return state_type == StateType::Landmark; }
+  bool isUnitSphere() const { return state_type == StateType::UnitSphere; }
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const StateID &state_type) {
+    os << StateTypeToString(state_type.state_type) << "(" << state_type.robot_id
+       << "," << state_type.frame_id << ")";
+    return os;
+  }
 };
 
 class PoseID : public StateID {
 public:
   explicit PoseID(unsigned int rid = 0, unsigned int fid = 0)
       : StateID(StateType::Pose, rid, fid) {}
+
+  explicit PoseID(const StateID &state) {
+    CHECK(state.isPose())
+        << "Error: Cannot construct PoseID from StateID with type: "
+        << StateTypeToString(state.state_type);
+    state_type = state.state_type;
+    robot_id = state.robot_id;
+    frame_id = state.frame_id;
+  }
 };
 
-class PointID : public StateID {
+class LandmarkID : public StateID {
 public:
-  explicit PointID(unsigned int rid = 0, unsigned int fid = 0)
-      : StateID(StateType::Point, rid, fid) {}
+  explicit LandmarkID(unsigned int rid = 0, unsigned int fid = 0)
+      : StateID(StateType::Landmark, rid, fid) {}
+
+  explicit LandmarkID(const StateID &state) {
+    CHECK(state.isLandmark())
+        << "Error: Cannot construct LandmarkID from StateID with type: "
+        << StateTypeToString(state.state_type);
+    state_type = state.state_type;
+    robot_id = state.robot_id;
+    frame_id = state.frame_id;
+  }
+};
+
+class UnitSphereID : public StateID {
+public:
+  explicit UnitSphereID(unsigned int rid = 0, unsigned int fid = 0)
+      : StateID(StateType::UnitSphere, rid, fid) {}
+
+  explicit UnitSphereID(const StateID &state) {
+    CHECK(state.isUnitSphere())
+        << "Error: Cannot construct UnitSphereID from StateID with type: "
+        << StateTypeToString(state.state_type);
+    state_type = state.state_type;
+    robot_id = state.robot_id;
+    frame_id = state.frame_id;
+  }
 };
 
 // Comparator for StateID
@@ -231,19 +295,26 @@ struct CompareStateID {
 };
 
 // Edge measurement (edge) is uniquely determined by an ordered pair of states
+// and measurement type
 class EdgeID {
 public:
   StateID src_state_id;
   StateID dst_state_id;
-  EdgeID(const StateID &srcId, const StateID &dstId)
-      : src_state_id(srcId), dst_state_id(dstId) {}
+  MeasurementType measurement_type;
+  EdgeID(const StateID &srcId, const StateID &dstId,
+         const MeasurementType &measurementType)
+      : src_state_id(srcId),
+        dst_state_id(dstId),
+        measurement_type(measurementType) {}
   bool operator==(const EdgeID &other) const {
     return (src_state_id == other.src_state_id &&
-            dst_state_id == other.dst_state_id);
+            dst_state_id == other.dst_state_id &&
+            measurement_type == other.measurement_type);
   }
   bool isOdometry() const {
     return (src_state_id.state_type == StateType::Pose &&
             dst_state_id.state_type == StateType::Pose &&
+            measurement_type == MeasurementType::PosePose &&
             src_state_id.robot_id == dst_state_id.robot_id &&
             src_state_id.frame_id + 1 == dst_state_id.frame_id);
   }
@@ -259,14 +330,14 @@ public:
 struct CompareEdgeID {
   bool operator()(const EdgeID &a, const EdgeID &b) const {
     // Treat edge ID as an ordered tuple
-    const auto ta =
-        std::make_tuple(a.src_state_id.state_type, a.dst_state_id.state_type,
-                        a.src_state_id.robot_id, a.dst_state_id.robot_id,
-                        a.src_state_id.frame_id, a.dst_state_id.frame_id);
-    const auto tb =
-        std::make_tuple(b.src_state_id.state_type, b.dst_state_id.state_type,
-                        b.src_state_id.robot_id, b.dst_state_id.robot_id,
-                        b.src_state_id.frame_id, b.dst_state_id.frame_id);
+    const auto ta = std::make_tuple(
+        a.src_state_id.state_type, a.dst_state_id.state_type,
+        a.src_state_id.robot_id, a.dst_state_id.robot_id,
+        a.src_state_id.frame_id, a.dst_state_id.frame_id, a.measurement_type);
+    const auto tb = std::make_tuple(
+        b.src_state_id.state_type, b.dst_state_id.state_type,
+        b.src_state_id.robot_id, b.dst_state_id.robot_id,
+        b.src_state_id.frame_id, b.dst_state_id.frame_id, b.measurement_type);
     return ta < tb;
   }
 };
@@ -284,6 +355,7 @@ struct HashEdgeID {
 
     // Modify 'seed' by XORing and bit-shifting in
     // one member of 'Key' after the other:
+    hash_combine(seed, hash_value(edge_id.measurement_type));
     hash_combine(seed, hash_value(edge_id.src_state_id.state_type));
     hash_combine(seed, hash_value(edge_id.dst_state_id.state_type));
     hash_combine(seed, hash_value(edge_id.src_state_id.robot_id));
@@ -295,5 +367,8 @@ struct HashEdgeID {
     return seed;
   }
 };
+
+// Map from edge ID to edge index
+typedef std::unordered_map<EdgeID, size_t, HashEdgeID> EdgeIDMap;
 
 } // namespace DCORA

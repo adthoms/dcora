@@ -16,6 +16,7 @@
 #include <DCORA/Measurements.h>
 #include <DCORA/manifold/Elements.h>
 
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -27,7 +28,7 @@ namespace DCORA {
 
 /**
  * @brief A graph class representing the local optimization problem in
- * distributed PGO and/or RA-SLAM.
+ * distributed PGO or RA-SLAM.
  */
 class Graph {
 public:
@@ -51,8 +52,10 @@ public:
    * @param id robot ID
    * @param r relaxation rank
    * @param d dimension (2/3)
+   * @param graphType graph type
    */
-  Graph(unsigned int id, unsigned int r, unsigned int d);
+  Graph(unsigned int id, unsigned int r, unsigned int d,
+        GraphType graphType = GraphType::PoseGraph);
   /**
    * @brief Destructor
    */
@@ -73,7 +76,7 @@ public:
    */
   unsigned int n() const { return n_; }
   /**
-   * @brief Get number of ranges
+   * @brief Get number of unit spheres
    * @return
    */
   unsigned int l() const { return l_; }
@@ -83,12 +86,17 @@ public:
    */
   unsigned int b() const { return b_; }
   /**
+   * @brief Get the underlying problem dimension
+   * @return
+   */
+  unsigned int k() const { return (d_ + 1) * n_ + l_ + b_; }
+  /**
    * @brief Return number of odometry edges
    * @return
    */
   unsigned int numOdometry() const { return odometry_.size(); }
   /**
-   * @brief Return number of private loop closures;
+   * @brief Return number of private loop closures
    * @return
    */
   unsigned int numPrivateLoopClosures() const {
@@ -100,18 +108,6 @@ public:
    */
   unsigned int numSharedLoopClosures() const { return shared_lcs_.vec.size(); }
   /**
-   * @brief Return the number of all measurements
-   * @return
-   */
-  unsigned int numMeasurements() const {
-    return numOdometry() + numPrivateLoopClosures() + numSharedLoopClosures();
-  }
-  /**
-   * @brief Return true if the graph is compatible with PGO
-   * @return
-   */
-  bool isPGOCompatible() const { return (b_ == 0 && l_ == 0); }
-  /**
    * @brief Clear all contents and reset this graph to be empty
    */
   void empty();
@@ -120,24 +116,24 @@ public:
    */
   void reset();
   /**
+   * @brief Return true if the graph is compatible with PGO
+   * @return
+   */
+  bool isPGOCompatible() const;
+  /**
    * @brief Clear all cached neighbor states
    */
   void clearNeighborStates();
   /**
    * @brief Update the number of poses and landmarks
    * @param stateID
-   * @return
    */
-  void updateNumStates(const StateID &stateID);
+  void updateNumPosesAndLandmarks(const StateID &stateID);
   /**
-   * @brief Update the number of unit sphere variables. A flag sets the robot ID
-   * to be used for ownership of the associated range measurement.
+   * @brief Update the number of unit spheres
    * @param measurement
-   * @param useSourceIDforOwnership
-   * @return
    */
-  void updateNumRanges(const RelativeMeasurement &measurement,
-                       bool useSourceIDforOwnership = true);
+  void updateNumUnitSpheres(const RelativeMeasurement &measurements);
   /**
    * @brief Set measurements for this graph
    * @param measurements
@@ -173,7 +169,7 @@ public:
    */
   RelativeMeasurements sharedLoopClosures() const { return shared_lcs_; }
   /**
-   * @brief Return a copy of all inter-robot loop closures with the specified
+   * @brief Return a copy of all shared loop closures with the specified
    * neighbor
    * @param neighbor_id
    * @return
@@ -183,10 +179,10 @@ public:
    * @brief Return a copy of all measurements
    * @return
    */
-  RelativeMeasurements measurements() const;
+  RelativeMeasurements allMeasurements() const;
   /**
-   * @brief Return a copy of all LOCAL measurements (i.e., without inter-robot
-   * loop closures)
+   * @brief Return a copy of all LOCAL measurements (i.e., without shared loop
+   * closures)
    * @return
    */
   RelativeMeasurements localMeasurements() const;
@@ -201,30 +197,37 @@ public:
    */
   void setPrior(unsigned index, const LiftedPose &Xi);
   /**
-   * @brief Add a point prior term
+   * @brief Add a landmark prior term
    * @param index The index of the local variable
-   * @param ti Corresponding point prior term
+   * @param ti Corresponding landmark prior term
    */
   void setPrior(unsigned index, const LiftedPoint &ti);
   /**
-   * @brief Set neighbor state
+   * @brief Set neighbor states
    * @param pose_dict
-   * @param point_dict
+   * @param landmark_dict
+   * @param unit_sphere_dict
    */
   void setNeighborStates(const PoseDict &pose_dict,
-                         const PointDict &point_dict);
+                         const LandmarkDict &landmark_dict,
+                         const UnitSphereDict &unit_sphere_dict);
   /**
    * @brief Set neighbor poses
    * @param pose_dict
    */
   void setNeighborPoses(const PoseDict &pose_dict);
   /**
-   * @brief Set neighbor points
-   * @param point_dict
+   * @brief Set neighbor landmarks
+   * @param landmark_dict
    */
-  void setNeighborPoints(const PointDict &point_dict);
+  void setNeighborLandmarks(const LandmarkDict &landmark_dict);
   /**
-   * @brief Get quadratic cost matrix.
+   * @brief Set neighbor unit spheres
+   * @param unit_sphere_dict
+   */
+  void setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict);
+  /**
+   * @brief Get quadratic cost matrix
    * @return
    */
   const SparseMatrix &quadraticMatrix();
@@ -233,7 +236,7 @@ public:
    */
   void clearQuadraticMatrix();
   /**
-   * @brief Get linear cost matrix.
+   * @brief Get linear cost matrix
    * @return
    */
   const Matrix &linearMatrix();
@@ -243,8 +246,8 @@ public:
   void clearLinearMatrix();
   /**
    * @brief Construct data matrices that are needed for optimization, if they do
-   * not yet exist
-   * @return true if construction is successful
+   * not yet exist. Return true if construction is successful
+   * @return
    */
   bool constructDataMatrices();
   /**
@@ -265,37 +268,63 @@ public:
    * @brief Get the set of my pose IDs that are shared with other robots
    * @return
    */
-  PoseSet myPublicPoseIDs() const { return local_shared_pose_ids_; }
+  PoseSet myPublicPoseIDs() const { return loc_shared_pose_ids_; }
   /**
-   * @brief Get the set of my point IDs that are shared with other robots
+   * @brief Get the set of my landmark IDs that are shared with other robots
    * @return
    */
-  PointSet myPublicPointIDs() const { return local_shared_point_ids_; }
+  LandmarkSet myPublicLandmarkIDs() const { return loc_shared_landmark_ids_; }
   /**
-   * @brief Get the set of Pose IDs that ALL neighbors need to share with me
+   * @brief Get the set of my unit sphere IDs that are shared with other robots
+   * @return
+   */
+  UnitSphereSet myPublicUnitSphereIDs() const {
+    return loc_shared_unit_sphere_ids_;
+  }
+  /**
+   * @brief Get the set of pose IDs that ALL neighbors need to share with me
    * @return
    */
   PoseSet neighborPublicPoseIDs() const { return nbr_shared_pose_ids_; }
   /**
-   * @brief Get the set of Point IDs that ALL neighbors need to share with me
+   * @brief Get the set of landmark IDs that ALL neighbors need to share with me
    * @return
    */
-  PointSet neighborPublicPointIDs() const { return nbr_shared_point_ids_; }
+  LandmarkSet neighborPublicLandmarkIDs() const {
+    return nbr_shared_landmark_ids_;
+  }
   /**
-   * @brief Get the set of Pose IDs that active neighbors need to share with me.
+   * @brief Get the set of unit sphere IDs that ALL neighbors need to share with
+   * me
+   * @return
+   */
+  UnitSphereSet neighborPublicUnitSphereIDs() const {
+    return nbr_shared_unit_sphere_ids_;
+  }
+  /**
+   * @brief Get the set of pose IDs that active neighbors need to share with me.
    * A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
+   * @return
    */
   PoseSet activeNeighborPublicPoseIDs() const;
   /**
-   * @brief Get the set of Point IDs that active neighbors need to share with
+   * @brief Get the set of landmark IDs that active neighbors need to share with
    * me. A neighbor is active if it is actively participating in distributed
    * optimization with this robot.
+   * @return
    */
-  PointSet activeNeighborPublicPointIDs() const;
+  LandmarkSet activeNeighborPublicLandmarkIDs() const;
   /**
-   * @brief Get the set of neighbor robot IDs that share inter-robot loop
-   * closures with me
+   * @brief Get the set of unit sphere IDs that active neighbors need to share
+   * with me. A neighbor is active if it is actively participating in
+   * distributed optimization with this robot.
+   * @return
+   */
+  UnitSphereSet activeNeighborPublicUnitSphereIDs() const;
+  /**
+   * @brief Get the set of neighbor robot IDs that share shared loop closures
+   * with me
    * @return
    */
   std::set<unsigned> neighborIDs() const { return nbr_robot_ids_; }
@@ -319,15 +348,15 @@ public:
    */
   size_t numActiveNeighbors() const;
   /**
-   * @brief Return true if the input robot is a neighbor (i.e., share
-   * inter-robot loop closure)
+   * @brief Return true if the input robot is a neighbor (i.e., shared loop
+   * closure)
    * @param robot_id
    * @return
    */
   bool hasNeighbor(unsigned int robot_id) const;
   /**
-   * @brief Check if the input neighbor is active
-   * @return false if the input robot is not a neighbor or is ignored
+   * @brief Check if the input neighbor is active. Return false if the input
+   * robot is not a neighbor or is ignored
    * @param neighbor_id
    * @return
    */
@@ -346,11 +375,17 @@ public:
    */
   bool requireNeighborPose(const PoseID &pose_id) const;
   /**
-   * @brief Return true if the given neighbor point ID is required by me
-   * @param point_id
+   * @brief Return true if the given neighbor landmark ID is required by me
+   * @param landmark_id
    * @return
    */
-  bool requireNeighborPoint(const PointID &point_id) const;
+  bool requireNeighborLandmark(const LandmarkID &landmark_id) const;
+  /**
+   * @brief Return true if the given neighbor unit sphere ID is required by me
+   * @param unit_sphere_id
+   * @return
+   */
+  bool requireNeighborUnitSphere(const UnitSphereID &unit_sphere_id) const;
   /**
    * @brief Compute number of accepted, rejected, and undecided loop closures
    * Note that loop closures with inactive neighbors are not included
@@ -359,22 +394,17 @@ public:
   Statistics statistics() const;
   /**
    * @brief Check if a measurement exists in the graph
-   * @param srcID
-   * @param dstID
+   * @param edgeID
    * @return
    */
-  bool hasMeasurement(const StateID &srcID, const StateID &dstID) const;
+  bool hasMeasurement(const EdgeID &edgeID) const;
   /**
    * @brief Find and return a writable pointer to the specified measurement
-   * within this graph
-   * @param measurements
-   * @param srcID
-   * @param dstID
-   * @return writable pointer to the desired measurement (nullptr if measurement
-   * does not exists)
+   * within this graph. If the measurement does not exist, return nullptr.
+   * @param edgeID
+   * @return
    */
-  RelativeMeasurement *findMeasurement(const StateID &srcID,
-                                       const StateID &dstID);
+  RelativeMeasurement *findMeasurement(const EdgeID &edgeID);
   /**
    * @brief Return a vector of writable pointers to all loop closures in the
    * graph (contains both private and inter-robot loop closures)
@@ -389,6 +419,9 @@ protected:
   // Problem dimensions
   unsigned int r_, d_, n_, l_, b_;
 
+  // Graph Type
+  GraphType graph_type;
+
   // Store odometry measurements of this robot
   std::vector<RelativePosePoseMeasurement> odometry_;
 
@@ -399,16 +432,22 @@ protected:
   RelativeMeasurements shared_lcs_;
 
   // Store the set of public poses that need to be sent to other robots
-  PoseSet local_shared_pose_ids_;
+  PoseSet loc_shared_pose_ids_;
 
-  // Store the set of public points that need to be sent to other robots
-  PointSet local_shared_point_ids_;
+  // Store the set of public landmarks that need to be sent to other robots
+  LandmarkSet loc_shared_landmark_ids_;
+
+  // Store the set of public unit spheres that need to be sent to other robots
+  UnitSphereSet loc_shared_unit_sphere_ids_;
 
   // Store the set of public poses needed from other robots
   PoseSet nbr_shared_pose_ids_;
 
-  // Store the set of public points needed from other robots
-  PointSet nbr_shared_point_ids_;
+  // Store the set of public landmarks needed from other robots
+  LandmarkSet nbr_shared_landmark_ids_;
+
+  // Store the set of public unit spheres needed from other robots
+  UnitSphereSet nbr_shared_unit_sphere_ids_;
 
   // Store the set of neighboring agents
   std::set<unsigned> nbr_robot_ids_;
@@ -419,8 +458,11 @@ protected:
   // Store public poses from neighbors
   PoseDict neighbor_poses_;
 
-  // Store public points from neighbors
-  PointDict neighbor_points_;
+  // Store public landmarks from neighbors
+  LandmarkDict neighbor_landmarks_;
+
+  // Store public unit spheres from neighbors
+  UnitSphereDict neighbor_unit_spheres_;
 
   // Quadratic matrix in cost function
   std::optional<SparseMatrix> Q_;
@@ -430,6 +472,12 @@ protected:
 
   // Preconditioner
   std::optional<CholmodSolverPtr> precon_;
+
+  // Invalid index when populating cost terms
+  static constexpr size_t IDX_NOT_SET = std::numeric_limits<size_t>::max();
+
+  // Expected number of non-zero elements per column in sparse matrices
+  static constexpr unsigned int SPARSE_ENTRIES = 8;
 
   // Timing
   SimpleTimer timer_;
@@ -464,15 +512,71 @@ protected:
    */
   bool constructG();
   /**
+   * @brief Helper function to construct the quadratic cost term for PGO
+   * @return
+   */
+  bool constructQuadraticCostTermPGO();
+  /**
+   * @brief Helper function to construct the linear cost term for PGO
+   * @return
+   */
+  bool constructLinearCostTermPGO();
+  /**
+   * @brief Helper function to construct the quadratic cost term for RA-SLAM
+   * @return
+   */
+  bool constructQuadraticCostTermRASLAM();
+  /**
+   * @brief Helper function to construct the linear cost term for RA-SLAM
+   * @return
+   */
+  bool constructLinearCostTermRASLAM();
+  /**
+   * @brief Helper function to set indices i and j when constructing cost terms.
+   * See Eq (7) of the SE-Sync paper for details
+   * @return
+   */
+  std::optional<bool>
+  setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
+                               size_t *i, size_t *j);
+  /**
+   * @brief Helper function to determine if a state (which is either the source
+   * or destination state of a relative measurement) is owned by an inactive
+   * neighbor. Return true if the neighbor is inactive and if the query
+   * neighborStateID belongs to the neighbor. If the neighbor is active, return
+   * false. If the neighbor is inactive but the query neighborStateID does not
+   * belong to the neighbor, return std::nullopt
+   * @param neighborStateID
+   * @return
+   */
+  std::optional<bool>
+  isStateOwnedByInactiveNeighbor(const StateID &neighborStateID);
+  /**
+   * @brief Helper function to return the lifted data matrix of the fixed public
+   * variable (associated with neighborStateID) owned by a neighbor of this
+   * agent. Supported fixed variables include poses, landmarks, and unit spheres
+   * @param neighborStateID
+   * @return
+   */
+  Matrix getNeighborFixedVariableLiftedData(const StateID &neighborStateID);
+  /**
    * @brief Construct the preconditioner for this graph
    * @return
    */
   bool constructPreconditioner();
+  /**
+   * @brief Helper function for computing the regularization term reg for the
+   * regularized Cholesky preconditioner of P so that (P + reg*I)^-1 has a
+   * suitable condition number
+   * @param P
+   * @return
+   */
+  double computePreconditionerRegularization(const SparseMatrix &P);
 
 private:
   // Mapping Edge ID to the corresponding index in the vector of measurements
-  // (either odometry, private loop closures, or public loop closures)
-  std::unordered_map<EdgeID, size_t, HashEdgeID> edge_id_to_index_;
+  // (either odometry, private loop closures, or shared loop closures)
+  EdgeIDMap edge_id_to_index_;
 
   // Use measurements with inactive neighbors when constructing data matrices
   bool use_inactive_neighbors_;
@@ -483,7 +587,7 @@ private:
 
   // Priors
   std::map<unsigned, LiftedPose> pose_priors_;
-  std::map<unsigned, LiftedPoint> point_priors_;
+  std::map<unsigned, LiftedPoint> landmark_priors_;
 };
 
 } // namespace DCORA

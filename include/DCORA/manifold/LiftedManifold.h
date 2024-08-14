@@ -36,20 +36,29 @@ public:
   /**
    * @brief Destructor
    */
-  virtual ~LiftedSEManifold();
+  ~LiftedSEManifold();
   /**
    * @brief Get the underlying ROPTLIB product manifold
    * @return
    */
-  virtual ROPTLIB::ProductManifold *getManifold() { return MySEManifold; }
+  ROPTLIB::ProductManifold *getManifold() { return MySEManifold; }
   /**
    * @brief Utility function to project a given matrix onto this manifold
    * @param M
    * @return orthogonal projection of M onto this manifold
    */
-  virtual Matrix project(const Matrix &M) const;
+  Matrix project(const Matrix &M);
+  /**
+   * @brief Utility function to project a matrix v onto the tangent space T_Y(M)
+   * of the manifold at point x using ROBOTLIB containers.
+   * @param x
+   * @param v
+   * @param result
+   */
+  void projectToTangentSpace(ROPTLIB::Variable *x, ROPTLIB::Vector *v,
+                             ROPTLIB::Vector *result);
 
-protected:
+private:
   unsigned int r_, d_, n_;
   ROPTLIB::Stiefel *StiefelManifold;
   ROPTLIB::Euclidean *EuclideanManifold;
@@ -61,14 +70,14 @@ protected:
  * @brief This class represents a manifold for the RA-SLAM synchronization
  * problem
  */
-class LiftedRAManifold : public LiftedSEManifold {
+class LiftedRAManifold {
 public:
   /**
    * @brief Constructor
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param l number of ranges
+   * @param l number of unit spheres
    * @param b number of landmarks
    */
   LiftedRAManifold(unsigned int r, unsigned int d, unsigned int n,
@@ -76,22 +85,33 @@ public:
   /**
    * @brief Destructor
    */
-  ~LiftedRAManifold() override;
+  ~LiftedRAManifold();
   /**
    * @brief Get the underlying ROPTLIB product manifold
    * @return
    */
-  ROPTLIB::ProductManifold *getManifold() override { return MyRAManifold; }
+  ROPTLIB::ProductManifold *getManifold() { return MyRAManifold; }
   /**
    * @brief Utility function to project a given matrix onto this manifold
    * @param M
    * @return orthogonal projection of M onto this manifold
    */
-  Matrix project(const Matrix &M) const override;
+  Matrix project(const Matrix &M);
+  /**
+   * @brief Utility function to project a matrix v onto the tangent space T_Y(M)
+   * of the manifold at point x using ROBOTLIB containers.
+   * @param x
+   * @param v
+   * @param result
+   */
+  void projectToTangentSpace(ROPTLIB::Variable *x, ROPTLIB::Vector *v,
+                             ROPTLIB::Vector *result);
 
 private:
-  unsigned int l_, b_;
-  ROPTLIB::Oblique *ObliqueManifold;
+  unsigned int r_, d_, n_, l_, b_;
+  ROPTLIB::Stiefel *StiefelPoseManifold;
+  ROPTLIB::Euclidean *EuclideanPoseManifold;
+  ROPTLIB::Oblique *ObliqueUnitSphereManifold;
   ROPTLIB::Euclidean *EuclideanLandmarkManifold;
   ROPTLIB::ProductManifold *MyRAManifold;
 };

@@ -30,6 +30,9 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -G "${CMAKE_GENERATOR}" . WORKING_DIR
 execute_process(COMMAND "${CMAKE_COMMAND}" --build . WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/roptlib-download")
 add_subdirectory("${CMAKE_BINARY_DIR}/roptlib-src" "${CMAKE_BINARY_DIR}/roptlib-build")
 
+# SPECTRA
+include(spectra)
+
 # Dependencies
 find_package(SPQR REQUIRED)
 find_package(Cholmod REQUIRED)
@@ -86,6 +89,8 @@ target_include_directories(DCORA PUBLIC
   # INSTALL
   $<INSTALL_INTERFACE:${DCORA_INSTALL_INCLUDEDIR}>
 )
+target_include_directories(DCORA PRIVATE ${spectra_SOURCE_DIR}/include)
+
 target_link_libraries(DCORA
   ${CMAKE_THREAD_LIBS_INIT}
   roptlib
@@ -172,10 +177,9 @@ if(BUILD_DCORA_TESTS)
     tests/testUtils.cpp
     tests/testCORA.cpp
     tests/testElements.cpp
-    tests/testEigenMap.cpp
+    tests/testManifold.cpp
     tests/testConstruction.cpp
     tests/testLineGraph.cpp
-    tests/testMeasurements.cpp
     tests/testTriangleGraph.cpp
     tests/testOptimizationThread.cpp
   )

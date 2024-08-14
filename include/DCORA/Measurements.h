@@ -21,6 +21,7 @@
 #include <memory>
 #include <set>
 #include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -141,10 +142,10 @@ struct PosePrior : PriorMeasurement {
 };
 
 /**
- * @brief A simple struct that contains the elements of a single point prior for
- * (robot, point).
+ * @brief A simple struct that contains the elements of a single landmark prior
+ * for (robot, landmark).
  */
-struct PointPrior : PriorMeasurement {
+struct LandmarkPrior : PriorMeasurement {
   // Translational measurement
   Vector t;
 
@@ -152,16 +153,16 @@ struct PointPrior : PriorMeasurement {
   double tau;
 
   // Default constructor
-  PointPrior()
-      : PriorMeasurement(MeasurementType::PointPrior, 0, 0, StateType::Point,
-                         false, 1.0) {}
+  LandmarkPrior()
+      : PriorMeasurement(MeasurementType::LandmarkPrior, 0, 0,
+                         StateType::Landmark, false, 1.0) {}
 
   // Basic constructor
-  PointPrior(size_t robot, size_t point, const Vector &priorTranslation,
-             double translationalPrecision, bool fixedWeight = false,
-             double weight = 1.0)
-      : PriorMeasurement(MeasurementType::PointPrior, robot, point,
-                         StateType::Point, fixedWeight, weight),
+  LandmarkPrior(size_t robot, size_t landmark, const Vector &priorTranslation,
+                double translationalPrecision, bool fixedWeight = false,
+                double weight = 1.0)
+      : PriorMeasurement(MeasurementType::LandmarkPrior, robot, landmark,
+                         StateType::Landmark, fixedWeight, weight),
         t(priorTranslation),
         tau(translationalPrecision) {}
 
@@ -170,7 +171,7 @@ struct PointPrior : PriorMeasurement {
     CHECK(t.size() == d);
   }
 
-  StateID getSrcID() const override { return PointID(r, p); }
+  StateID getSrcID() const override { return LandmarkID(r, p); }
 
   void print(std::ostream &os) const override {
     os << "t: " << std::endl << t << std::endl;
@@ -239,6 +240,9 @@ struct RelativeMeasurement {
 
   // Get the destination state ID
   virtual StateID getDstID() const = 0;
+
+  // Get the edge ID
+  virtual EdgeID getEdgeID() const = 0;
 
   // Print relative measurement information
   virtual void print(std::ostream &os) const = 0;
@@ -329,6 +333,10 @@ struct RelativePosePoseMeasurement : RelativeMeasurement {
 
   StateID getDstID() const override { return PoseID(r2, p2); }
 
+  EdgeID getEdgeID() const override {
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::PosePose);
+  }
+
   void print(std::ostream &os) const override {
     os << "R: " << std::endl << R << std::endl;
     os << "t: " << std::endl << t << std::endl;
@@ -338,10 +346,11 @@ struct RelativePosePoseMeasurement : RelativeMeasurement {
 };
 
 /**
- * @brief A simple struct that contains the elements of a relative pose-point
- * measurement from (robot, state) pairs: (robot1, pose1) to (robot2, point2).
+ * @brief A simple struct that contains the elements of a relative pose-landmark
+ * measurement from (robot, state) pairs: (robot1, pose1) to (robot2,
+ * landmark2).
  */
-struct RelativePosePointMeasurement : RelativeMeasurement {
+struct RelativePoseLandmarkMeasurement : RelativeMeasurement {
   // Translational measurement
   Vector t;
 
@@ -349,24 +358,25 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
   double tau;
 
   // Default constructor
-  RelativePosePointMeasurement()
-      : RelativeMeasurement(MeasurementType::PosePoint, 0, 0, 0, 0,
-                            StateType::Pose, StateType::Point, false, 1.0) {}
+  RelativePoseLandmarkMeasurement()
+      : RelativeMeasurement(MeasurementType::PoseLandmark, 0, 0, 0, 0,
+                            StateType::Pose, StateType::Landmark, false, 1.0) {}
 
   // Basic constructor
-  RelativePosePointMeasurement(size_t firstRobot, size_t secondRobot,
-                               size_t firstPose, size_t secondPoint,
-                               const Vector &relativeTranslation,
-                               double translationalPrecision,
-                               bool fixedWeight = false, double weight = 1.0)
-      : RelativeMeasurement(MeasurementType::PosePoint, firstRobot, secondRobot,
-                            firstPose, secondPoint, StateType::Pose,
-                            StateType::Point, fixedWeight, weight),
+  RelativePoseLandmarkMeasurement(size_t firstRobot, size_t secondRobot,
+                                  size_t firstPose, size_t secondLandmark,
+                                  const Vector &relativeTranslation,
+                                  double translationalPrecision,
+                                  bool fixedWeight = false, double weight = 1.0)
+      : RelativeMeasurement(MeasurementType::PoseLandmark, firstRobot,
+                            secondRobot, firstPose, secondLandmark,
+                            StateType::Pose, StateType::Landmark, fixedWeight,
+                            weight),
         t(relativeTranslation),
         tau(translationalPrecision) {}
 
   // Copy constructor
-  RelativePosePointMeasurement(const RelativePosePointMeasurement &other)
+  RelativePoseLandmarkMeasurement(const RelativePoseLandmarkMeasurement &other)
       : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
                             other.p2, other.stateType1, other.stateType2,
                             other.fixedWeight, other.weight),
@@ -374,7 +384,7 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
         tau(other.tau) {}
 
   // Equality operator
-  bool operator==(const RelativePosePointMeasurement &other) const {
+  bool operator==(const RelativePoseLandmarkMeasurement &other) const {
     return std::tie(r1, r2, p1, p2, fixedWeight, weight, t, tau) ==
            std::tie(other.r1, other.r2, other.p1, other.p2, other.fixedWeight,
                     other.weight, other.t, other.tau);
@@ -387,7 +397,11 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
 
   StateID getSrcID() const override { return PoseID(r1, p1); }
 
-  StateID getDstID() const override { return PointID(r2, p2); }
+  StateID getDstID() const override { return LandmarkID(r2, p2); }
+
+  EdgeID getEdgeID() const override {
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::PoseLandmark);
+  }
 
   void print(std::ostream &os) const override {
     os << "t: " << std::endl << t << std::endl;
@@ -400,6 +414,9 @@ struct RelativePosePointMeasurement : RelativeMeasurement {
  * (robot, state) pairs: (robot1, state1) to (robot2, state2).
  */
 struct RangeMeasurement : RelativeMeasurement {
+  // Unit sphere variable index
+  size_t l;
+
   // Range measurement
   double range;
 
@@ -413,13 +430,14 @@ struct RangeMeasurement : RelativeMeasurement {
 
   // Basic constructor
   RangeMeasurement(size_t firstRobot, size_t secondRobot, size_t firstState,
-                   size_t secondState, const double rangeMeasurement,
-                   double rangePrecision, StateType stateType1,
-                   StateType stateType2, bool fixedWeight = false,
-                   double weight = 1.0)
+                   size_t secondState, size_t unitSphereVarIdx,
+                   const double rangeMeasurement, double rangePrecision,
+                   StateType stateType1, StateType stateType2,
+                   bool fixedWeight = false, double weight = 1.0)
       : RelativeMeasurement(MeasurementType::Range, firstRobot, secondRobot,
                             firstState, secondState, stateType1, stateType2,
                             fixedWeight, weight),
+        l(unitSphereVarIdx),
         range(rangeMeasurement),
         precision(rangePrecision) {}
 
@@ -428,15 +446,16 @@ struct RangeMeasurement : RelativeMeasurement {
       : RelativeMeasurement(other.measurementType, other.r1, other.r2, other.p1,
                             other.p2, other.stateType1, other.stateType2,
                             other.fixedWeight, other.weight),
+        l(other.l),
         range(other.range),
         precision(other.precision) {}
 
   // Equality operator
   bool operator==(const RangeMeasurement &other) const {
     return std::tie(r1, r2, p1, p2, stateType1, stateType2, fixedWeight, weight,
-                    range, precision) ==
+                    l, range, precision) ==
            std::tie(other.r1, other.r2, other.p1, other.p2, other.stateType1,
-                    other.stateType2, other.fixedWeight, other.weight,
+                    other.stateType2, other.fixedWeight, other.weight, other.l,
                     other.range, other.precision);
   }
 
@@ -445,8 +464,8 @@ struct RangeMeasurement : RelativeMeasurement {
   StateID getSrcID() const override {
     if (stateType1 == StateType::Pose)
       return PoseID(r1, p1);
-    else if (stateType1 == StateType::Point)
-      return PointID(r1, p1);
+    else if (stateType1 == StateType::Landmark)
+      return LandmarkID(r1, p1);
     else
       LOG(FATAL) << "StateType1 is " << StateTypeToString(stateType1) << " in "
                  << MeasurementTypeToString(measurementType) << "!";
@@ -455,25 +474,32 @@ struct RangeMeasurement : RelativeMeasurement {
   StateID getDstID() const override {
     if (stateType2 == StateType::Pose)
       return PoseID(r2, p2);
-    else if (stateType2 == StateType::Point)
-      return PointID(r2, p2);
+    else if (stateType2 == StateType::Landmark)
+      return LandmarkID(r2, p2);
     else
       LOG(FATAL) << "StateType2 is " << StateTypeToString(stateType2) << " in "
                  << MeasurementTypeToString(measurementType) << "!";
   }
 
+  EdgeID getEdgeID() const override {
+    return EdgeID(getSrcID(), getDstID(), MeasurementType::Range);
+  }
+
+  UnitSphereID getUnitSphereID() const { return UnitSphereID(r1, l); }
+
   void print(std::ostream &os) const override {
+    os << "l: " << l << std::endl;
     os << "range: " << range << std::endl;
     os << "precision: " << precision << std::endl;
   }
 };
 
 // Type-safe unions of relative measurements
-typedef std::variant<RelativePosePoseMeasurement, RelativePosePointMeasurement,
-                     RangeMeasurement>
+typedef std::variant<RelativePosePoseMeasurement,
+                     RelativePoseLandmarkMeasurement, RangeMeasurement>
     RelativeMeasurementVariant;
 typedef std::variant<RelativePosePoseMeasurement *,
-                     RelativePosePointMeasurement *, RangeMeasurement *>
+                     RelativePoseLandmarkMeasurement *, RangeMeasurement *>
     RelativeMeasurementPointerVariant;
 
 /**
@@ -508,15 +534,15 @@ public:
     return pose_pose_measurements;
   }
 
-  std::vector<RelativePosePointMeasurement>
-  GetRelativePosePointMeasurements() const {
-    std::vector<RelativePosePointMeasurement> pose_point_measurements;
+  std::vector<RelativePoseLandmarkMeasurement>
+  GetRelativePoseLandmarkMeasurements() const {
+    std::vector<RelativePoseLandmarkMeasurement> pose_landmark_measurements;
     for (const auto &m : vec) {
-      if (std::holds_alternative<RelativePosePointMeasurement>(m))
-        pose_point_measurements.emplace_back(
-            std::get<RelativePosePointMeasurement>(m));
+      if (std::holds_alternative<RelativePoseLandmarkMeasurement>(m))
+        pose_landmark_measurements.emplace_back(
+            std::get<RelativePoseLandmarkMeasurement>(m));
     }
-    return pose_point_measurements;
+    return pose_landmark_measurements;
   }
 
   std::vector<RangeMeasurement> GetRangeMeasurements() const {
@@ -534,8 +560,8 @@ public:
     case MeasurementType::PosePose:
       addPosePoseMeasurement(relative_measurement);
       break;
-    case MeasurementType::PosePoint:
-      addPosePointMeasurement(relative_measurement);
+    case MeasurementType::PoseLandmark:
+      addPoseLandmarkMeasurement(relative_measurement);
       break;
     case MeasurementType::Range:
       addRangeMeasurement(relative_measurement);
@@ -565,7 +591,7 @@ private:
   /**
    * @brief Template function to cast a Relative Measurement object to a
    * specific type T, such as RelativePosePoseMeasurement,
-   * RelativePosePointMeasurement, or RangeMeasurement.
+   * RelativePoseLandmarkMeasurement, or RangeMeasurement.
    * @tparam T
    * @param relative_measurement
    * @return
@@ -574,7 +600,7 @@ private:
   T castRelativeMeasurement(const RelativeMeasurement &relative_measurement) {
     if constexpr (std::is_same_v<T, RelativePosePoseMeasurement>)
       return dynamic_cast<const T &>(relative_measurement);
-    else if constexpr (std::is_same_v<T, RelativePosePointMeasurement>)
+    else if constexpr (std::is_same_v<T, RelativePoseLandmarkMeasurement>)
       return dynamic_cast<const T &>(relative_measurement);
     else if constexpr (std::is_same_v<T, RangeMeasurement>)
       return dynamic_cast<const T &>(relative_measurement);
@@ -585,7 +611,7 @@ private:
   }
 
   /**
-   * Add a relative pose pose measurement.
+   * Add a relative pose-pose measurement.
    * @param relative_measurement
    */
   void addPosePoseMeasurement(const RelativeMeasurement &relative_measurement) {
@@ -596,15 +622,15 @@ private:
   }
 
   /**
-   * Add a relative pose point measurement.
+   * Add a relative pose-landmark measurement.
    * @param relative_measurement
    */
   void
-  addPosePointMeasurement(const RelativeMeasurement &relative_measurement) {
-    const RelativePosePointMeasurement &pose_point_measurement =
-        castRelativeMeasurement<RelativePosePointMeasurement>(
+  addPoseLandmarkMeasurement(const RelativeMeasurement &relative_measurement) {
+    const RelativePoseLandmarkMeasurement &pose_landmark_measurement =
+        castRelativeMeasurement<RelativePoseLandmarkMeasurement>(
             relative_measurement);
-    vec.push_back(pose_point_measurement);
+    vec.push_back(pose_landmark_measurement);
   }
 
   /**
@@ -622,9 +648,13 @@ private:
  * @brief A simple struct that contains all measurement types.
  */
 struct Measurements {
+  // Measurements
   std::vector<PosePrior> pose_priors;
-  std::vector<PointPrior> point_priors;
+  std::vector<LandmarkPrior> landmark_priors;
   RelativeMeasurements relative_measurements;
+
+  // Ground truth initialization
+  std::shared_ptr<RangeAidedArray> ground_truth_init;
 
   // Simple default constructor; does nothing
   Measurements() = default;
@@ -632,72 +662,22 @@ struct Measurements {
   // A utility function for streaming this struct to cout
   inline friend std::ostream &operator<<(std::ostream &os,
                                          const Measurements &measurements) {
+    os << "Measurements:" << std::endl;
     os << "Priors:" << std::endl;
     for (const auto &pose_prior : measurements.pose_priors) {
       os << pose_prior;
     }
-    for (const auto &point_prior : measurements.point_priors) {
-      os << point_prior;
+    for (const auto &landmark_prior : measurements.landmark_priors) {
+      os << landmark_prior;
     }
     os << "Relative Measurements:" << std::endl;
     os << measurements.relative_measurements << std::endl;
-    return os;
-  }
-};
-
-/**
- * @brief A simple struct that contains the elements of a PyFG dataset.
- */
-struct PyFGDataset {
-  unsigned int dim;                 // Problem dimension
-  size_t num_poses;                 // Number of poses
-  size_t num_points;                // Number of points
-  std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
-
-  // Measurements
-  Measurements measurements;
-
-  // Ground truth poses
-  std::vector<unsigned int> ground_truth_pose_robot_ids;
-  std::vector<unsigned int> ground_truth_pose_state_ids;
-  std::shared_ptr<PoseArray> ground_truth_pose_array;
-
-  // Ground truth points
-  std::vector<unsigned int> ground_truth_point_robot_ids;
-  std::vector<unsigned int> ground_truth_point_state_ids;
-  std::shared_ptr<PointArray> ground_truth_point_array;
-
-  // Simple default constructor; does nothing
-  PyFGDataset() = default;
-
-  // A utility function for streaming this struct to cout
-  inline friend std::ostream &operator<<(std::ostream &os,
-                                         const PyFGDataset &pyfg_dataset) {
-    os << "PyFGDataset:" << std::endl;
-    os << "Dimension: " << pyfg_dataset.dim << std::endl;
-    os << "NumPoses: " << pyfg_dataset.num_poses << std::endl;
-    os << "NumPoints: " << pyfg_dataset.num_points << std::endl;
-    os << "NumRobots: " << pyfg_dataset.robot_IDs.size() - 1 << std::endl;
-    os << "Measurements:" << std::endl;
-    os << pyfg_dataset.measurements;
-    os << "GroundTruth:" << std::endl;
-    os << "Poses:" << std::endl;
-    for (size_t i = 0; i < pyfg_dataset.ground_truth_pose_array->n(); i++) {
-      os << "r: " << pyfg_dataset.ground_truth_pose_robot_ids.at(i)
-         << std::endl;
-      os << "p: " << pyfg_dataset.ground_truth_pose_state_ids.at(i)
-         << std::endl;
-      os << "T: \n"
-         << pyfg_dataset.ground_truth_pose_array->pose(i) << std::endl;
-    }
-    os << "Points:" << std::endl;
-    for (size_t i = 0; i < pyfg_dataset.ground_truth_point_array->n(); i++) {
-      os << "r: " << pyfg_dataset.ground_truth_point_robot_ids.at(i)
-         << std::endl;
-      os << "p: " << pyfg_dataset.ground_truth_point_state_ids.at(i)
-         << std::endl;
-      os << "t: \n"
-         << pyfg_dataset.ground_truth_point_array->translation(i) << std::endl;
+    os << "Ground Truth Initialization Matrix:" << std::endl;
+    if (measurements.ground_truth_init) {
+      os << std::fixed << std::setprecision(9)
+         << measurements.ground_truth_init->getData() << std::endl;
+    } else {
+      os << "Ground truth initialization matrix not set." << std::endl;
     }
     return os;
   }
@@ -715,5 +695,131 @@ inline std::ostream &operator<<(std::ostream &os,
   }
   return os;
 }
+
+/**
+ * @brief A simple struct that contains ground truth states.
+ */
+struct GroundTruth {
+  PoseDict poses;
+  LandmarkDict landmarks;
+  UnitSphereDict unit_spheres;
+
+  // Simple default constructor; does nothing
+  GroundTruth() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const GroundTruth &ground_truth) {
+    os << "Ground Truth:" << std::endl;
+    os << "Poses:" << std::endl;
+    for (const auto &[pose_id, pose] : ground_truth.poses) {
+      os << "ID: " << pose_id << std::endl;
+      os << "Variable:\n " << pose.pose() << std::endl;
+    }
+    os << "Landmarks:" << std::endl;
+    for (const auto &[landmark_id, landmark] : ground_truth.landmarks) {
+      os << "ID: " << landmark_id << std::endl;
+      os << "Variable:\n " << landmark.translation() << std::endl;
+    }
+    os << "Unit Spheres:" << std::endl;
+    for (const auto &[unit_sphere_id, unit_sphere] :
+         ground_truth.unit_spheres) {
+      os << "ID: " << unit_sphere_id << std::endl;
+      os << "Variable:\n " << unit_sphere.translation() << std::endl;
+    }
+    return os;
+  }
+};
+
+// Ordered map of local and global states
+typedef std::map<StateID, StateID, CompareStateID> LocalToGlobalStateDict;
+
+/**
+ * @brief A simple struct that contains local to global state mappings.
+ */
+struct LocalToGlobalStateDicts {
+  LocalToGlobalStateDict poses;
+  LocalToGlobalStateDict landmarks;
+  LocalToGlobalStateDict unit_spheres;
+
+  // Simple default constructor; does nothing
+  LocalToGlobalStateDicts() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &
+  operator<<(std::ostream &os,
+             const LocalToGlobalStateDicts &local_to_global_state_dicts) {
+    os << "Local to Global State:" << std::endl;
+    os << "Poses:" << std::endl;
+    for (const auto &[local_id, global_id] :
+         local_to_global_state_dicts.poses) {
+      os << local_id << " --> " << global_id << std::endl;
+    }
+    os << "Landmarks:" << std::endl;
+    for (const auto &[local_id, global_id] :
+         local_to_global_state_dicts.landmarks) {
+      os << local_id << " --> " << global_id << std::endl;
+    }
+    os << "Unit Spheres:" << std::endl;
+    for (const auto &[local_id, global_id] :
+         local_to_global_state_dicts.unit_spheres) {
+      os << local_id << " --> " << global_id << std::endl;
+    }
+    return os;
+  }
+};
+
+/**
+ * @brief A simple struct that contains the elements of a PyFG dataset.
+ */
+struct PyFGDataset {
+  unsigned int dim;                 // Dimension (2 or 3)
+  std::set<unsigned int> robot_IDs; // Robot IDs (includes map ID)
+
+  // Ordered maps of robot id to number of states
+  std::map<unsigned int, unsigned int> robot_id_to_num_poses;
+  std::map<unsigned int, unsigned int> robot_id_to_num_landmarks;
+  std::map<unsigned int, unsigned int> robot_id_to_num_unit_spheres;
+
+  // Measurements
+  Measurements measurements;
+
+  // Ground truth
+  GroundTruth ground_truth;
+
+  // Simple default constructor; does nothing
+  PyFGDataset() = default;
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const PyFGDataset &pyfg_dataset) {
+    os << "PyFGDataset:" << std::endl;
+    os << "Dimension: " << pyfg_dataset.dim << std::endl;
+    os << "Number of Robots: " << pyfg_dataset.robot_IDs.size() << std::endl;
+    os << "Number of Poses: " << std::endl;
+    for (const auto &[robot_id, num_poses] :
+         pyfg_dataset.robot_id_to_num_poses) {
+      std::cout << "Robot ID: " << robot_id << ", Count: " << num_poses
+                << std::endl;
+    }
+    os << "Number of Landmarks: " << std::endl;
+    for (const auto &[robot_id, num_landmarks] :
+         pyfg_dataset.robot_id_to_num_landmarks) {
+      std::cout << "Robot ID: " << robot_id << ", Count: " << num_landmarks
+                << std::endl;
+    }
+    os << "Number of Unit Spheres: " << std::endl;
+    for (const auto &[robot_id, num_unit_spheres] :
+         pyfg_dataset.robot_id_to_num_unit_spheres) {
+      std::cout << "Robot ID: " << robot_id << ", Count: " << num_unit_spheres
+                << std::endl;
+    }
+    os << "Measurements:" << std::endl;
+    os << pyfg_dataset.measurements;
+    os << "GroundTruth:" << std::endl;
+    os << pyfg_dataset.ground_truth << std::endl;
+    return os;
+  }
+};
 
 } // namespace DCORA

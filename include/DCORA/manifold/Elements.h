@@ -22,10 +22,10 @@ namespace DCORA {
 /**
  * @brief A class representing an array of n "lifted" elements of dimension r by
  * dim. Elements consist of poses Ti = [Yi pi] and translations pj, where:
- * dim = d + 1 for a pose array, dim = 1 for a translation array. Each rotation
- * Yi is a r-by-d matrix representing an element of the Stiefel manifold while
- * each translation pi/pj is a r-dimensional vector representing an element of
- * the Euclidean space. Note that translations can also represent unit-sphere
+ * dim = d + 1 for a pose array, dim = 1 for a point array. Each rotation Yi is
+ * a r-by-d matrix representing an element of the Stiefel manifold while each
+ * translation pi/pj is a r-dimensional vector representing an element of the
+ * Euclidean space. Note that translations can also represent unit-sphere
  * auxiliary variables for ranges, which are r-dimensional vectors
  */
 class LiftedArray {
@@ -62,6 +62,10 @@ public:
    * @param X
    */
   void setData(const Matrix &X);
+  /**
+   * @brief Set the underlying Eigen matrix to zero
+   */
+  void setDataToZero();
   /**
    * @brief Obtain the writable translation at the specified index, expressed as
    * an r dimensional vector
@@ -118,6 +122,10 @@ public:
    */
   LiftedPoseArray(unsigned int r, unsigned int d, unsigned int n);
   /**
+   * @brief Set the underlying Eigen matrix as random in the SE manifold
+   */
+  void setRandomData();
+  /**
    * @brief Check that the stored data are valid
    */
   void checkData() const;
@@ -166,9 +174,6 @@ public:
   LiftedPointArray(unsigned int r, unsigned int d, unsigned int n);
 };
 
-typedef LiftedPointArray LiftedRangeArray;
-typedef LiftedPointArray LiftedLandmarkArray;
-
 /**
  * @brief A class representing an array of "lifted" poses, unit-sphere auxiliary
  * variables, and translations in RA ordering. Internally store as
@@ -181,7 +186,7 @@ public:
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param l number of ranges
+   * @param l number of unit spheres
    * @param b number of landmarks
    */
   LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n,
@@ -235,30 +240,108 @@ public:
    */
   void setData(const Matrix &X);
   /**
+   * @brief Set the underlying Eigen matrix as random in the RA manifold
+   */
+  void setRandomData();
+  /**
+   * @brief Set the underlying Eigen matrices of encapsulated arrays to zero
+   */
+  void setDataToZero();
+  /**
+   * @brief Obtain the writable pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Matrix> pose(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose at the specified index, expressed as an
+   * r-by-(d+1) matrix
+   * @param index
+   * @return
+   */
+  Matrix pose(unsigned int index) const;
+  /**
+   * @brief Obtain the writable pose rotation at the specified index, expressed
+   * as an r-by-d matrix
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Matrix> rotation(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose rotation at the specified index, expressed
+   * as an r-by-d matrix
+   * @param index
+   * @return
+   */
+  Matrix rotation(unsigned int index) const;
+  /**
+   * @brief Obtain the writable pose translation at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> translation(unsigned int index);
+  /**
+   * @brief Obtain the read-only pose translation at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector translation(unsigned int index) const;
+  /**
+   * @brief Obtain the writable unit-sphere auxiliary variable, expressed as an
+   * r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> unitSphere(unsigned int index);
+  /**
+   * @brief Obtain the read-only unit-sphere auxiliary variable, expressed as an
+   * r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector unitSphere(unsigned int index) const;
+  /**
+   * @brief Obtain the writable landmark at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Eigen::Ref<Vector> landmark(unsigned int index);
+  /**
+   * @brief Obtain the read-only landmark at the specified index,
+   * expressed as an r dimensional vector
+   * @param index
+   * @return
+   */
+  Vector landmark(unsigned int index) const;
+  /**
    * @brief Get "lifted" pose array
    * @return
    */
   LiftedPoseArray *GetLiftedPoseArray() const { return poses_.get(); }
   /**
-   * @brief Get "lifted" range array
+   * @brief Get "lifted" unit sphere array
    * @return
    */
-  LiftedRangeArray *GetLiftedRangeArray() const { return ranges_.get(); }
+  LiftedPointArray *GetLiftedUnitSphereArray() const {
+    return unit_spheres_.get();
+  }
   /**
    * @brief Get "lifted" landmark array
    * @return
    */
-  LiftedLandmarkArray *GetLiftedLandmarkArray() const {
-    return landmarks_.get();
-  }
+  LiftedPointArray *GetLiftedLandmarkArray() const { return landmarks_.get(); }
 
 private:
   // Dimension constants
   unsigned int r_, d_, n_, l_, b_;
   // "Lifted" arrays
   std::unique_ptr<LiftedPoseArray> poses_;
-  std::unique_ptr<LiftedRangeArray> ranges_;
-  std::unique_ptr<LiftedLandmarkArray> landmarks_;
+  std::unique_ptr<LiftedPointArray> unit_spheres_;
+  std::unique_ptr<LiftedPointArray> landmarks_;
 };
 
 /**
@@ -283,14 +366,10 @@ public:
   PointArray(unsigned int d, unsigned int n) : LiftedPointArray(d, d, n) {}
 };
 
-typedef PointArray RangeArray;
-typedef PointArray LandmarkArray;
-
 /**
  * @brief A class representing an array of poses, unit-sphere auxiliary
  * variables, and translations in RA ordering. Internally store as
  * d-by-(d+1)n+l+b matrix: X = [X1, ... Xn | r1 ... rn | p1 ... pn | l1 ... ln]
- * See PoseArray, RangeArray, and PointArray for details
  */
 class RangeAidedArray : public LiftedRangeAidedArray {
 public:
@@ -413,6 +492,9 @@ public:
   Matrix matrix() const;
 };
 
+/**
+ * @brief Representing a single standard euclidean vector in SE(d)
+ */
 class Point : public LiftedPoint {
 public:
   // Constructor
@@ -446,9 +528,14 @@ typedef std::map<PoseID, LiftedPose, CompareStateID> PoseDict;
 // Ordered set of PoseID
 typedef std::set<PoseID, CompareStateID> PoseSet;
 
-// Ordered map of PointID to LiftedPoint object
-typedef std::map<PointID, LiftedPoint, CompareStateID> PointDict;
-// Ordered set of PointID
-typedef std::set<PointID, CompareStateID> PointSet;
+// Ordered map of LandmarkID to LiftedPoint object
+typedef std::map<LandmarkID, LiftedPoint, CompareStateID> LandmarkDict;
+// Ordered set of LandmarkID
+typedef std::set<LandmarkID, CompareStateID> LandmarkSet;
+
+// Ordered map of UnitSphereID to LiftedPoint object
+typedef std::map<UnitSphereID, LiftedPoint, CompareStateID> UnitSphereDict;
+// Ordered set of UnitSphereID
+typedef std::set<UnitSphereID, CompareStateID> UnitSphereSet;
 
 } // namespace DCORA

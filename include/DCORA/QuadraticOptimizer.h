@@ -18,6 +18,9 @@
 #include <DCORA/manifold/LiftedVariable.h>
 #include <DCORA/manifold/LiftedVector.h>
 
+#include "RSD.h"
+#include "RTRNewton.h"
+
 namespace DCORA {
 
 class QuadraticOptimizer {
@@ -105,6 +108,9 @@ private:
   // Optimization algorithm to be used
   ROptParameters params_;
 
+  // Bool for using SE manifold or RA manifold
+  bool use_se_manifold_;
+
   // Optimization result
   ROPTResult result_;
 
@@ -113,12 +119,29 @@ private:
 
   // Apply RTR
   Matrix trustRegion(const Matrix &Yinit);
+  Matrix trustRegionSE(const Matrix &Yinit, unsigned int r, unsigned int d,
+                       unsigned int n);
+  Matrix trustRegionRA(const Matrix &Yinit, unsigned int r, unsigned int d,
+                       unsigned int n, unsigned int l, unsigned int b);
 
   // Apply a single RGD iteration with constant step size
   Matrix gradientDescent(const Matrix &Yinit);
+  Matrix gradientDescentSE(const Matrix &Yinit, unsigned int r, unsigned int d,
+                           unsigned int n);
+  Matrix gradientDescentRA(const Matrix &Yinit, unsigned int r, unsigned int d,
+                           unsigned int n, unsigned int l, unsigned int b);
 
   // Apply gradient descent with line search
-  Matrix gradientDescentLS(const Matrix &Yinit);
+  Matrix gradientDescentLineSearch(const Matrix &Yinit);
+  Matrix gradientDescentLineSearchSE(const Matrix &Yinit, unsigned int r,
+                                     unsigned int d, unsigned int n);
+  Matrix gradientDescentLineSearchRA(const Matrix &Yinit, unsigned int r,
+                                     unsigned int d, unsigned int n,
+                                     unsigned int l, unsigned int b);
+
+  // Helper functions for configuring and running the solvers
+  bool configureAndRunTrustRegionSolver(ROPTLIB::RTRNewton *Solver);
+  void configureAndRunLineSearchSolver(ROPTLIB::RSD *Solver);
 };
 
 } // namespace DCORA

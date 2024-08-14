@@ -36,37 +36,22 @@ public:
   /**
    * @brief Destructor
    */
-  virtual ~LiftedSEVector();
+  ~LiftedSEVector();
   /**
    * @brief Get underlying ROPTLIB vector
    * @return
    */
-  virtual ROPTLIB::ProductElement *vec() { return MySEVector; }
+  ROPTLIB::ProductElement *vec() { return MySEVector; }
   /**
    * @brief Get data as Eigen matrix
    * @return
    */
-  virtual Matrix getData();
+  Matrix getData();
   /**
    * @brief Set data from Eigen matrix
    * @param X
    */
-  virtual void setData(const Matrix &X);
-  /**
-   * @brief Set underlying ROPTLIB vector size
-   * @return
-   */
-  virtual void setSize();
-  /**
-   * @brief Set underlying ROPTLIB vector size from ROPTLIB product element size
-   * @param productElement
-   * @param row
-   * @param col
-   * @param num_el
-   */
-  static void setSizeFromProductElement(ROPTLIB::ProductElement *productElement,
-                                        unsigned int *row, unsigned int *col,
-                                        unsigned int *num_el);
+  void setData(const Matrix &X);
 
 protected:
   unsigned int r_, d_, n_;
@@ -78,16 +63,16 @@ protected:
 
 /**
  * @brief This class acts as container for ROPTLIB::ProductElement vectors for
- * RA-SLAM synchronization
+ * RA-SLAM
  */
-class LiftedRAVector : public LiftedSEVector {
+class LiftedRAVector {
 public:
   /**
    * @brief Constructor
    * @param r relaxation rank
    * @param d dimension (2/3)
    * @param n number of poses
-   * @param l number of ranges
+   * @param l number of unit spheres
    * @param b number of landmarks
    */
   LiftedRAVector(unsigned int r, unsigned int d, unsigned int n, unsigned int l,
@@ -95,34 +80,29 @@ public:
   /**
    * @brief Destructor
    */
-  ~LiftedRAVector() override;
+  ~LiftedRAVector();
   /**
    * @brief Get underlying ROPTLIB vector
    * @return
    */
-  ROPTLIB::ProductElement *vec() override { return MyRAVector; }
+  ROPTLIB::ProductElement *vec() { return MyRAVector; }
   /**
    * @brief Get data as Eigen matrix
    * @return
    */
-  Matrix getData() override;
+  Matrix getData();
   /**
    * @brief Set data from Eigen matrix
    * @param X
    */
-  void setData(const Matrix &X) override;
-  /**
-   * @brief Set underlying ROPTLIB vector size
-   * @return
-   */
-  void setSize() override;
+  void setData(const Matrix &X);
 
 private:
-  unsigned int l_, b_;
-  ROPTLIB::ObliqueVector *ObliqueRangeVector;
+  unsigned int r_, d_, n_, l_, b_;
+  ROPTLIB::StieVector *StiefelPoseVector;
+  ROPTLIB::EucVector *EuclideanPoseVector;
+  ROPTLIB::ObliqueVector *ObliqueUnitSphereVector;
   ROPTLIB::EucVector *EuclideanLandmarkVector;
-  ROPTLIB::ProductElement *MyOBVector;
-  ROPTLIB::ProductElement *MyEVector;
   ROPTLIB::ProductElement *MyRAVector;
 };
 

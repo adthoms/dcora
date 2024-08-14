@@ -53,6 +53,9 @@ int main(int argc, char **argv) {
   r = d;
   DCORA::PGOAgentParameters options(d, r, 1);
   options.verbose = true;
+  options.logDirectory = "/home/alex/data/dcora_dpgo_examples/"
+                         "dcora_examples/single_robot_example_pgo/";
+  options.logData = true;
 
   std::vector<DCORA::RelativePosePoseMeasurement> odometry;
   std::vector<DCORA::RelativePosePoseMeasurement> private_loop_closures;
@@ -88,6 +91,9 @@ int main(int argc, char **argv) {
   agent->setMeasurements(odometry, private_loop_closures, shared_loop_closure);
   agent->initialize();
 
+  const DCORA::Matrix T_WORLD = DCORA::LiftedPose(r, d).getData();
+  agent->setGlobalAnchor(T_WORLD);
+
   /**
   ###########################################
   Local Pose Graph Optimization
@@ -99,6 +105,9 @@ int main(int argc, char **argv) {
 
   // Evaluate
   std::cout << "Cost = " << 2 * problemCentral.f(X) << std::endl;
+
+  // Log trajectory
+  agent->reset();
 
   exit(0);
 }

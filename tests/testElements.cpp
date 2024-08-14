@@ -17,163 +17,164 @@
 #include "gtest/gtest.h"
 
 TEST(testDCORA, testLiftedPoseArray) {
-  int r = 5;
-  int d = 3;
-  int n = 3;
-  for (int trial = 0; trial < 50; ++trial) {
-    DCORA::LiftedPoseArray var(r, d, n);
-    // Test setter and getter methods
-    for (int i = 0; i < n; ++i) {
-      auto Yi = DCORA::randomStiefelVariable(r, d);
-      auto pi = DCORA::randomEuclideanVariable(r);
-      var.rotation(i) = Yi;
-      var.translation(i) = pi;
-      ASSERT_LE((Yi - var.rotation(i)).norm(), 1e-6);
-      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
-    }
-    // Test copy constructor
-    DCORA::LiftedPoseArray var2(var);
-    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
-    // Test assignment
-    DCORA::LiftedPoseArray var3(r, d, n);
-    var3 = var;
-    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  unsigned int r = 5;
+  unsigned int d = 3;
+  unsigned int n = 3;
+  DCORA::LiftedPoseArray var(r, d, n);
+  // Test setter and getter methods
+  for (unsigned int i = 0; i < n; ++i) {
+    DCORA::Matrix Y = DCORA::randomStiefelVariable(r, d + 1);
+    var.pose(i) = Y;
+    ASSERT_TRUE(Y.isApprox(var.pose(i)));
+    DCORA::Matrix Yi = DCORA::randomStiefelVariable(r, d);
+    DCORA::Matrix pi = DCORA::randomEuclideanVariable(r);
+    var.rotation(i) = Yi;
+    var.translation(i) = pi;
+    ASSERT_TRUE(Yi.isApprox(var.rotation(i)));
+    ASSERT_TRUE(pi.isApprox(var.translation(i)));
   }
+  // Test copy constructor
+  DCORA::LiftedPoseArray var2(var);
+  ASSERT_TRUE(var.getData().isApprox(var2.getData()));
+  // Test assignment
+  DCORA::LiftedPoseArray var3(r, d, n);
+  var3 = var;
+  ASSERT_TRUE(var.getData().isApprox(var3.getData()));
+  // Test random data
+  var.setRandomData();
+  DCORA::Matrix Y = var.getData();
+  ASSERT_TRUE(DCORA::projectToSEMatrix(Y, r, d, n).isApprox(Y));
 }
 
 TEST(testDCORA, testLiftedPointArray) {
-  int r = 5;
-  int d = 3;
-  int n = 3;
-  for (int trial = 0; trial < 50; ++trial) {
-    DCORA::LiftedPointArray var(r, d, n);
-    // Test setter and getter methods
-    for (int i = 0; i < n; ++i) {
-      auto pi = DCORA::randomEuclideanVariable(r);
-      var.translation(i) = pi;
-      ASSERT_LE((pi - var.translation(i)).norm(), 1e-6);
-    }
-    // Test copy constructor
-    DCORA::LiftedPointArray var2(var);
-    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
-    // Test assignment
-    DCORA::LiftedPointArray var3(r, d, n);
-    var3 = var;
-    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+  unsigned int r = 5;
+  unsigned int d = 3;
+  unsigned int n = 3;
+  DCORA::LiftedPointArray var(r, d, n);
+  // Test setter and getter methods
+  for (unsigned int i = 0; i < n; ++i) {
+    DCORA::Matrix pi = DCORA::randomEuclideanVariable(r);
+    var.translation(i) = pi;
+    ASSERT_TRUE(pi.isApprox(var.translation(i)));
   }
+  // Test copy constructor
+  DCORA::LiftedPointArray var2(var);
+  ASSERT_TRUE(var.getData().isApprox(var2.getData()));
+  // Test assignment
+  DCORA::LiftedPointArray var3(r, d, n);
+  var3 = var;
+  ASSERT_TRUE(var.getData().isApprox(var3.getData()));
 }
 
 TEST(testDCORA, testLiftedRangeAidedArray) {
-  int r = 5;
-  int d = 3;
-  int n = 3;
-  int l = 5;
-  int b = 7;
-  for (int trial = 0; trial < 50; ++trial) {
+  unsigned int r = 5;
+  unsigned int d = 3;
+  unsigned int n = 3;
+  std::vector<unsigned int> l_cases = {0, 6, 0, 6};
+  std::vector<unsigned int> b_cases = {0, 0, 7, 7};
+  for (unsigned int i = 0; i < l_cases.size(); i++) {
+    unsigned int l = l_cases.at(i);
+    unsigned int b = b_cases.at(i);
     DCORA::LiftedRangeAidedArray var(r, d, n, l, b);
     // Test setter and getter methods
-    for (int i = 0; i < n; ++i) {
-      // poses
-      auto Yi = DCORA::randomStiefelVariable(r, d);
-      auto pi = DCORA::randomEuclideanVariable(r);
-      var.GetLiftedPoseArray()->rotation(i) = Yi;
-      var.GetLiftedPoseArray()->translation(i) = pi;
-      ASSERT_LE((Yi - var.GetLiftedPoseArray()->rotation(i)).norm(), 1e-6);
-      ASSERT_LE((pi - var.GetLiftedPoseArray()->translation(i)).norm(), 1e-6);
+    for (unsigned int i = 0; i < n; ++i) {
+      DCORA::Matrix Y = DCORA::randomStiefelVariable(r, d + 1);
+      var.pose(i) = Y;
+      ASSERT_TRUE(Y.isApprox(var.pose(i)));
+      DCORA::Matrix Yi = DCORA::randomStiefelVariable(r, d);
+      DCORA::Matrix pi = DCORA::randomEuclideanVariable(r);
+      var.rotation(i) = Yi;
+      var.translation(i) = pi;
+      ASSERT_TRUE(Yi.isApprox(var.rotation(i)));
+      ASSERT_TRUE(pi.isApprox(var.translation(i)));
     }
-    for (int i = 0; i < l; ++i) {
-      // ranges
-      auto ri = DCORA::randomObliqueVariable(r);
-      var.GetLiftedRangeArray()->translation(i) = ri;
-      ASSERT_LE((ri - var.GetLiftedRangeArray()->translation(i)).norm(), 1e-6);
+    for (unsigned int i = 0; i < l; ++i) {
+      DCORA::Matrix ri = DCORA::randomObliqueVariable(r);
+      var.unitSphere(i) = ri;
+      ASSERT_TRUE(ri.isApprox(var.unitSphere(i)));
     }
-    for (int i = 0; i < b; ++i) {
-      // landmarks
-      auto li = DCORA::randomEuclideanVariable(r);
-      var.GetLiftedLandmarkArray()->translation(i) = li;
-      ASSERT_LE((li - var.GetLiftedLandmarkArray()->translation(i)).norm(),
-                1e-6);
+    for (unsigned int i = 0; i < b; ++i) {
+      DCORA::Matrix li = DCORA::randomEuclideanVariable(r);
+      var.landmark(i) = li;
+      ASSERT_TRUE(li.isApprox(var.landmark(i)));
     }
     // Test copy constructor
     DCORA::LiftedRangeAidedArray var2(var);
-    ASSERT_LE((var.getData() - var2.getData()).norm(), 1e-6);
+    ASSERT_TRUE(var.getData().isApprox(var2.getData()));
 
     // Test assignment
     DCORA::LiftedRangeAidedArray var3(r, d, n, l, b);
     var3 = var;
-    ASSERT_LE((var.getData() - var3.getData()).norm(), 1e-6);
+    ASSERT_TRUE(var.getData().isApprox(var3.getData()));
+
+    // Test random data
+    var.setRandomData();
+    DCORA::Matrix Y = var.getData();
+    ASSERT_TRUE(DCORA::projectToRAMatrix(Y, r, d, n, l, b).isApprox(Y));
   }
 }
 
 TEST(testDCORA, testLiftedPose) {
-  int d = 3;
-  int r = 5;
+  unsigned int d = 3;
+  unsigned int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
     DCORA::Matrix Xi = DCORA::Matrix::Zero(r, d + 1);
     Xi.block(0, 0, r, d) = DCORA::randomStiefelVariable(r, d);
     Xi.col(d) = DCORA::randomEuclideanVariable(r);
     // Test constructor from Eigen matrix
     DCORA::LiftedPose var(Xi);
-    ASSERT_LE((Xi - var.getData()).norm(), 1e-6);
+    ASSERT_TRUE(Xi.isApprox(var.getData()));
   }
 }
 
 TEST(testDCORA, testLiftedPoint) {
-  int r = 5;
+  unsigned int r = 5;
   for (int trial = 0; trial < 50; ++trial) {
     DCORA::Vector Pi = DCORA::randomEuclideanVariable(r);
     // Test constructor from Eigen vector
     DCORA::LiftedPoint var(Pi);
-    ASSERT_LE((Pi - var.getData()).norm(), 1e-6);
+    ASSERT_TRUE(Pi.isApprox(var.getData()));
   }
 }
 
 TEST(testDCORA, testPoseIdentity) {
-  int d = 3;
+  unsigned int d = 3;
   DCORA::Pose T(d);
-  ASSERT_LE((T.identity().rotation() - DCORA::Matrix::Identity(d, d)).norm(),
-            1e-6);
-  ASSERT_LE((T.identity().translation() - DCORA::Vector::Zero(d)).norm(), 1e-6);
-  ASSERT_LE(
-      (T.identity().matrix() - DCORA::Matrix::Identity(d + 1, d + 1)).norm(),
-      1e-6);
+  ASSERT_TRUE(T.identity().rotation().isApprox(DCORA::Matrix::Identity(d, d)));
+  ASSERT_TRUE(T.identity().translation().isApprox(DCORA::Vector::Zero(d)));
+  ASSERT_TRUE(
+      T.identity().matrix().isApprox(DCORA::Matrix::Identity(d + 1, d + 1)));
 }
 
 TEST(testDCORA, testTranslationZeroVector) {
-  int d = 3;
+  unsigned int d = 3;
   DCORA::Point P(d);
-  ASSERT_LE((P.zeroVector().translation() - DCORA::Vector::Zero(d)).norm(),
-            1e-6);
+  ASSERT_TRUE(P.zeroVector().translation().isApprox(DCORA::Vector::Zero(d)));
 }
 
 TEST(testDCORA, testPoseInverse) {
+  unsigned int d = 3;
+  DCORA::Matrix I = DCORA::Matrix::Identity(d + 1, d + 1);
   for (int trial = 0; trial < 50; ++trial) {
-    int d = 3;
     DCORA::Pose T(d);
     T.rotation() = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
     T.translation() = DCORA::Vector::Random(d);
-    auto TInv = T.inverse();
-    ASSERT_LE(
-        (T.matrix() * TInv.matrix() - DCORA::Matrix::Identity(d + 1, d + 1))
-            .norm(),
-        1e-6);
-    ASSERT_LE(
-        (TInv.matrix() * T.matrix() - DCORA::Matrix::Identity(d + 1, d + 1))
-            .norm(),
-        1e-6);
+    DCORA::Pose TInv = T.inverse();
+    ASSERT_TRUE((T.matrix() * TInv.matrix()).isApprox(I));
+    ASSERT_TRUE((TInv.matrix() * T.matrix()).isApprox(I));
   }
 }
 
 TEST(testDCORA, testPoseMultiplication) {
+  unsigned int d = 3;
   for (int trial = 0; trial < 50; ++trial) {
-    int d = 3;
     DCORA::Pose T1(d);
     T1.rotation() = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
     T1.translation() = DCORA::Vector::Random(d);
     DCORA::Pose T2(d);
     T2.rotation() = Eigen::Quaterniond::UnitRandom().toRotationMatrix();
     T2.translation() = DCORA::Vector::Random(d);
-    auto T = T1 * T2;
-    ASSERT_LE((T1.matrix() * T2.matrix() - T.matrix()).norm(), 1e-6);
+    DCORA::Pose T = T1 * T2;
+    ASSERT_TRUE((T1.matrix() * T2.matrix()).isApprox(T.matrix()));
   }
 }

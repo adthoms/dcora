@@ -34,38 +34,77 @@ LiftedSEManifold::~LiftedSEManifold() {
   delete MySEManifold;
 }
 
-Matrix LiftedSEManifold::project(const Matrix &M) const {
-  checkSEMatrixSize(M, r_, d_, n_);
-  Matrix X = M;
-#pragma omp parallel for
-  for (size_t i = 0; i < n_; ++i) {
-    X.block(0, i * (d_ + 1), r_, d_) =
-        projectToStiefelManifold(X.block(0, i * (d_ + 1), r_, d_));
-  }
-  return X;
+void LiftedSEManifold::projectToTangentSpace(ROPTLIB::Variable *x,
+                                             ROPTLIB::Vector *v,
+                                             ROPTLIB::Vector *result) {
+  MySEManifold->Projection(x, v, result);
+}
+
+Matrix LiftedSEManifold::project(const Matrix &M) {
+  return projectToSEMatrix(M, r_, d_, n_);
 }
 
 LiftedRAManifold::LiftedRAManifold(unsigned int r, unsigned int d,
                                    unsigned int n, unsigned int l,
                                    unsigned int b)
-    : LiftedSEManifold(r, d, n), l_(l), b_(b) {
-  ObliqueManifold = new ROPTLIB::Oblique(r, l);
-  EuclideanLandmarkManifold = new ROPTLIB::Euclidean(r, b);
-  MyRAManifold = new ROPTLIB::ProductManifold(
-      3, CartanManifold, n, ObliqueManifold, 1, EuclideanLandmarkManifold, 1);
+    : r_(r), d_(d), n_(n), l_(l), b_(b) {
+  StiefelPoseManifold = new ROPTLIB::Stiefel(r, d);
+  StiefelPoseManifold->ChooseStieParamsSet3();
+  EuclideanPoseManifold = new ROPTLIB::Euclidean(r, n);
+  ObliqueUnitSphereManifold = nullptr;
+  EuclideanLandmarkManifold = nullptr;
+
+  // Construct additional manifolds if not empty
+  if (l > 0) {
+    ObliqueUnitSphereManifold = new ROPTLIB::Oblique(r, l);
+    ObliqueUnitSphereManifold->ChooseObliqueParamsSet3();
+  }
+  if (b > 0) {
+    EuclideanLandmarkManifold = new ROPTLIB::Euclidean(r, b);
+  }
+
+  // Construct RA manifold
+  if (ObliqueUnitSphereManifold != nullptr &&
+      EuclideanLandmarkManifold != nullptr) {
+    MyRAManifold = new ROPTLIB::ProductManifold(
+        4, StiefelPoseManifold, n, ObliqueUnitSphereManifold, 1,
+        EuclideanPoseManifold, 1, EuclideanLandmarkManifold, 1);
+
+  } else if (ObliqueUnitSphereManifold != nullptr &&
+             EuclideanLandmarkManifold == nullptr) {
+    MyRAManifold = new ROPTLIB::ProductManifold(3, StiefelPoseManifold, n,
+                                                ObliqueUnitSphereManifold, 1,
+                                                EuclideanPoseManifold, 1);
+  } else if (ObliqueUnitSphereManifold == nullptr &&
+             EuclideanLandmarkManifold != nullptr) {
+    MyRAManifold = new ROPTLIB::ProductManifold(3, StiefelPoseManifold, n,
+                                                EuclideanPoseManifold, 1,
+                                                EuclideanLandmarkManifold, 1);
+  } else {
+    CHECK_EQ(ObliqueUnitSphereManifold, nullptr);
+    CHECK_EQ(EuclideanLandmarkManifold, nullptr);
+    MyRAManifold = new ROPTLIB::ProductManifold(2, StiefelPoseManifold, n,
+                                                EuclideanPoseManifold, 1);
+  }
 }
 
 LiftedRAManifold::~LiftedRAManifold() {
   // Avoid memory leak
-  delete ObliqueManifold;
+  delete StiefelPoseManifold;
+  delete EuclideanPoseManifold;
+  delete ObliqueUnitSphereManifold;
   delete EuclideanLandmarkManifold;
   delete MyRAManifold;
 }
 
-Matrix LiftedRAManifold::project(const Matrix &M) const {
-  auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(M, r_, d_, n_, l_, b_);
-  return createRAMatrix(projectToRotationGroup(X_SE_R),
-                        projectToObliqueManifold(X_OB), X_SE_t, X_E);
+Matrix LiftedRAManifold::project(const Matrix &M) {
+  return projectToRAMatrix(M, r_, d_, n_, l_, b_);
+}
+
+void LiftedRAManifold::projectToTangentSpace(ROPTLIB::Variable *x,
+                                             ROPTLIB::Vector *v,
+                                             ROPTLIB::Vector *result) {
+  MyRAManifold->Projection(x, v, result);
 }
 
 } // namespace DCORA

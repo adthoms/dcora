@@ -14,7 +14,8 @@
 
 namespace DCORA {
 
-LiftedSEVector::LiftedSEVector(unsigned int r, unsigned int d, unsigned int n) {
+LiftedSEVector::LiftedSEVector(unsigned int r, unsigned int d, unsigned int n)
+    : r_(r), d_(d), n_(n) {
   StiefelVector = new ROPTLIB::StieVector(r, d);
   EuclideanVector = new ROPTLIB::EucVector(r);
   CartanVector =
@@ -31,75 +32,72 @@ LiftedSEVector::~LiftedSEVector() {
 }
 
 Matrix LiftedSEVector::getData() {
-  setSize();
   return Eigen::Map<Matrix>(const_cast<double *>(MySEVector->ObtainReadData()),
-                            r_, n_ * (d_ + 1));
+                            r_, (d_ + 1) * n_);
 }
+
 void LiftedSEVector::setData(const Matrix &X) {
-  setSize();
   checkSEMatrixSize(X, r_, d_, n_);
-  copyEigenMatrixToROPTLIBVariable(X, MySEVector, r_ * (d_ + 1) * n_);
-}
-
-void LiftedSEVector::setSize() {
-  LiftedSEVector::setSizeFromProductElement(MySEVector, &r_, &d_, &n_);
-}
-
-void LiftedSEVector::setSizeFromProductElement(
-    ROPTLIB::ProductElement *productElement, unsigned int *row,
-    unsigned int *col, unsigned int *num_el) {
-  auto *T =
-      dynamic_cast<ROPTLIB::ProductElement *>(productElement->GetElement(0));
-  const int *sizes = T->GetElement(0)->Getsize();
-  *row = static_cast<unsigned int>(sizes[0]);
-  *col = static_cast<unsigned int>(sizes[1]);
-  *num_el = static_cast<unsigned int>(productElement->GetNumofElement());
+  size_t mem_size = r_ * (d_ + 1) * n_;
+  copyEigenMatrixToROPTLIBVariable(X, MySEVector, mem_size);
 }
 
 LiftedRAVector::LiftedRAVector(unsigned int r, unsigned int d, unsigned int n,
                                unsigned int l, unsigned int b)
-    : LiftedSEVector(r, d, n) {
-  ObliqueRangeVector = new ROPTLIB::ObliqueVector(r, l);
-  EuclideanLandmarkVector = new ROPTLIB::EucVector(r, b);
-  MyOBVector = new ROPTLIB::ProductElement(1, ObliqueRangeVector, 1);
-  MyEVector = new ROPTLIB::ProductElement(1, EuclideanLandmarkVector, 1);
-  MyRAVector = new ROPTLIB::ProductElement(3, MySEVector, 1, MyOBVector, 1,
-                                           MyEVector, 1);
+    : r_(r), d_(d), n_(n), l_(l), b_(b) {
+  StiefelPoseVector = new ROPTLIB::StieVector(r, d);
+  EuclideanPoseVector = new ROPTLIB::EucVector(r, n);
+  ObliqueUnitSphereVector = nullptr;
+  EuclideanLandmarkVector = nullptr;
+
+  // Construct additional vectors if not empty
+  if (l > 0)
+    ObliqueUnitSphereVector = new ROPTLIB::ObliqueVector(r, l);
+  if (b > 0)
+    EuclideanLandmarkVector = new ROPTLIB::EucVector(r, b);
+
+  // Construct RA manifold
+  if (ObliqueUnitSphereVector != nullptr &&
+      EuclideanLandmarkVector != nullptr) {
+    MyRAVector = new ROPTLIB::ProductElement(
+        4, StiefelPoseVector, n, ObliqueUnitSphereVector, 1,
+        EuclideanPoseVector, 1, EuclideanLandmarkVector, 1);
+  } else if (ObliqueUnitSphereVector != nullptr &&
+             EuclideanLandmarkVector == nullptr) {
+    MyRAVector = new ROPTLIB::ProductElement(3, StiefelPoseVector, n,
+                                             ObliqueUnitSphereVector, 1,
+                                             EuclideanPoseVector, 1);
+  } else if (ObliqueUnitSphereVector == nullptr &&
+             EuclideanLandmarkVector != nullptr) {
+    MyRAVector = new ROPTLIB::ProductElement(3, StiefelPoseVector, n,
+                                             EuclideanPoseVector, 1,
+                                             EuclideanLandmarkVector, 1);
+  } else {
+    CHECK_EQ(ObliqueUnitSphereVector, nullptr);
+    CHECK_EQ(EuclideanLandmarkVector, nullptr);
+    MyRAVector = new ROPTLIB::ProductElement(2, StiefelPoseVector, n,
+                                             EuclideanPoseVector, 1);
+  }
 }
 
 LiftedRAVector::~LiftedRAVector() {
   // Avoid memory leak
-  delete ObliqueRangeVector;
+  delete StiefelPoseVector;
+  delete EuclideanPoseVector;
+  delete ObliqueUnitSphereVector;
   delete EuclideanLandmarkVector;
-  delete MyOBVector;
-  delete MyEVector;
   delete MyRAVector;
 }
 
 Matrix LiftedRAVector::getData() {
-  setSize();
   return Eigen::Map<Matrix>(const_cast<double *>(MyRAVector->ObtainReadData()),
-                            r_, n_ * (d_ + 1) + l_ + b_);
+                            r_, (d_ + 1) * n_ + l_ + b_);
 }
 
 void LiftedRAVector::setData(const Matrix &X) {
-  setSize();
-  auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(X, r_, d_, n_, l_, b_);
-  Matrix X_SE = createSEMatrix(X_SE_R, X_SE_t);
-  copyEigenMatrixToROPTLIBVariable(X_SE, MySEVector, r_ * (d_ + 1) * n_);
-  copyEigenMatrixToROPTLIBVariable(X_OB, MyOBVector, r_ * l_);
-  copyEigenMatrixToROPTLIBVariable(X_E, MyEVector, r_ * b_);
-  copyEigenMatrixToROPTLIBVariable(X, MyRAVector,
-                                   r_ * ((d_ + 1) * n_ + l_ + b_));
-}
-
-void LiftedRAVector::setSize() {
-  // set r, d, n
-  LiftedSEVector::setSize();
-  // set l and b
-  unsigned int row, col;
-  LiftedSEVector::setSizeFromProductElement(MyOBVector, &row, &col, &l_);
-  LiftedSEVector::setSizeFromProductElement(MyEVector, &row, &col, &b_);
+  checkRAMatrixSize(X, r_, d_, n_, l_, b_);
+  size_t mem_size = r_ * ((d_ + 1) * n_ + l_ + b_);
+  copyEigenMatrixToROPTLIBVariable(X, MyRAVector, mem_size);
 }
 
 } // namespace DCORA

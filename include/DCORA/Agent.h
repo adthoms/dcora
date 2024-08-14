@@ -329,6 +329,14 @@ public:
   inline unsigned relaxation_rank() const { return mPoseGraph->r(); }
 
   /**
+   * @brief Get problem dimension
+   * @return
+   */
+  inline unsigned problem_dimension() const { return mPoseGraph->k(); }
+
+  // TODO(AT): Add supporting getters for graph dims l,b
+
+  /**
    * @brief Get current instance number
    * @return
    */
@@ -643,7 +651,7 @@ protected:
   ROPTResult mLocalOptResult;
 
   // Logging
-  PGOLogger mLogger;
+  Logger mLogger;
 
   // Store status of peer agents
   std::unordered_map<unsigned, PGOAgentStatus> mTeamStatus;
@@ -677,10 +685,12 @@ protected:
   PoseDict neighborPoseDict;
 
   // Implement locking to synchronize read & write of trajectory estimate
+  // TODO(AT): Rename as mStatesMutex as all states should be locked
   std::mutex mPosesMutex;
 
   // Implement locking to synchronize read & write of shared poses from
   // neighbors
+  // TODO(AT): Rename as mNeighborPosesMutex as all states should be locked
   std::mutex mNeighborPosesMutex;
 
   // Implement locking on measurements
@@ -760,15 +770,14 @@ protected:
   /**
    * @brief Set weight for measurement in the pose graph. Return false if the
    * specified public measurement does not exist
-   * @param src_ID
-   * @param dst_ID
+   * @param edgeID
    * @param weight
    * @param fixed_weight True if the weight is fixed (i.e. cannot be changed by
    * GNC)
    * @return
    */
-  bool setMeasurementWeight(const PoseID &src_ID, const PoseID &dst_ID,
-                            double weight, bool fixed_weight = false);
+  bool setMeasurementWeight(const EdgeID &edgeID, double weight,
+                            bool fixed_weight = false);
 
   /**
    * @brief Return true if the robot is initialized in global frame
