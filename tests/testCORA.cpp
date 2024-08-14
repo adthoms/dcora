@@ -106,8 +106,7 @@ TEST(testDCORA, testRobustSinglePoseAveragingTrivial) {
  * randomizations induced from additional unit tests
  *
  * This is a known issue in dpgo: https://github.com/mit-acl/dpgo/issues/2
- * As DCORA does not address robust RA-SLAM, we comment these assertions
- * out.
+ * As DCORA does not address robust RA-SLAM, we comment this test out.
  */
 // TEST(testDCORA, testRobustSinglePoseAveraging) {
 //   for (int trial = 0; trial < 50; ++trial) {
