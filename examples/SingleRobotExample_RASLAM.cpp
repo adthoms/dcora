@@ -178,10 +178,6 @@ int main(int argc, char **argv) {
       // Update initialization point for next level in the Staircase
       Xcurr.topRows(r + 1) = X;
     } else {
-      LOG(WARNING) << "Warning: Backtracking line search failed to escape from "
-                      "Saddle point. Try decreasing the preconditioned "
-                      "Gradient norm tolerance and/or the numerical tolerance "
-                      "for minimum eigenvalue nonnegativity.";
       break;
     }
   }

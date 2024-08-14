@@ -226,6 +226,9 @@ bool QuadraticProblem::escapeSaddle(const Matrix &Xopt, double theta,
   } else {
     // NO trial point decreased the objective value: we were unable to escape
     // the saddle point!
+    LOG(WARNING) << "Warning: Backtracking line search failed to escape from "
+                    "Saddle point. Try decreasing the preconditioned "
+                    "Gradient norm tolerance.";
     return false;
   }
 }

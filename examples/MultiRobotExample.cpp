@@ -120,10 +120,10 @@ int main(int argc, char **argv) {
   bool logData = true;
   unsigned int r_min = 5;
   unsigned int r_max = 100;
-  double min_eig_num_tol = 1e-6;
+  double min_eig_num_tol = 1e-3;
   double gradient_tolerance = 1e-6;
   double preconditioned_gradient_tolerance = 1e-6;
-  double shift = -20;
+  double shift = -10;
   double RGradNormTol = 0.1;
   DCORA::InitializationMethod init_method = DCORA::InitializationMethod::Random;
   bool rbcd_only = false;
@@ -355,10 +355,6 @@ int main(int argc, char **argv) {
       // Update initialization point for next level in the Staircase
       Xcurr.topRows(r + 1) = X;
     } else {
-      LOG(WARNING) << "Warning: Backtracking line search failed to escape from "
-                      "Saddle point. Try decreasing the preconditioned "
-                      "Gradient norm tolerance and/or the numerical tolerance "
-                      "for minimum eigenvalue nonnegativity.";
       break;
     }
   }
