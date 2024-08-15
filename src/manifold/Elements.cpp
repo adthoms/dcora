@@ -120,19 +120,21 @@ LiftedPointArray::LiftedPointArray(unsigned int r, unsigned int d,
 
 LiftedRangeAidedArray::LiftedRangeAidedArray(unsigned int r, unsigned int d,
                                              unsigned int n, unsigned int l,
-                                             unsigned int b)
+                                             unsigned int b,
+                                             GraphType graphType)
     : r_(r),
       d_(d),
       n_(n),
       l_(l),
       b_(b),
+      graph_type_(graphType),
       poses_(std::make_unique<LiftedPoseArray>(r, d, n)),
       unit_spheres_(std::make_unique<LiftedPointArray>(r, d, l)),
       landmarks_(std::make_unique<LiftedPointArray>(r, d, b)) {}
 
 LiftedRangeAidedArray::LiftedRangeAidedArray(const LiftedRangeAidedArray &other)
     : LiftedRangeAidedArray(other.r(), other.d(), other.n(), other.l(),
-                            other.b()) {
+                            other.b(), other.graphType()) {
   setData(other.getData());
 }
 
@@ -143,6 +145,7 @@ LiftedRangeAidedArray::operator=(const LiftedRangeAidedArray &other) {
   n_ = other.n();
   l_ = other.l();
   b_ = other.b();
+  graph_type_ = other.graphType();
   poses_ = std::make_unique<LiftedPoseArray>(r_, d_, n_);
   unit_spheres_ = std::make_unique<LiftedPointArray>(r_, d_, l_);
   landmarks_ = std::make_unique<LiftedPointArray>(r_, d_, b_);
@@ -152,13 +155,44 @@ LiftedRangeAidedArray::operator=(const LiftedRangeAidedArray &other) {
   return *this;
 }
 
+bool LiftedRangeAidedArray::isPGOCompatible() const {
+  if (graph_type_ == GraphType::RangeAidedSLAMGraph)
+    return false;
+
+  if (l_ > 0 || b_ > 0)
+    LOG(FATAL) << "Error: LiftedRangeAidedArray cannot contain unit spheres "
+                  "or landmarks when graph type is set to: "
+               << GraphTypeToString(graph_type_) << "!";
+
+  return true;
+}
+
 Matrix LiftedRangeAidedArray::getData() const {
+  return (isPGOCompatible()) ? getDataSE() : getDataRA();
+}
+
+Matrix LiftedRangeAidedArray::getDataSE() const { return poses_->getData(); }
+
+Matrix LiftedRangeAidedArray::getDataRA() const {
   auto [X_SE_R, X_SE_t] = partitionSEMatrix(poses_->getData(), r_, d_, n_);
   return createRAMatrix(X_SE_R, unit_spheres_->getData(), X_SE_t,
                         landmarks_->getData());
 }
 
 void LiftedRangeAidedArray::setData(const Matrix &X) {
+  if (isPGOCompatible())
+    setDataSE(X);
+  else
+    setDataRA(X);
+}
+
+void LiftedRangeAidedArray::setDataSE(const Matrix &X) {
+  CHECK_EQ(X.rows(), r_);
+  CHECK_EQ(X.cols(), (d_ + 1) * n_);
+  poses_->setData(X);
+}
+
+void LiftedRangeAidedArray::setDataRA(const Matrix &X) {
   CHECK_EQ(X.rows(), r_);
   CHECK_EQ(X.cols(), (d_ + 1) * n_ + l_ + b_);
   auto [X_SE_R, X_OB, X_SE_t, X_E] = partitionRAMatrix(X, r_, d_, n_, l_, b_);
@@ -175,6 +209,12 @@ void LiftedRangeAidedArray::setRandomData() {
   poses_->setData(X_SE_rand);
   unit_spheres_->setData(X_OB_rand);
   landmarks_->setData(X_E_rand);
+}
+
+void LiftedRangeAidedArray::setDataToZero() {
+  poses_->setDataToZero();
+  unit_spheres_->setDataToZero();
+  landmarks_->setDataToZero();
 }
 
 Eigen::Ref<Matrix> LiftedRangeAidedArray::pose(unsigned int index) {
@@ -227,10 +267,30 @@ Vector LiftedRangeAidedArray::landmark(unsigned int index) const {
   return landmarks_->translation(index);
 }
 
-void LiftedRangeAidedArray::setDataToZero() {
-  poses_->setDataToZero();
-  unit_spheres_->setDataToZero();
-  landmarks_->setDataToZero();
+void LiftedRangeAidedArray::setLiftedPoseArray(
+    const LiftedPoseArray &liftedPoseArray) {
+  CHECK_EQ(liftedPoseArray.r(), r_);
+  CHECK_EQ(liftedPoseArray.d(), d_);
+  CHECK_EQ(liftedPoseArray.n(), n_);
+  poses_->setData(liftedPoseArray.getData());
+}
+
+void LiftedRangeAidedArray::setLiftedUnitSphereArray(
+    const LiftedPointArray &liftedUnitSphereArray) {
+  CHECK_EQ(liftedUnitSphereArray.r(), r_);
+  CHECK_EQ(liftedUnitSphereArray.d(), d_);
+  CHECK_EQ(liftedUnitSphereArray.n(), l_);
+  CHECK(liftedUnitSphereArray.getData().isApprox(
+      projectToObliqueManifold(liftedUnitSphereArray.getData())));
+  unit_spheres_->setData(liftedUnitSphereArray.getData());
+}
+
+void LiftedRangeAidedArray::setLiftedLandmarkArray(
+    const LiftedPointArray &liftedLandmarkArray) {
+  CHECK_EQ(liftedLandmarkArray.r(), r_);
+  CHECK_EQ(liftedLandmarkArray.d(), d_);
+  CHECK_EQ(liftedLandmarkArray.n(), b_);
+  landmarks_->setData(liftedLandmarkArray.getData());
 }
 
 Pose::Pose(const Matrix &T) : Pose(T.rows()) {
