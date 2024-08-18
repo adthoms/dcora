@@ -275,6 +275,13 @@ public:
    * @brief Set measurements for this agent
    * @param inputMeasurements
    */
+  void setMeasurements(
+      const std::vector<RelativePosePoseMeasurement> &inputMeasurements);
+
+  /**
+   * @brief Set measurements for this agent
+   * @param inputMeasurements
+   */
   void setMeasurements(const RelativeMeasurements &inputMeasurements);
 
   /**
@@ -342,19 +349,19 @@ public:
    * @brief Get relaxation rank
    * @return
    */
-  inline unsigned relaxation_rank() const { return mGraph->r(); }
+  inline unsigned relaxation_rank() const { return r; }
 
   /**
    * @brief Get dimension (2 or 3)
    * @return
    */
-  inline unsigned dimension() const { return mGraph->d(); }
+  inline unsigned dimension() const { return d; }
 
   /**
    * @brief Get number of poses of this robot
    * @return
    */
-  inline unsigned num_poses() const { return mGraph->n(); }
+  inline unsigned num_poses() const { return isAgentMap() ? 1 : mGraph->n(); }
 
   /**
    * @brief Get number of unit spheres of this robot
@@ -372,7 +379,9 @@ public:
    * @brief Get problem dimension
    * @return
    */
-  inline unsigned problem_dimension() const { return mGraph->k(); }
+  inline unsigned problem_dimension() const {
+    return isAgentMap() ? (d + 1) + mGraph->b() : mGraph->k();
+  }
 
   /**
    * @brief Get current instance number
@@ -469,6 +478,17 @@ public:
    * @return
    */
   bool getTrajectoryInLocalFrame(Matrix *Trajectory);
+
+  /**
+   * @brief State estimate of this robot in local frame, with its first
+   * pose set to identity
+   * @param Trajectory
+   * @param UnitSpheres
+   * @param Landmarks
+   * @return
+   */
+  bool getStatesInLocalFrame(Matrix *Trajectory, Matrix *UnitSpheres = nullptr,
+                             Matrix *Landmarks = nullptr);
 
   /**
    * @brief Trajectory estimate of this robot in global frame, with the first
@@ -652,7 +672,7 @@ public:
   void clearNeighborStates();
 
   /**
-   * @brief Clear local caches of all active neighbors' poses
+   * @brief Clear local caches of all active neighbors' states
    */
   void clearActiveNeighborStates();
 

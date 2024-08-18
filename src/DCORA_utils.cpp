@@ -162,20 +162,18 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
   file.close();
 }
 
-std::vector<RelativePosePoseMeasurement>
-read_g2o_file(const std::string &filename, size_t *num_poses) {
+G2ODataset read_g2o_file(const std::string &filename) {
   /*
   The following implementation is adapted from:
   SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
   */
 
-  // Preallocate output vector
-  std::vector<DCORA::RelativePosePoseMeasurement> measurements;
+  // Initialize g2o dataset
+  G2ODataset g2o_dataset;
 
   // A single measurement, whose values we will fill in
   DCORA::RelativePosePoseMeasurement measurement;
-  measurement.weight = 1.0;
 
   // A string used to contain the contents of a single line
   std::string line;
@@ -192,8 +190,11 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
   // Open the file for reading
   std::ifstream infile(filename);
 
-  *num_poses = 0;
+  // Initialize dimension and number of poses
+  unsigned int dim = 0;
+  unsigned int num_poses = 0;
 
+  // Read ground truth and measurements
   while (std::getline(infile, line)) {
     // Construct a stream from the string
     std::stringstream strstrm(line);
@@ -201,7 +202,50 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
     // Extract the first token from the string
     strstrm >> token;
 
-    if (token == "EDGE_SE2") {
+    if (token == "VERTEX_SE2") {
+      // Set dimension
+      if (dim == 0)
+        dim = 2;
+
+      // Extract formatted output
+      strstrm >> i >> dx >> dy >> dtheta;
+
+      // Populate ground truth
+      Pose gt_pose = Pose(2);
+      gt_pose.translation() = Eigen::Matrix<double, 2, 1>(dx, dy);
+      gt_pose.rotation() = Eigen::Rotation2Dd(dtheta).toRotationMatrix();
+
+      const PoseID pose_id = PoseID(0, i);
+      if (g2o_dataset.ground_truth_poses.find(pose_id) !=
+          g2o_dataset.ground_truth_poses.end()) {
+        LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+      }
+      g2o_dataset.ground_truth_poses[pose_id] = gt_pose;
+      continue;
+
+    } else if (token == "VERTEX_SE3:QUAT") {
+      // Set dimension
+      if (dim == 0)
+        dim = 3;
+
+      // Extract formatted output
+      strstrm >> i >> dx >> dy >> dz >> dqx >> dqy >> dqz >> dqw;
+
+      // Populate ground truth
+      Pose gt_pose = Pose(3);
+      gt_pose.translation() = Eigen::Matrix<double, 3, 1>(dx, dy, dz);
+      gt_pose.rotation() =
+          Eigen::Quaterniond(dqw, dqx, dqy, dqz).toRotationMatrix();
+
+      const PoseID pose_id = PoseID(0, i);
+      if (g2o_dataset.ground_truth_poses.find(pose_id) !=
+          g2o_dataset.ground_truth_poses.end()) {
+        LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+      }
+      g2o_dataset.ground_truth_poses[pose_id] = gt_pose;
+      continue;
+
+    } else if (token == "EDGE_SE2") {
       // This is a 2D pose measurement
 
       /** The g2o format specifies a 2D relative pose measurement in the
@@ -293,25 +337,27 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
         measurement.fixedWeight = false;
       }
 
-    } else if ((token == "VERTEX_SE2") || (token == "VERTEX_SE3:QUAT")) {
-      // This is just initialization information, so do nothing
-      continue;
     } else {
       LOG(FATAL) << "Error: unrecognized type: " << token << "!";
     }
 
     // Update maximum value of poses found so far
-    size_t max_pair = std::max<double>(measurement.p1, measurement.p2);
+    unsigned int max_pair =
+        std::max<unsigned int>(measurement.p1, measurement.p2);
 
-    *num_poses = ((max_pair > *num_poses) ? max_pair : *num_poses);
-    measurements.push_back(measurement);
-  } // while
+    num_poses = ((max_pair > num_poses) ? max_pair : num_poses);
+    g2o_dataset.pose_pose_measurements.push_back(measurement);
+  }
+  CHECK(dim == 2 || dim == 3);
 
   infile.close();
 
-  (*num_poses)++; // Account for the use of zero-based indexing
+  num_poses++; // Account for the use of zero-based indexing
 
-  return measurements;
+  g2o_dataset.dim = dim;
+  g2o_dataset.num_poses = num_poses;
+
+  return g2o_dataset;
 }
 
 int getDimFromPyfgFirstLine(const std::string &filename) {
@@ -1068,7 +1114,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 LocalToGlobalStateDicts
 getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
   LocalToGlobalStateDicts local_to_global_state_dicts;
-  const unsigned int global_robot_id = 0;
+  const unsigned int global_robot_id = CENTRALIZED_AGENT_ID;
 
   // Get ground truth dictionaries
   const PoseDict &gt_pose_dict = pyfg_dataset.ground_truth.poses;
@@ -1562,7 +1608,7 @@ Matrix projectToRotationGroup(const Matrix &M) {
 Matrix projectToStiefelManifold(const Matrix &M) {
   size_t r = M.rows();
   size_t d = M.cols();
-  CHECK(r >= d);
+  CHECK_GE(r, d);
   Eigen::JacobiSVD<Matrix> svd(M, Eigen::ComputeThinU | Eigen::ComputeThinV);
   return svd.matrixU() * svd.matrixV().transpose();
 }
@@ -2000,6 +2046,75 @@ Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
   auto [X_SE_R_proj, X_SE_t_proj] = partitionSEMatrix(X_SE_proj, r, d, n);
   return createRAMatrix(X_SE_R_proj, projectToObliqueManifold(X_OB),
                         X_SE_t_proj, X_E);
+}
+
+PoseArray alignTrajectoryToFrame(PoseArray trajectoryInit, const Pose Tw0) {
+  unsigned int d = trajectoryInit.d();
+  unsigned int n = trajectoryInit.n();
+  CHECK_EQ(d, Tw0.d());
+  PoseArray trajectoryTransformed(d, n);
+  for (unsigned int i = 0; i < n; ++i) {
+    const Pose Twi(trajectoryInit.pose(i));
+    const Pose T0i = Tw0.inverse() * Twi;
+    trajectoryTransformed.pose(i) = T0i.pose();
+  }
+  return trajectoryTransformed;
+}
+
+PointArray alignUnitSpheresToFrame(PointArray unitSpheresInit, const Pose Tw0) {
+  unsigned int d = unitSpheresInit.d();
+  unsigned int l = unitSpheresInit.n();
+  CHECK_EQ(d, Tw0.d());
+  PointArray unitSpheresTransformed(d, l);
+  const Matrix R0 = Tw0.rotation();
+  for (unsigned int i = 0; i < l; ++i) {
+    unitSpheresTransformed.translation(i) =
+        R0.transpose() * unitSpheresInit.translation(i);
+  }
+  return unitSpheresTransformed;
+}
+
+PointArray alignLandmarksToFrame(PointArray landmarksInit, const Pose Tw0) {
+  unsigned int d = landmarksInit.d();
+  unsigned int b = landmarksInit.n();
+  CHECK_EQ(d, Tw0.d());
+  PointArray landmarksTransformed(d, b);
+  Pose Twi = Pose::Identity(d);
+  for (unsigned int i = 0; i < b; ++i) {
+    Twi.translation() = landmarksInit.translation(i);
+    const Pose T0i = Tw0.inverse() * Twi;
+    landmarksTransformed.translation(i) = T0i.translation();
+  }
+  return landmarksTransformed;
+}
+
+PoseArray alignLiftedTrajectoryToFrame(const Matrix &liftedTrajectoryInit,
+                                       const LiftedPose Tw0, unsigned int d,
+                                       unsigned int n, bool isGlobalAlignment) {
+  unsigned int r = liftedTrajectoryInit.rows();
+  unsigned int k = liftedTrajectoryInit.cols();
+  CHECK_EQ(r, Tw0.r());
+  CHECK_EQ(d, Tw0.d());
+  CHECK_EQ(k, (d + 1) * n);
+
+  // Rotate trajectory to global or local frame
+  const Matrix &R0T = Tw0.rotation().transpose();
+  PoseArray liftedTrajectoryTransformed(d, n);
+  liftedTrajectoryTransformed.setData(R0T * liftedTrajectoryInit);
+  const Vector &ta = isGlobalAlignment
+                         ? Vector(Tw0.translation())
+                         : Vector(liftedTrajectoryTransformed.translation(0));
+  const Vector &t0 = R0T * ta;
+
+  // Project each rotation block to the rotation group, and make the first
+  // translation zero
+  for (unsigned int i = 0; i < n; ++i) {
+    liftedTrajectoryTransformed.rotation(i) =
+        projectToRotationGroup(liftedTrajectoryTransformed.rotation(i));
+    liftedTrajectoryTransformed.translation(i) =
+        liftedTrajectoryTransformed.translation(i) - t0;
+  }
+  return liftedTrajectoryTransformed;
 }
 
 } // namespace DCORA

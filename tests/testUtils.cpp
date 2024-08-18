@@ -264,3 +264,68 @@ TEST(testDCORA, testProjectSolutionRASLAM) {
         X_project.isApprox(DCORA::projectToRAMatrix(X_project, d, d, n, l, b)));
   }
 }
+
+TEST(testDCORA, testAlignTrajectoryToFrame) {
+  unsigned int d = 3;
+  unsigned int n = 10;
+  // Set random data
+  DCORA::PoseArray TrajectoryInit(d, n);
+  TrajectoryInit.setRandomData();
+  // Set random frame
+  DCORA::Pose Tw0;
+  Tw0.rotation() = DCORA::randomStiefelVariable(d, d);
+  Tw0.translation() = DCORA::randomEuclideanVariable(d);
+  // Transform
+  DCORA::PoseArray TrajectoryTransformedTmp =
+      alignTrajectoryToFrame(TrajectoryInit, Tw0);
+  DCORA::PoseArray TrajectoryTransformed =
+      alignTrajectoryToFrame(TrajectoryTransformedTmp, Tw0.inverse());
+  ASSERT_TRUE(
+      TrajectoryTransformed.getData().isApprox(TrajectoryInit.getData()));
+}
+
+TEST(testDCORA, testAlignUnitSpheresToFrame) {
+  unsigned int d = 3;
+  std::vector<unsigned int> l_cases = {0, 6};
+  // Set random frame
+  DCORA::Pose Tw0;
+  Tw0.rotation() = DCORA::randomStiefelVariable(d, d);
+  Tw0.translation() = DCORA::randomEuclideanVariable(d);
+  for (unsigned int i = 0; i < l_cases.size(); i++) {
+    unsigned int l = l_cases.at(i);
+    // Set random data
+    DCORA::PointArray UnitSpheresInit(d, l);
+    UnitSpheresInit.setData(DCORA::randomObliqueVariable(d, l));
+    // Transform
+    DCORA::PointArray UnitSpheresTransformedTmp =
+        alignUnitSpheresToFrame(UnitSpheresInit, Tw0);
+    DCORA::PointArray UnitSpheresTransformed =
+        alignUnitSpheresToFrame(UnitSpheresTransformedTmp, Tw0.inverse());
+    ASSERT_TRUE(
+        UnitSpheresTransformed.getData().isApprox(UnitSpheresInit.getData()));
+    ASSERT_TRUE(UnitSpheresTransformed.getData().isApprox(
+        DCORA::projectToObliqueManifold(UnitSpheresTransformed.getData())));
+  }
+}
+
+TEST(testDCORA, testAlignLandmarksToFrame) {
+  unsigned int d = 3;
+  std::vector<unsigned int> b_cases = {0, 7};
+  // Set random frame
+  DCORA::Pose Tw0;
+  Tw0.rotation() = DCORA::randomStiefelVariable(d, d);
+  Tw0.translation() = DCORA::randomEuclideanVariable(d);
+  for (unsigned int i = 0; i < b_cases.size(); i++) {
+    unsigned int b = b_cases.at(i);
+    // Set random data
+    DCORA::PointArray LandmarksInit(d, b);
+    LandmarksInit.setData(DCORA::randomEuclideanVariable(d, b));
+    // Transform
+    DCORA::PointArray LandmarksTransformedTmp =
+        alignLandmarksToFrame(LandmarksInit, Tw0);
+    DCORA::PointArray LandmarksTransformed =
+        alignLandmarksToFrame(LandmarksTransformedTmp, Tw0.inverse());
+    ASSERT_TRUE(
+        LandmarksTransformed.getData().isApprox(LandmarksInit.getData()));
+  }
+}

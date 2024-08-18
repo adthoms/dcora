@@ -121,6 +121,16 @@ public:
    */
   bool isPGOCompatible() const;
   /**
+   * @brief Return true if this agent is the map in RA-SLAM
+   * @return
+   */
+  bool isAgentMap() const;
+  /**
+   * @brief Return true if the provided agent is the map in RA-SLAM
+   * @return
+   */
+  bool isAgentMap(unsigned int id) const;
+  /**
    * @brief Clear all cached neighbor states
    */
   void clearNeighborStates();

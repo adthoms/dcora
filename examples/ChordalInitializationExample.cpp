@@ -33,20 +33,20 @@ int main(int argc, char **argv) {
 
   std::cout << "Chordal Initialization Example. " << std::endl;
 
-  size_t num_poses;
-  std::vector<DCORA::RelativePosePoseMeasurement> dataset =
-      DCORA::read_g2o_file(argv[1], &num_poses);
-  size_t d = (!dataset.empty() ? dataset[0].t.size() : 0);
+  const DCORA::G2ODataset dataset = DCORA::read_g2o_file(argv[1]);
+  const std::vector<DCORA::RelativePosePoseMeasurement> &measurements =
+      dataset.pose_pose_measurements;
+  size_t d = (!measurements.empty() ? dataset.dim : 0);
   std::cout << "Loaded dataset from file " << argv[1] << "." << std::endl;
 
   // Construct optimization problem
   std::shared_ptr<DCORA::Graph> pose_graph =
       std::make_shared<DCORA::Graph>(0, d, d);
-  pose_graph->setMeasurements(dataset);
+  pose_graph->setMeasurements(measurements);
   DCORA::QuadraticProblem problemCentral(pose_graph);
 
   // Compute chordal relaxation
-  auto TChordal = DCORA::chordalInitialization(dataset);
+  auto TChordal = DCORA::chordalInitialization(measurements);
   std::cout << "Chordal initialization cost: "
             << 2 * problemCentral.f(TChordal.getData()) << std::endl;
 

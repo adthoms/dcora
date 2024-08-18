@@ -138,12 +138,14 @@ bool Agent::getSharedStateDicts(PoseDict *poseDict,
   for (const auto &unit_sphere_id : mGraph->myPublicUnitSphereIDs()) {
     unsigned int frame_id = validateStateID(unit_sphere_id);
     const LiftedPoint Xi(X.unitSphere(frame_id));
-    unitSphereDict->emplace(unit_sphere_id, Xi);
+    if (unitSphereDict)
+      unitSphereDict->emplace(unit_sphere_id, Xi);
   }
   for (const auto &landmark_id : mGraph->myPublicLandmarkIDs()) {
     unsigned int frame_id = validateStateID(landmark_id);
     const LiftedPoint Xi(X.landmark(frame_id));
-    landmarkDict->emplace(landmark_id, Xi);
+    if (landmarkDict)
+      landmarkDict->emplace(landmark_id, Xi);
   }
 
   return true;
@@ -212,19 +214,26 @@ void Agent::setMeasurements(
     const std::vector<RelativePosePoseMeasurement> &inputOdometry,
     const std::vector<RelativePosePoseMeasurement> &inputPrivateLoopClosures,
     const std::vector<RelativePosePoseMeasurement> &inputSharedLoopClosures) {
+  std::vector<RelativePosePoseMeasurement> inputMeasurements = inputOdometry;
+  inputMeasurements.insert(inputMeasurements.end(),
+                           inputPrivateLoopClosures.begin(),
+                           inputPrivateLoopClosures.end());
+  inputMeasurements.insert(inputMeasurements.end(),
+                           inputSharedLoopClosures.begin(),
+                           inputSharedLoopClosures.end());
+  setMeasurements(inputMeasurements);
+}
+
+void Agent::setMeasurements(
+    const std::vector<RelativePosePoseMeasurement> &inputMeasurements) {
   CHECK(!isOptimizationRunning());
   CHECK_EQ(mState, AgentState::WAIT_FOR_DATA);
   CHECK(isPGOCompatible()) << "Error: Robot << " << getID()
                            << "must have a graph compatible with PGO when "
                               "using relative pose-pose measurements only!";
 
-  mGraph = std::make_shared<Graph>(mID, r, d);
-  std::vector<RelativePosePoseMeasurement> measurements = inputOdometry;
-  measurements.insert(measurements.end(), inputPrivateLoopClosures.begin(),
-                      inputPrivateLoopClosures.end());
-  measurements.insert(measurements.end(), inputSharedLoopClosures.begin(),
-                      inputSharedLoopClosures.end());
-  mGraph->setMeasurements(measurements);
+  mGraph = std::make_shared<Graph>(mID, r, d, GraphType::PoseGraph);
+  mGraph->setMeasurements(inputMeasurements);
   CHECK_GT(mGraph->n(), 0)
       << "Error: Robot << " << getID()
       << "has no poses! Each agent must have at least one pose!";
@@ -237,7 +246,7 @@ void Agent::setMeasurements(const RelativeMeasurements &inputMeasurements) {
                             << "must have a graph compatible with RA-SLAM when "
                                "using RelativeMeasurements!";
 
-  mGraph = std::make_shared<Graph>(mID, r, d, mParams.graphType);
+  mGraph = std::make_shared<Graph>(mID, r, d, GraphType::RangeAidedSLAMGraph);
   mGraph->setMeasurements(inputMeasurements);
   if (!isAgentMap())
     CHECK_GT(mGraph->n(), 0)
@@ -254,19 +263,19 @@ void Agent::initialize(const PoseArray *TrajectoryInitPtr,
   // Optimization loop should not be running
   endOptimizationLoop();
 
-  // Do nothing if we are performing distributed RA-SLAM optimization and the
-  // agent ID is the map
-  if (isAgentMap()) {
-    LOG_IF(INFO, mParams.verbose) << "Agent corresponding to map does not "
-                                     "require initialization. Skipping.";
+  // Do nothing if local graph is empty
+  if (mGraph->n() == 0 && !isAgentMap()) {
+    LOG_IF(INFO, mParams.verbose)
+        << "Local graph has no poses. Skipping initialization.";
     return;
   }
 
-  // Do nothing if local graph is empty
-  if (mGraph->n() == 0) {
-    LOG_IF(INFO, mParams.verbose)
-        << "Local graph is empty. Skip initialization.";
-    return;
+  // Check conditions for map in RA-SLAM
+  if (isAgentMap()) {
+    CHECK_EQ(mGraph->n(), 0) << "Error: Map cannot contain poses!";
+    CHECK_EQ(num_unit_spheres(), 0)
+        << "Error: Map cannot contain unit spheres!";
+    CHECK_GT(num_landmarks(), 0) << "Error: Map must contain landmarks!";
   }
 
   // Check validity of initial estimates with respect to graph compatibility
@@ -341,65 +350,67 @@ void Agent::initialize(const PoseArray *TrajectoryInitPtr,
   // Initialize trajectory estimate in an arbitrary frame
   if (!trajectory_initialization_successful) {
     PoseArray T(dimension(), num_poses());
-    switch (mParams.localInitializationMethod) {
-    case (InitializationMethod::Odometry): {
-      LOG(INFO) << "Computing local trajectory odometry initialization.";
-      T = odometryInitialization(mGraph->odometry());
-      break;
-    }
-    case (InitializationMethod::Chordal): {
-      if (!isPGOCompatible())
-        LOG(FATAL) << "Error: "
-                   << InitializationMethodToString(
-                          mParams.localInitializationMethod)
-                   << "initialization requires the local graph "
-                      "to be PGO compatible!";
-      LOG(INFO) << "Computing local trajectory chordal initialization.";
-      const RelativeMeasurements &m = mGraph->localMeasurements();
-      T = chordalInitialization(m.GetRelativePosePoseMeasurements());
-      break;
-    }
-    case (InitializationMethod::Random): {
-      LOG(INFO) << "Computing local trajectory random initialization.";
-      T.setRandomData();
-      break;
-    }
-    case (InitializationMethod::GNC_TLS): {
-      if (!isPGOCompatible())
-        LOG(FATAL) << "Error: "
-                   << InitializationMethodToString(
-                          mParams.localInitializationMethod)
-                   << "initialization requires the local graph "
-                      "to be PGO compatible!";
-      LOG(INFO) << "Computing local trajectory GNC_TLS initialization.";
-      solveRobustPGOParams params;
-      params.verbose = mParams.verbose;
-      // Standard L2 PGO params (GNC inner iters)
-      params.opt_params.verbose = false;
-      params.opt_params.gradnorm_tol = 1;
-      params.opt_params.RTR_iterations = 20;
-      // Robust optimization params (GNC outer iters)
-      params.robust_params.costType = RobustCostParameters::Type::GNC_TLS;
-      params.robust_params.GNCMaxNumIters = 10;
-      params.robust_params.GNCBarc = 5.0;
-      params.robust_params.GNCMuStep = 1.4;
-      PoseArray TOdom = odometryInitialization(mGraph->odometry());
-      const RelativeMeasurements &m = mGraph->localMeasurements();
-      std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
-          m.GetRelativePosePoseMeasurements();
-      // Solve for trajectory
-      T = solveRobustPGO(&mutable_local_measurements, params, &TOdom);
-      // Reject outlier local loop closures
-      int reject_count = 0;
-      for (const auto &m : mutable_local_measurements) {
-        if (m.weight < 1e-8) {
-          setMeasurementWeight(m.getEdgeID(), 0);
-          reject_count++;
-        }
+    if (!isAgentMap()) {
+      switch (mParams.localInitializationMethod) {
+      case (InitializationMethod::Odometry): {
+        LOG(INFO) << "Computing local trajectory odometry initialization.";
+        T = odometryInitialization(mGraph->odometry());
+        break;
       }
-      LOG(INFO) << "Reject " << reject_count << " local loop closures.";
-      break;
-    }
+      case (InitializationMethod::Chordal): {
+        if (!isPGOCompatible())
+          LOG(FATAL) << "Error: "
+                     << InitializationMethodToString(
+                            mParams.localInitializationMethod)
+                     << "initialization requires the local graph "
+                        "to be PGO compatible!";
+        LOG(INFO) << "Computing local trajectory chordal initialization.";
+        const RelativeMeasurements &m = mGraph->localMeasurements();
+        T = chordalInitialization(m.GetRelativePosePoseMeasurements());
+        break;
+      }
+      case (InitializationMethod::Random): {
+        LOG(INFO) << "Computing local trajectory random initialization.";
+        T.setRandomData();
+        break;
+      }
+      case (InitializationMethod::GNC_TLS): {
+        if (!isPGOCompatible())
+          LOG(FATAL) << "Error: "
+                     << InitializationMethodToString(
+                            mParams.localInitializationMethod)
+                     << "initialization requires the local graph "
+                        "to be PGO compatible!";
+        LOG(INFO) << "Computing local trajectory GNC_TLS initialization.";
+        solveRobustPGOParams params;
+        params.verbose = mParams.verbose;
+        // Standard L2 PGO params (GNC inner iters)
+        params.opt_params.verbose = false;
+        params.opt_params.gradnorm_tol = 1;
+        params.opt_params.RTR_iterations = 20;
+        // Robust optimization params (GNC outer iters)
+        params.robust_params.costType = RobustCostParameters::Type::GNC_TLS;
+        params.robust_params.GNCMaxNumIters = 10;
+        params.robust_params.GNCBarc = 5.0;
+        params.robust_params.GNCMuStep = 1.4;
+        PoseArray TOdom = odometryInitialization(mGraph->odometry());
+        const RelativeMeasurements &m = mGraph->localMeasurements();
+        std::vector<RelativePosePoseMeasurement> mutable_local_measurements =
+            m.GetRelativePosePoseMeasurements();
+        // Solve for trajectory
+        T = solveRobustPGO(&mutable_local_measurements, params, &TOdom);
+        // Reject outlier local loop closures
+        int reject_count = 0;
+        for (const auto &m : mutable_local_measurements) {
+          if (m.weight < 1e-8) {
+            setMeasurementWeight(m.getEdgeID(), 0);
+            reject_count++;
+          }
+        }
+        LOG(INFO) << "Reject " << reject_count << " local loop closures.";
+        break;
+      }
+      }
     }
     CHECK_EQ(T.d(), dimension());
     CHECK_EQ(T.n(), num_poses());
@@ -413,46 +424,25 @@ void Agent::initialize(const PoseArray *TrajectoryInitPtr,
   }
 
   // Transform the local trajectory so that the first pose is identity
-  PoseArray TrajectoryLocalTransformed(dimension(), num_poses());
   const Pose Tw0(TrajectoryLocalInit.value().pose(0));
-  for (unsigned int i = 0; i < num_poses(); ++i) {
-    const Pose Twi(TrajectoryLocalInit.value().pose(i));
-    const Pose T0i = Tw0.inverse() * Twi;
-    TrajectoryLocalTransformed.pose(i) = T0i.pose();
-  }
+  const PoseArray TrajectoryLocalTransformed =
+      alignTrajectoryToFrame(TrajectoryLocalInit.value(), Tw0);
   TrajectoryLocalInit.emplace(TrajectoryLocalTransformed);
 
   // Transform the local unit spheres and landmarks so that they remain in the
   // same frame as the trajectory
   if (!isPGOCompatible()) {
-    PointArray UnitSpheresLocalTransformed(dimension(), num_unit_spheres());
-    PointArray LandmarksLocalTransformed(dimension(), num_landmarks());
-
-    // Lambda function for transforming point arrays with respect to the first
-    // pose of the trajectory Tw0
-    auto transformPointArray = [&](const PointArray &pointArrayInit,
-                                   PointArray &pointArrayTransformed,
-                                   unsigned int num_elements) {
-      Pose Twi = Pose::Identity(dimension());
-      for (unsigned int i = 0; i < num_elements; ++i) {
-        Twi.translation() = pointArrayInit.translation(i);
-        const Pose T0i = Tw0.inverse() * Twi;
-        pointArrayTransformed.translation(i) = T0i.translation();
-      }
-    };
-
-    // Transform local unit spheres and landmarks
-    transformPointArray(UnitSphereLocalInit.value(),
-                        UnitSpheresLocalTransformed, num_unit_spheres());
-    transformPointArray(LandmarkLocalInit.value(), LandmarksLocalTransformed,
-                        num_landmarks());
+    const PointArray UnitSpheresLocalTransformed =
+        alignUnitSpheresToFrame(UnitSphereLocalInit.value(), Tw0);
+    const PointArray LandmarksLocalTransformed =
+        alignLandmarksToFrame(LandmarkLocalInit.value(), Tw0);
     UnitSphereLocalInit.emplace(UnitSpheresLocalTransformed);
     LandmarkLocalInit.emplace(LandmarksLocalTransformed);
   }
 
   // Update dimension for internal iterate
   X = LiftedRangeAidedArray(relaxation_rank(), dimension(), num_poses(),
-                            num_landmarks(), num_unit_spheres(),
+                            num_unit_spheres(), num_landmarks(),
                             mParams.graphType);
 
   // Waiting for initialization in the GLOBAL frame
@@ -489,36 +479,17 @@ void Agent::initializeInGlobalFrame(const Pose &T_world_robot) {
   clearNeighborStates();
 
   // Apply global transformation to local trajectory estimate
-  PoseArray TrajectoryGlobalInit = TrajectoryLocalInit.value();
-  for (unsigned int i = 0; i < num_poses(); ++i) {
-    const Pose T_robot_frame(TrajectoryGlobalInit.pose(i));
-    const Pose T_world_frame = T_world_robot * T_robot_frame;
-    TrajectoryGlobalInit.pose(i) = T_world_frame.pose();
-  }
+  const PoseArray TrajectoryGlobalInit = alignTrajectoryToFrame(
+      TrajectoryLocalInit.value(), T_world_robot.inverse());
 
   // Apply global transformation to local unit sphere and landmark estimates
   PointArray UnitSpheresGlobalInit(dimension(), num_unit_spheres());
   PointArray LandmarksGlobalInit(dimension(), num_landmarks());
   if (!isPGOCompatible()) {
-    UnitSpheresGlobalInit = UnitSphereLocalInit.value();
-    LandmarksGlobalInit = LandmarkLocalInit.value();
-
-    // Lambda function for transforming point arrays from local to global
-    // coordinates
-    auto transformPointArray = [&](PointArray &pointArray,
-                                   unsigned int num_elements) {
-      Pose T_robot_frame = Pose::Identity(dimension());
-      for (unsigned int i = 0; i < num_elements; ++i) {
-        T_robot_frame.translation() = pointArray.translation(i);
-        const Pose T_world_frame = T_world_robot * T_robot_frame;
-        pointArray.translation(i) = T_world_frame.translation();
-      }
-    };
-
-    // Transform unit spheres and landmarks from local to global
-    // coordinates
-    transformPointArray(UnitSpheresGlobalInit, num_unit_spheres());
-    transformPointArray(LandmarksGlobalInit, num_landmarks());
+    UnitSpheresGlobalInit = alignUnitSpheresToFrame(UnitSphereLocalInit.value(),
+                                                    T_world_robot.inverse());
+    LandmarksGlobalInit = alignLandmarksToFrame(LandmarkLocalInit.value(),
+                                                T_world_robot.inverse());
   }
 
   // Set initial global estimate
@@ -563,6 +534,8 @@ void Agent::initializeInGlobalFrame(const Pose &T_world_robot) {
 }
 
 bool Agent::iterate(bool doOptimization) {
+  if (isAgentMap())
+    return false;
   mIterationNumber++;
   if (mParams.robustCostParams.costType != RobustCostParameters::Type::L2)
     mRobustOptInnerIter++;
@@ -972,18 +945,69 @@ bool Agent::getTrajectoryInLocalFrame(Matrix *Trajectory) {
     return false;
   std::lock_guard<std::mutex> lock(mStatesMutex);
 
-  PoseArray T(d, num_poses());
-  T.setData(X.rotation(0).transpose() * X.getData());
-  const Vector &t0 = T.translation(0);
+  // Get estimated lifted trajectory
+  const Matrix &TrajectoryLifted = X.GetLiftedPoseArray()->getData();
+
+  // Align lifted trajectory to its first pose
+  const LiftedPose Tw0(X.pose(0));
+  const PoseArray T = alignLiftedTrajectoryToFrame(
+      TrajectoryLifted, Tw0, dimension(), num_poses(), false);
+
+  *Trajectory = T.getData();
+  return true;
+}
+
+bool Agent::getStatesInLocalFrame(Matrix *Trajectory, Matrix *UnitSpheres,
+                                  Matrix *Landmarks) {
+  if (mState != AgentState::INITIALIZED)
+    return false;
+  std::lock_guard<std::mutex> lock(mStatesMutex);
+
+  // Get estimated lifted state estimates
+  const Matrix &TrajectoryLifted = X.GetLiftedPoseArray()->getData();
+  const Matrix &UnitSpheresLifted = X.GetLiftedUnitSphereArray()->getData();
+  const Matrix &LandmarksLifted = X.GetLiftedLandmarkArray()->getData();
+
+  // Get first pose of trajectory
+  const LiftedPose Tw0(X.pose(0));
+  const Matrix &R0T = Tw0.rotation().transpose();
+
+  // Rotate trajectory to local frame
+  PoseArray liftedTrajectoryTransformed(dimension(), num_poses());
+  liftedTrajectoryTransformed.setData(R0T * TrajectoryLifted);
+  const Vector &t0 = liftedTrajectoryTransformed.translation(0);
 
   // Project each rotation block to the rotation group, and make the first
   // translation zero
   for (unsigned int i = 0; i < num_poses(); ++i) {
-    T.rotation(i) = projectToRotationGroup(T.rotation(i));
-    T.translation(i) = T.translation(i) - t0;
+    liftedTrajectoryTransformed.rotation(i) =
+        projectToRotationGroup(liftedTrajectoryTransformed.rotation(i));
+    liftedTrajectoryTransformed.translation(i) =
+        liftedTrajectoryTransformed.translation(i) - t0;
   }
 
-  *Trajectory = T.getData();
+  // Rotate unit spheres to local frame. As unit sphere variables do not depend
+  // on the translation of the frame, we simply apply a rotation.
+  PointArray liftedUnitSpheresTransformed(dimension(), num_unit_spheres());
+  liftedUnitSpheresTransformed.setData(R0T * UnitSpheresLifted);
+
+  // Rotate landmarks to local frame
+  PointArray liftedLandmarksTransformed(dimension(), num_landmarks());
+  liftedLandmarksTransformed.setData(R0T * LandmarksLifted);
+
+  // Translate landmarks into the local frame set by the trajectory
+  for (unsigned int i = 0; i < num_landmarks(); ++i) {
+    liftedLandmarksTransformed.translation(i) =
+        liftedLandmarksTransformed.translation(i) - t0;
+  }
+
+  // Set state estimates in local frame
+  *Trajectory = liftedTrajectoryTransformed.getData();
+  if (UnitSpheres)
+    *UnitSpheres = liftedUnitSpheresTransformed.getData();
+  if (Landmarks)
+    *Landmarks = liftedLandmarksTransformed.getData();
+
   return true;
 }
 
@@ -1005,16 +1029,12 @@ bool Agent::getTrajectoryInGlobalFrame(PoseArray *Trajectory) {
     return false;
   std::lock_guard<std::mutex> lock(mStatesMutex);
 
-  PoseArray T(d, num_poses());
-  T.setData(Xa.rotation().transpose() * X.getData());
-  const Vector t0 = Xa.rotation().transpose() * Xa.translation();
+  // Get estimated lifted trajectory
+  const Matrix &TrajectoryLifted = X.GetLiftedPoseArray()->getData();
 
-  // Project each rotation block to the rotation group, and make the first
-  // translation zero
-  for (unsigned int i = 0; i < num_poses(); ++i) {
-    T.rotation(i) = projectToRotationGroup(T.rotation(i));
-    T.translation(i) = T.translation(i) - t0;
-  }
+  // Align lifted trajectory to globl anchor
+  const PoseArray T = alignLiftedTrajectoryToFrame(
+      TrajectoryLifted, Xa, dimension(), num_poses(), true);
 
   *Trajectory = T;
   return true;

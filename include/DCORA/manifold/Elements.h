@@ -357,7 +357,7 @@ public:
    */
   LiftedPointArray *GetLiftedLandmarkArray() const { return landmarks_.get(); }
 
-private:
+protected:
   /**
    * @brief Return true if the array is compatible with PGO
    * @return
@@ -433,6 +433,21 @@ public:
                   unsigned int b,
                   GraphType graphType = GraphType::RangeAidedSLAMGraph)
       : LiftedRangeAidedArray(d, d, n, l, b, graphType) {}
+  /**
+   * @brief Get pose array
+   * @return
+   */
+  PoseArray getPoseArray() const;
+  /**
+   * @brief Get unit sphere array
+   * @return
+   */
+  PointArray getUnitSphereArray() const;
+  /**
+   * @brief Get landmark array
+   * @return
+   */
+  PointArray getLandmarkArray() const;
 };
 
 /**
@@ -585,14 +600,66 @@ typedef std::map<PoseID, LiftedPose, CompareStateID> PoseDict;
 // Ordered set of PoseID
 typedef std::set<PoseID, CompareStateID> PoseSet;
 
+// A utility function for streaming PoseDict to cout
+inline std::ostream &operator<<(std::ostream &os, const PoseDict &pose_dict) {
+  for (const auto &[pose_id, lifted_pose] : pose_dict) {
+    os << "ID: " << pose_id << std::endl;
+    os << "Variable:\n" << lifted_pose.pose() << std::endl;
+  }
+  return os;
+}
+
+// A utility function for streaming PoseSet to cout
+inline std::ostream &operator<<(std::ostream &os, const PoseSet &pose_set) {
+  for (const auto &pose_id : pose_set)
+    os << "ID: " << pose_id << std::endl;
+  return os;
+}
+
 // Ordered map of LandmarkID to LiftedPoint object
 typedef std::map<LandmarkID, LiftedPoint, CompareStateID> LandmarkDict;
 // Ordered set of LandmarkID
 typedef std::set<LandmarkID, CompareStateID> LandmarkSet;
 
+// A utility function for streaming LandmarkDict to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const LandmarkDict &landmark_dict) {
+  for (const auto &[landmark_id, lifted_landmark] : landmark_dict) {
+    os << "ID: " << landmark_id << std::endl;
+    os << "Variable:\n" << lifted_landmark.translation() << std::endl;
+  }
+  return os;
+}
+
+// A utility function for streaming LandmarkSet to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const LandmarkSet &landmark_set) {
+  for (const auto &landmark_id : landmark_set)
+    os << "ID: " << landmark_id << std::endl;
+  return os;
+}
+
 // Ordered map of UnitSphereID to LiftedPoint object
 typedef std::map<UnitSphereID, LiftedPoint, CompareStateID> UnitSphereDict;
 // Ordered set of UnitSphereID
 typedef std::set<UnitSphereID, CompareStateID> UnitSphereSet;
+
+// A utility function for streaming UnitSphereDict to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const UnitSphereDict &unit_sphere_dict) {
+  for (const auto &[unit_sphere_id, lifted_unit_sphere] : unit_sphere_dict) {
+    os << "ID: " << unit_sphere_id << std::endl;
+    os << "Variable:\n" << lifted_unit_sphere.translation() << std::endl;
+  }
+  return os;
+}
+
+// A utility function for streaming UnitSphereSet to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const UnitSphereSet &unit_sphere_set) {
+  for (const auto &unit_sphere_id : unit_sphere_set)
+    os << "ID: " << unit_sphere_id << std::endl;
+  return os;
+}
 
 } // namespace DCORA

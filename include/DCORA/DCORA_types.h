@@ -39,7 +39,9 @@ typedef std::shared_ptr<CholmodSolver> CholmodSolverPtr;
 constexpr char FIRST_AGENT_SYMBOL = 'A';
 constexpr char MAP_SYMBOL = 'M';
 constexpr char LANDMARK_SYMBOL = 'L';
-constexpr unsigned int MAP_ID = static_cast<unsigned int>(MAP_SYMBOL);
+constexpr unsigned int CENTRALIZED_AGENT_ID = 0;
+constexpr unsigned int MAP_ID =
+    static_cast<unsigned int>(MAP_SYMBOL - FIRST_AGENT_SYMBOL);
 
 /**
  * @brief Algorithms for initializing PGO

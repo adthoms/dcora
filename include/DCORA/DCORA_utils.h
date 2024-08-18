@@ -77,11 +77,9 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
 /**
  * @brief Helper function to read a dataset in .g2o format
  * @param filename
- * @param num_poses
  * @return
  */
-std::vector<RelativePosePoseMeasurement>
-read_g2o_file(const std::string &filename, size_t *num_poses);
+G2ODataset read_g2o_file(const std::string &filename);
 
 /**
  * @brief Helper function to get the dimension of the RA-SLAM problem encoded in
@@ -490,5 +488,43 @@ Matrix projectToSEMatrix(const Matrix &M, unsigned int r, unsigned int d,
  */
 Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
                          unsigned int n, unsigned int l, unsigned int b);
+
+/**
+ * @brief Align trajectory with a given pose Tw0
+ * @param trajectoryInit
+ * @param Tw0
+ * @return
+ */
+PoseArray alignTrajectoryToFrame(PoseArray trajectoryInit, const Pose Tw0);
+
+/**
+ * @brief Align unit spheres with a given pose Tw0
+ * @param unitSpheresInit
+ * @param Tw0
+ * @return
+ */
+PointArray alignUnitSpheresToFrame(PointArray unitSpheresInit, const Pose Tw0);
+
+/**
+ * @brief Align landmarks with a given pose Tw0
+ * @param landmarksInit
+ * @param Tw0
+ * @return
+ */
+PointArray alignLandmarksToFrame(PointArray landmarksInit, const Pose Tw0);
+
+/**
+ * @brief Align lifted trajectory with a given pose Tw0 globally or locally
+ * @param liftedTrajectoryInit
+ * @param Tw0
+ * @param d
+ * @param n
+ * @param isGlobalAlignment
+ * @return
+ */
+PoseArray alignLiftedTrajectoryToFrame(const Matrix &liftedTrajectoryInit,
+                                       const LiftedPose Tw0, unsigned int d,
+                                       unsigned int n,
+                                       bool isGlobalAlignment = true);
 
 } // namespace DCORA

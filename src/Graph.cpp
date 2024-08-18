@@ -68,12 +68,16 @@ void Graph::reset() {
 bool Graph::isPGOCompatible() const {
   if (graph_type == GraphType::RangeAidedSLAMGraph)
     return false;
-
   if (l_ > 0 || b_ > 0)
     LOG(FATAL)
         << "Error: Pose graph cannot contain unit spheres and landmarks!";
-
   return true;
+}
+
+bool Graph::isAgentMap() const { return !isPGOCompatible() && id_ == MAP_ID; }
+
+bool Graph::isAgentMap(unsigned int id) const {
+  return !isPGOCompatible() && id == MAP_ID;
 }
 
 void Graph::clearNeighborStates() {
@@ -346,19 +350,20 @@ bool Graph::hasNeighbor(unsigned int robot_id) const {
 }
 
 bool Graph::isNeighborActive(unsigned int neighbor_id) const {
-  if (!hasNeighbor(neighbor_id)) {
+  if (isAgentMap(neighbor_id))
     return false;
-  }
+  if (!hasNeighbor(neighbor_id))
+    return false;
   return neighbor_active_.at(neighbor_id);
 }
 
 void Graph::setNeighborActive(unsigned int neighbor_id, bool active) {
-  if (!hasNeighbor(neighbor_id)) {
+  if (isAgentMap(neighbor_id))
     return;
-  }
-  if (neighbor_active_.at(neighbor_id) != active) {
+  if (!hasNeighbor(neighbor_id))
+    return;
+  if (neighbor_active_.at(neighbor_id) != active)
     clearDataMatrices();
-  }
   neighbor_active_[neighbor_id] = active;
 }
 

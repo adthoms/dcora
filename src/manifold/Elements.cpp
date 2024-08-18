@@ -293,6 +293,27 @@ void LiftedRangeAidedArray::setLiftedLandmarkArray(
   landmarks_->setData(liftedLandmarkArray.getData());
 }
 
+PoseArray RangeAidedArray::getPoseArray() const {
+  CHECK_EQ(r_, d_);
+  PoseArray poseArray(d_, n_);
+  poseArray.setData(poses_->getData());
+  return poseArray;
+}
+
+PointArray RangeAidedArray::getUnitSphereArray() const {
+  CHECK_EQ(r_, d_);
+  PointArray unitSphereArray(d_, l_);
+  unitSphereArray.setData(unit_spheres_->getData());
+  return unitSphereArray;
+}
+
+PointArray RangeAidedArray::getLandmarkArray() const {
+  CHECK_EQ(r_, d_);
+  PointArray landmarkArray(d_, b_);
+  landmarkArray.setData(landmarks_->getData());
+  return landmarkArray;
+}
+
 Pose::Pose(const Matrix &T) : Pose(T.rows()) {
   CHECK_EQ(T.rows(), d_);
   CHECK_EQ(T.cols(), dim_);

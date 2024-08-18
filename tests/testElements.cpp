@@ -150,6 +150,36 @@ TEST(testDCORA, testLiftedRangeAidedArray) {
   ASSERT_TRUE(var.getData().isApprox(Y));
 }
 
+TEST(testDCORA, testRangeAidedArray) {
+  unsigned int d = 3;
+  unsigned int n = 3;
+  std::vector<unsigned int> l_cases = {0, 6, 0, 6};
+  std::vector<unsigned int> b_cases = {0, 0, 7, 7};
+  for (unsigned int i = 0; i < l_cases.size(); i++) {
+    unsigned int l = l_cases.at(i);
+    unsigned int b = b_cases.at(i);
+    DCORA::RangeAidedArray var(d, n, l, b);
+    // Test setter and getter methods
+    DCORA::LiftedPoseArray liftedPoseArray(d, d, n);
+    DCORA::LiftedPointArray liftedUnitSphereArray(d, d, l);
+    DCORA::LiftedPointArray liftedLandmarkArray(d, d, b);
+    liftedPoseArray.setRandomData();
+    DCORA::Matrix M1 = DCORA::Matrix::Random(d, l);
+    liftedUnitSphereArray.setData(DCORA::projectToObliqueManifold(M1));
+    DCORA::Matrix M2 = DCORA::Matrix::Random(d, b);
+    liftedLandmarkArray.setData(M2);
+    var.setLiftedPoseArray(liftedPoseArray);
+    var.setLiftedUnitSphereArray(liftedUnitSphereArray);
+    var.setLiftedLandmarkArray(liftedLandmarkArray);
+    ASSERT_TRUE(
+        liftedPoseArray.getData().isApprox(var.getPoseArray().getData()));
+    ASSERT_TRUE(liftedUnitSphereArray.getData().isApprox(
+        var.getUnitSphereArray().getData()));
+    ASSERT_TRUE(liftedLandmarkArray.getData().isApprox(
+        var.getLandmarkArray().getData()));
+  }
+}
+
 TEST(testDCORA, testLiftedPose) {
   unsigned int d = 3;
   unsigned int r = 5;
