@@ -234,7 +234,7 @@ void Agent::setMeasurements(
 
   mGraph = std::make_shared<Graph>(mID, r, d, GraphType::PoseGraph);
   mGraph->setMeasurements(inputMeasurements);
-  CHECK_GT(mGraph->n(), 0)
+  CHECK_GT(num_poses(), 0)
       << "Error: Robot << " << getID()
       << "has no poses! Each agent must have at least one pose!";
 }
@@ -248,10 +248,9 @@ void Agent::setMeasurements(const RelativeMeasurements &inputMeasurements) {
 
   mGraph = std::make_shared<Graph>(mID, r, d, GraphType::RangeAidedSLAMGraph);
   mGraph->setMeasurements(inputMeasurements);
-  if (!isAgentMap())
-    CHECK_GT(mGraph->n(), 0)
-        << "Error: Robot << " << getID()
-        << "has no poses! Each agent must have at least one pose!";
+  CHECK_GT(num_poses(), 0)
+      << "Error: Robot << " << getID()
+      << "has no poses! Each agent must have at least one pose!";
 }
 
 void Agent::initialize(const PoseArray *TrajectoryInitPtr,
@@ -264,7 +263,7 @@ void Agent::initialize(const PoseArray *TrajectoryInitPtr,
   endOptimizationLoop();
 
   // Do nothing if local graph is empty
-  if (mGraph->n() == 0 && !isAgentMap()) {
+  if (num_poses() == 0) {
     LOG_IF(INFO, mParams.verbose)
         << "Local graph has no poses. Skipping initialization.";
     return;
@@ -534,14 +533,12 @@ void Agent::initializeInGlobalFrame(const Pose &T_world_robot) {
 }
 
 bool Agent::iterate(bool doOptimization) {
-  if (isAgentMap())
-    return false;
   mIterationNumber++;
   if (mParams.robustCostParams.costType != RobustCostParameters::Type::L2)
     mRobustOptInnerIter++;
 
   // Perform iteration
-  if (mState == AgentState::INITIALIZED) {
+  if (mState == AgentState::INITIALIZED && !isAgentMap()) {
     // Save current iterate
     XPrev = X;
     bool success;

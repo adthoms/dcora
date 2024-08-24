@@ -16,11 +16,11 @@
 
 #include "gtest/gtest.h"
 
-// Set tolerance on optimized state
-const double STATE_ESTIMATION_TOL = 1e-6;
-const double OPTIMIZATION_RUNTIME = 3.0;
+// Set optimization parameters
+const double OPTIMIZATION_TOL = 1e-9;
+const double OPTIMIZATION_RUNTIME = 2.0;
 
-// Set datasets
+// Set datasets (datasets are noiseless)
 const std::vector<std::string> g2o_datasets = {
     "pose_graph_optimization_test_2d.g2o",
     "pose_graph_optimization_test_3d.g2o"};
@@ -133,13 +133,13 @@ TEST(testDCORA, testAgentInitializeIterateOptimizeSE) {
     DCORA::Matrix TrajectoryEstimated;
     agent.getTrajectoryInLocalFrame(&TrajectoryEstimated);
     ASSERT_TRUE(TrajectoryGroundTruthAligned.getData().isApprox(
-        TrajectoryEstimated, STATE_ESTIMATION_TOL));
+        TrajectoryEstimated, OPTIMIZATION_TOL));
 
     // Check trajectory after one iteration
     agent.iterate();
     agent.getTrajectoryInLocalFrame(&TrajectoryEstimated);
     ASSERT_TRUE(TrajectoryGroundTruthAligned.getData().isApprox(
-        TrajectoryEstimated, STATE_ESTIMATION_TOL));
+        TrajectoryEstimated, OPTIMIZATION_TOL));
 
     // Check optimization thread
     agent.startOptimizationLoop();
@@ -147,7 +147,7 @@ TEST(testDCORA, testAgentInitializeIterateOptimizeSE) {
     agent.endOptimizationLoop();
     agent.getTrajectoryInLocalFrame(&TrajectoryEstimated);
     ASSERT_TRUE(TrajectoryGroundTruthAligned.getData().isApprox(
-        TrajectoryEstimated, STATE_ESTIMATION_TOL));
+        TrajectoryEstimated, OPTIMIZATION_TOL));
 
     // Reset
     agent.reset();
@@ -206,22 +206,22 @@ TEST(testDCORA, testAgentInitializeIterateOptimizeRA) {
     agent.getStatesInLocalFrame(&TrajectoryEstimated, &UnitSphereEstimated,
                                 &LandmarksEstimated);
     ASSERT_TRUE(TrajectoryGroundTruthAligned.getData().isApprox(
-        TrajectoryEstimated, STATE_ESTIMATION_TOL));
+        TrajectoryEstimated, OPTIMIZATION_TOL));
     ASSERT_TRUE(UnitSpheresGroundTruthAligned.getData().isApprox(
-        UnitSphereEstimated, STATE_ESTIMATION_TOL));
+        UnitSphereEstimated, OPTIMIZATION_TOL));
     ASSERT_TRUE(LandmarksGroundTruthAligned.getData().isApprox(
-        LandmarksEstimated, STATE_ESTIMATION_TOL));
+        LandmarksEstimated, OPTIMIZATION_TOL));
 
     // Check trajectory after one iteration
     agent.iterate();
     agent.getStatesInLocalFrame(&TrajectoryEstimated, &UnitSphereEstimated,
                                 &LandmarksEstimated);
     ASSERT_TRUE(TrajectoryGroundTruthAligned.getData().isApprox(
-        TrajectoryEstimated, STATE_ESTIMATION_TOL));
+        TrajectoryEstimated, OPTIMIZATION_TOL));
     ASSERT_TRUE(UnitSpheresGroundTruthAligned.getData().isApprox(
-        UnitSphereEstimated, STATE_ESTIMATION_TOL));
+        UnitSphereEstimated, OPTIMIZATION_TOL));
     ASSERT_TRUE(LandmarksGroundTruthAligned.getData().isApprox(
-        LandmarksEstimated, STATE_ESTIMATION_TOL));
+        LandmarksEstimated, OPTIMIZATION_TOL));
 
     // Check optimization thread
     agent.startOptimizationLoop();
@@ -230,11 +230,11 @@ TEST(testDCORA, testAgentInitializeIterateOptimizeRA) {
     agent.getStatesInLocalFrame(&TrajectoryEstimated, &UnitSphereEstimated,
                                 &LandmarksEstimated);
     ASSERT_TRUE(TrajectoryGroundTruthAligned.getData().isApprox(
-        TrajectoryEstimated, STATE_ESTIMATION_TOL));
+        TrajectoryEstimated, OPTIMIZATION_TOL));
     ASSERT_TRUE(UnitSpheresGroundTruthAligned.getData().isApprox(
-        UnitSphereEstimated, STATE_ESTIMATION_TOL));
+        UnitSphereEstimated, OPTIMIZATION_TOL));
     ASSERT_TRUE(LandmarksGroundTruthAligned.getData().isApprox(
-        LandmarksEstimated, STATE_ESTIMATION_TOL));
+        LandmarksEstimated, OPTIMIZATION_TOL));
 
     // Reset
     agent.reset();
@@ -296,8 +296,10 @@ TEST(testDCORA, testAgentMapRA) {
     ASSERT_TRUE(XMapGroundTruth.getLandmarkArray().getData().isApprox(
         LandmarksEstimated));
 
-    // Check that map is passive
-    ASSERT_FALSE(agent.iterate());
+    // Given that the map agent is passive, calling the iterate method will
+    // simply advance the iteration number (and the robust optimization inner
+    // iteration number, which for RA-SLAM has no meaning) and return true
+    ASSERT_TRUE(agent.iterate());
 
     // Check shared states
     DCORA::PoseDict sharedPoseDict;
@@ -351,6 +353,7 @@ TEST(testDCORA, testAgentMultiAgentRA) {
       DCORA::AgentParameters options(d, r, robot_IDs,
                                      DCORA::GraphType::RangeAidedSLAMGraph);
       options.acceleration = acceleration;
+      options.verbose = true;
 
       auto *agent = new DCORA::Agent(robot_id, options);
 
@@ -378,8 +381,9 @@ TEST(testDCORA, testAgentMultiAgentRA) {
       agents[robot_id] = std::move(agent);
     }
 
-    // Check centralized iterate vs agent iterates
-    for (unsigned int robot_id : robot_IDs) {
+    // Lambda function to check that agent state is within tolerance of the
+    // centralized ground truth.
+    auto checkAgentStateIsGroundTruth = [&](const unsigned int robot_id) {
       DCORA::Matrix XAgent;
       agents.at(robot_id)->getX(&XAgent);
       unsigned int n = agents.at(robot_id)->num_poses();
@@ -392,89 +396,99 @@ TEST(testDCORA, testAgentMultiAgentRA) {
            local_to_global_state_dicts.poses) {
         if (robot_id != local_pose_id.robot_id)
           continue;
-
         const DCORA::Matrix &XAgentPose =
             XAgentLiftedArray.pose(local_pose_id.frame_id);
         const DCORA::Matrix &XCentralizedPose =
             XCentralizedGroundTruth.pose(global_pose_id.frame_id);
-        ASSERT_TRUE(XAgentPose.isApprox(XCentralizedPose));
+        ASSERT_TRUE(XAgentPose.isApprox(XCentralizedPose, OPTIMIZATION_TOL));
       }
       for (const auto &[local_unit_sphere_id, global_unit_sphere_id] :
            local_to_global_state_dicts.unit_spheres) {
         if (robot_id != local_unit_sphere_id.robot_id)
           continue;
-
         const DCORA::Vector &XAgentUnitSphere =
             XAgentLiftedArray.unitSphere(local_unit_sphere_id.frame_id);
         const DCORA::Vector &XCentralizedUnitSphere =
             XCentralizedGroundTruth.unitSphere(global_unit_sphere_id.frame_id);
-        ASSERT_TRUE(XAgentUnitSphere.isApprox(XCentralizedUnitSphere));
+        ASSERT_TRUE(XAgentUnitSphere.isApprox(XCentralizedUnitSphere,
+                                              OPTIMIZATION_TOL));
       }
       for (const auto &[local_landmark_id, global_landmark_id] :
            local_to_global_state_dicts.landmarks) {
         if (robot_id != local_landmark_id.robot_id)
           continue;
-
         const DCORA::Vector &XAgentLandmark =
             XAgentLiftedArray.landmark(local_landmark_id.frame_id);
         const DCORA::Vector &XCentralizedLandmark =
             XCentralizedGroundTruth.landmark(global_landmark_id.frame_id);
-        ASSERT_TRUE(XAgentLandmark.isApprox(XCentralizedLandmark));
+        ASSERT_TRUE(
+            XAgentLandmark.isApprox(XCentralizedLandmark, OPTIMIZATION_TOL));
       }
-    }
+    };
 
-    // Perform one iteration of RBCD/RBCD++
+    // Check centralized ground truth vs agent iterates after ground truth
+    // initialization
+    for (unsigned int robot_id : robot_IDs)
+      checkAgentStateIsGroundTruth(robot_id);
+
+    // Perform one iteration of RBCD/RBCD++ for each agent
     unsigned int iter = 0;
-    unsigned int selected_robot_id = first_agent_id;
-    DCORA::Agent *selected_robot_ptr = agents.at(selected_robot_id);
+    for (unsigned int selected_robot_id : robot_IDs) {
+      DCORA::Agent *selected_robot_ptr = agents.at(selected_robot_id);
 
-    // Non-selected robots perform an iteration
-    for (const auto &robot_id : robot_IDs) {
-      DCORA::Agent *robot_ptr = agents.at(robot_id);
-      ASSERT_EQ(robot_ptr->instance_number(), 0);
-      ASSERT_EQ(robot_ptr->iteration_number(), iter);
-      if (robot_ptr->getID() != selected_robot_id)
-        robot_ptr->iterate(false);
-    }
+      // Non-selected robots perform an iteration
+      for (const auto &robot_id : robot_IDs) {
+        DCORA::Agent *robot_ptr = agents.at(robot_id);
+        ASSERT_EQ(robot_ptr->instance_number(), 0);
+        ASSERT_EQ(robot_ptr->iteration_number(), iter);
+        if (robot_ptr->getID() != selected_robot_id)
+          robot_ptr->iterate(false);
+      }
 
-    // Selected robot requests public states from others
-    for (const auto &robot_id : robot_IDs) {
-      DCORA::Agent *robot_ptr = agents.at(robot_id);
-      if (robot_ptr->getID() == selected_robot_id)
-        continue;
-      DCORA::PoseDict sharedPoses;
-      DCORA::UnitSphereDict sharedUnitSpheres;
-      DCORA::LandmarkDict sharedLandmarks;
-      if (!robot_ptr->getSharedStateDicts(&sharedPoses, &sharedUnitSpheres,
-                                          &sharedLandmarks))
-        continue;
-      selected_robot_ptr->setNeighborStatus(robot_ptr->getStatus());
-      selected_robot_ptr->updateNeighborStates(robot_ptr->getID(), sharedPoses,
-                                               false, sharedUnitSpheres,
-                                               sharedLandmarks);
-    }
-
-    // When using acceleration, selected robot also requests auxiliary states
-    if (acceleration) {
+      // Selected robot requests public states from others
       for (const auto &robot_id : robot_IDs) {
         DCORA::Agent *robot_ptr = agents.at(robot_id);
         if (robot_ptr->getID() == selected_robot_id)
           continue;
-        DCORA::PoseDict auxSharedPoses;
-        DCORA::UnitSphereDict auxSharedUnitSpheres;
-        DCORA::LandmarkDict auxSharedLandmarks;
-        if (!robot_ptr->getSharedStateDicts(
-                &auxSharedPoses, &auxSharedUnitSpheres, &auxSharedLandmarks))
+        DCORA::PoseDict sharedPoses;
+        DCORA::UnitSphereDict sharedUnitSpheres;
+        DCORA::LandmarkDict sharedLandmarks;
+        if (!robot_ptr->getSharedStateDicts(&sharedPoses, &sharedUnitSpheres,
+                                            &sharedLandmarks))
           continue;
         selected_robot_ptr->setNeighborStatus(robot_ptr->getStatus());
         selected_robot_ptr->updateNeighborStates(
-            robot_ptr->getID(), auxSharedPoses, acceleration,
-            auxSharedUnitSpheres, auxSharedLandmarks);
+            robot_ptr->getID(), sharedPoses, false, sharedUnitSpheres,
+            sharedLandmarks);
       }
-    }
 
-    // Selected robot performs an iteration
-    // TODO(AT): program seg faults at the commented-out line of code below
-    // selected_robot_ptr->iterate(true);
+      // When using acceleration, selected robot also requests auxiliary states
+      if (acceleration) {
+        for (const auto &robot_id : robot_IDs) {
+          DCORA::Agent *robot_ptr = agents.at(robot_id);
+          if (robot_ptr->getID() == selected_robot_id)
+            continue;
+          DCORA::PoseDict auxSharedPoses;
+          DCORA::UnitSphereDict auxSharedUnitSpheres;
+          DCORA::LandmarkDict auxSharedLandmarks;
+          if (!robot_ptr->getSharedStateDicts(
+                  &auxSharedPoses, &auxSharedUnitSpheres, &auxSharedLandmarks))
+            continue;
+          selected_robot_ptr->setNeighborStatus(robot_ptr->getStatus());
+          selected_robot_ptr->updateNeighborStates(
+              robot_ptr->getID(), auxSharedPoses, acceleration,
+              auxSharedUnitSpheres, auxSharedLandmarks);
+        }
+      }
+
+      // Selected robot performs an iteration
+      selected_robot_ptr->iterate(true);
+
+      // Check centralized ground truth vs agent iterate
+      checkAgentStateIsGroundTruth(selected_robot_id);
+
+      // Increment iteration number
+      iter++;
+    }
   }
 }
