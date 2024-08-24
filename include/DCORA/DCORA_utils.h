@@ -98,12 +98,15 @@ PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
  * @brief Helper function to get the local-to-global state indexes from a PyFG
- * dataset
+ * dataset. Optionally, the local states can be reindexed from zero (assuming
+ * state ids are contiguous).
  * @param pyfg_dataset
+ * @param reindex_local_states
  * @return
  */
 LocalToGlobalStateDicts
-getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset);
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset,
+                             bool reindex_local_states = false);
 
 /**
  * @brief Helper function to globally reindex a PyFG dataset's measurements

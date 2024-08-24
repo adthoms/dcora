@@ -421,13 +421,27 @@ int getDimFromPyfgFirstLine(const std::string &filename) {
 }
 
 PyFGDataset read_pyfg_file(const std::string &filename) {
-  /*
-  The following implementation is adapted from:
-  CORA: https://github.com/MarineRoboticsGroup/cora
-  */
+  // Initialize PyFG dataset
+  PyFGDataset pyfg_dataset;
+
+  // Get dimension of PyFG file
+  pyfg_dataset.dim = getDimFromPyfgFirstLine(filename);
+
+  // Initialize measurements, whose values we will fill in
+  PosePrior pose_prior;
+  LandmarkPrior landmark_prior;
+  RelativePosePoseMeasurement pose_pose_measurement;
+  RelativePoseLandmarkMeasurement pose_landmark_measurement;
+  RangeMeasurement range_measurement;
+
+  // Initialize map for indexing unit spheres according to robot ID
+  std::map<unsigned int, unsigned int> robot_id_to_unit_sphere_idx = {};
+
+  // Initialize map to maintain unique range edges
+  EdgeIDMap range_edge_id_to_index;
+  size_t range_edge_index = 0;
 
   // Define helper lambda functions
-
   auto readScalar = [](std::istringstream &strstrm) -> double {
     double result;
     if (strstrm >> result) {
@@ -610,25 +624,56 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
     return T;
   };
 
-  // Initialize PyFG dataset
-  PyFGDataset pyfg_dataset;
+  auto updateGroundTruthPoses = [&](const PoseID &pose_id,
+                                    const Pose &gt_pose) {
+    if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
+        pyfg_dataset.ground_truth.poses.end()) {
+      LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+    }
+    pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+  };
 
-  // Get dimension of PyFG file
-  pyfg_dataset.dim = getDimFromPyfgFirstLine(filename);
+  auto updateGroundTruthLandmarks = [&](const LandmarkID &landmark_id,
+                                        const Point &gt_landmark) {
+    if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
+        pyfg_dataset.ground_truth.landmarks.end()) {
+      LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
+    }
+    pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+  };
 
-  // Initialize measurements, whose values we will fill in
-  PosePrior pose_prior;
-  LandmarkPrior landmark_prior;
-  RelativePosePoseMeasurement pose_pose_measurement;
-  RelativePoseLandmarkMeasurement pose_landmark_measurement;
-  RangeMeasurement range_measurement;
+  auto updateFirstPoseIdx = [&](unsigned int robotID, const PoseID &pose_id) {
+    if (pyfg_dataset.robot_id_to_first_pose_idx.find(robotID) !=
+        pyfg_dataset.robot_id_to_first_pose_idx.end()) {
+      unsigned int prev_min_pose_idx =
+          pyfg_dataset.robot_id_to_first_pose_idx.at(robotID);
+      unsigned int min_pose_idx = std::min(prev_min_pose_idx, pose_id.frame_id);
+      pyfg_dataset.robot_id_to_first_pose_idx.at(robotID) = min_pose_idx;
+    } else {
+      pyfg_dataset.robot_id_to_first_pose_idx[robotID] = pose_id.frame_id;
+    }
+  };
 
-  // Initialize map for indexing unit spheres according to robot ID
-  std::map<unsigned int, unsigned int> robot_id_to_unit_sphere_idx = {};
+  auto updateFirstLandmarkIdx = [&](unsigned int robotID,
+                                    const LandmarkID &landmark_id) {
+    if (pyfg_dataset.robot_id_to_first_landmark_idx.find(robotID) !=
+        pyfg_dataset.robot_id_to_first_landmark_idx.end()) {
+      unsigned int prev_min_landmark_idx =
+          pyfg_dataset.robot_id_to_first_landmark_idx.at(robotID);
+      unsigned int min_landmark_idx =
+          std::min(prev_min_landmark_idx, landmark_id.frame_id);
+      pyfg_dataset.robot_id_to_first_landmark_idx.at(robotID) =
+          min_landmark_idx;
+    } else {
+      pyfg_dataset.robot_id_to_first_landmark_idx[robotID] =
+          landmark_id.frame_id;
+    }
+  };
 
-  // Initialize map to maintain unique range edges
-  EdgeIDMap range_edge_id_to_index;
-  size_t range_edge_index = 0;
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
 
   // A string used to contain the contents of a single line
   std::string line;
@@ -670,14 +715,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const PoseID pose_id = PoseID(robotID, stateID);
         const Matrix T = getTransformFromRotationAndTranslation(R, t);
         const Pose gt_pose = Pose(T);
-        if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
-            pyfg_dataset.ground_truth.poses.end()) {
-          LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
-        }
-        pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+        updateGroundTruthPoses(pose_id, gt_pose);
 
         // Increment number of poses for this robot
         pyfg_dataset.robot_id_to_num_poses[robotID]++;
+
+        // Set first pose idx
+        updateFirstPoseIdx(robotID, pose_id);
 
       } else {
         LOG(FATAL) << "Error: could not read pose variable from line: " << line
@@ -699,14 +743,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const PoseID pose_id = PoseID(robotID, stateID);
         const Matrix T = getTransformFromRotationAndTranslation(R, t);
         const Pose gt_pose = Pose(T);
-        if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
-            pyfg_dataset.ground_truth.poses.end()) {
-          LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
-        }
-        pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+        updateGroundTruthPoses(pose_id, gt_pose);
 
         // Increment number of poses for this robot
         pyfg_dataset.robot_id_to_num_poses[robotID]++;
+
+        // Set first pose idx
+        updateFirstPoseIdx(robotID, pose_id);
 
       } else {
         LOG(FATAL) << "Error: could not read pose variable from line: " << line
@@ -782,14 +825,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Populate ground truth
         const LandmarkID landmark_id = LandmarkID(robotID, stateID);
         const Point gt_landmark = Point(t);
-        if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
-            pyfg_dataset.ground_truth.landmarks.end()) {
-          LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
-        }
-        pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+        updateGroundTruthLandmarks(landmark_id, gt_landmark);
 
         // Increment number of landmarks for this robot
         pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
+
+        // Set first pose idx
+        updateFirstLandmarkIdx(robotID, landmark_id);
 
       } else {
         LOG(FATAL) << "Error: could not read landmark variable from line: "
@@ -809,14 +851,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Populate ground truth
         const LandmarkID landmark_id = LandmarkID(robotID, stateID);
         const Point gt_landmark = Point(t);
-        if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
-            pyfg_dataset.ground_truth.landmarks.end()) {
-          LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
-        }
-        pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+        updateGroundTruthLandmarks(landmark_id, gt_landmark);
 
         // Increment number of landmarks for this robot
         pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
+
+        // Set first pose idx
+        updateFirstLandmarkIdx(robotID, landmark_id);
 
       } else {
         LOG(FATAL) << "Error: could not read landmark variable from line: "
@@ -1112,7 +1153,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 }
 
 LocalToGlobalStateDicts
-getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset,
+                             bool reindex_local_states) {
   LocalToGlobalStateDicts local_to_global_state_dicts;
   const unsigned int global_robot_id = CENTRALIZED_AGENT_ID;
 
@@ -1125,18 +1167,31 @@ getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
   // Assign local to global state mapping
   unsigned int global_pose_idx = 0;
   for (const auto &[local_pose_id, pose] : gt_pose_dict) {
+    // Reindex
+    PoseID local_pose_id_reindexed = local_pose_id;
+    if (reindex_local_states) {
+      local_pose_id_reindexed.frame_id -=
+          pyfg_dataset.robot_id_to_first_pose_idx.at(local_pose_id.robot_id);
+    }
     // Populate map
     const PoseID global_pose_id(global_robot_id, global_pose_idx);
-    local_to_global_state_dicts.poses[local_pose_id] = global_pose_id;
+    local_to_global_state_dicts.poses[local_pose_id_reindexed] = global_pose_id;
 
     // Increment
     global_pose_idx++;
   }
   unsigned int global_landmark_idx = 0;
   for (const auto &[local_landmark_id, landmark] : gt_landmark_dict) {
+    // Reindex
+    LandmarkID local_landmark_id_reindexed = local_landmark_id;
+    if (reindex_local_states) {
+      local_landmark_id_reindexed.frame_id -=
+          pyfg_dataset.robot_id_to_first_landmark_idx.at(
+              local_landmark_id.robot_id);
+    }
     // Populate map
     const LandmarkID global_landmark_id(global_robot_id, global_landmark_idx);
-    local_to_global_state_dicts.landmarks[local_landmark_id] =
+    local_to_global_state_dicts.landmarks[local_landmark_id_reindexed] =
         global_landmark_id;
 
     // Increment

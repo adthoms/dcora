@@ -824,6 +824,10 @@ struct PyFGDataset {
   std::map<unsigned int, unsigned int> robot_id_to_num_landmarks;
   std::map<unsigned int, unsigned int> robot_id_to_num_unit_spheres;
 
+  // Ordered maps of robot id to first state idx
+  std::map<unsigned int, unsigned int> robot_id_to_first_pose_idx;
+  std::map<unsigned int, unsigned int> robot_id_to_first_landmark_idx;
+
   // Measurements
   Measurements measurements;
 
@@ -855,6 +859,18 @@ struct PyFGDataset {
     for (const auto &[robot_id, num_unit_spheres] :
          pyfg_dataset.robot_id_to_num_unit_spheres) {
       std::cout << "Robot ID: " << robot_id << ", Count: " << num_unit_spheres
+                << std::endl;
+    }
+    os << "First Pose Index: " << std::endl;
+    for (const auto &[robot_id, first_pose_idx] :
+         pyfg_dataset.robot_id_to_first_pose_idx) {
+      std::cout << "Robot ID: " << robot_id << ", Index: " << first_pose_idx
+                << std::endl;
+    }
+    os << "First Landmark Index: " << std::endl;
+    for (const auto &[robot_id, first_landmark_idx] :
+         pyfg_dataset.robot_id_to_first_landmark_idx) {
+      std::cout << "Robot ID: " << robot_id << ", Index: " << first_landmark_idx
                 << std::endl;
     }
     os << "Measurements:" << std::endl;

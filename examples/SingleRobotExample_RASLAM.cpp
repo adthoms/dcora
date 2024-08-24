@@ -21,12 +21,12 @@ int main(int argc, char **argv) {
    */
 
   if (argc < 2) {
-    std::cout << "Single robot RA-SLAM demo. " << std::endl;
-    std::cout << "Usage: " << argv[0] << " [input .pyfg file]" << std::endl;
+    LOG(INFO) << "Single robot RA-SLAM demo. ";
+    LOG(INFO) << "Usage: " << argv[0] << " [input .pyfg file]";
     exit(1);
   }
 
-  std::cout << "Single robot RA-SLAM demo. " << std::endl;
+  LOG(INFO) << "Single robot RA-SLAM demo. ";
 
   // Load PyFG dataset and get centralized measurements
   const DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(argv[1]);
@@ -36,6 +36,10 @@ int main(int argc, char **argv) {
       global_measurements.relative_measurements;
   const DCORA::RangeAidedArray &ground_truth_init =
       *global_measurements.ground_truth_init;
+  const DCORA::RobotMeasurements robot_measurements =
+      DCORA::getRobotMeasurements(dataset);
+  const DCORA::LocalToGlobalStateDicts local_to_global_state_dicts =
+      DCORA::getLocalToGlobalStateMapping(dataset, true);
 
   /**
    * @brief Settings
@@ -65,6 +69,10 @@ int main(int argc, char **argv) {
                              "dcora_examples/single_robot_example_ra_slam/";
   DCORA::Logger logger(logDirectory);
 
+  // Initialization method
+  DCORA::InitializationMethod init_method =
+      DCORA::InitializationMethod::Odometry;
+
   // Hyperparameters
   double min_eig_num_tol = 1e-4;
   double gradient_tolerance = 1e-4;
@@ -77,16 +85,93 @@ int main(int argc, char **argv) {
 
   // Initialize current state estimate
   DCORA::Matrix Xcurr = DCORA::Matrix::Zero(r_max, (d + 1) * n + l + b);
+  switch (init_method) {
+  case DCORA::InitializationMethod::Odometry: {
+    DCORA::RangeAidedArray XOdomInit(d, n, l, b);
 
-  // TODO(Alex): Add other initialization methods
-  Xcurr.topRows(d) = ground_truth_init.getData();
+    // Calculate odometry for each agent
+    for (unsigned int robot_id : dataset.robot_IDs) {
+      if (robot_id == DCORA::MAP_ID)
+        continue;
 
-  // Log ground truth trajectory
+      // Get relative measurements and ground truth
+      const DCORA::RelativeMeasurements &robot_relative_measurements =
+          robot_measurements.at(robot_id).relative_measurements;
+      const DCORA::RangeAidedArray &robot_ground_truth =
+          *robot_measurements.at(robot_id).ground_truth_init;
+
+      // Get odometry measurements
+      std::vector<DCORA::RelativePosePoseMeasurement> odometryAgent;
+      for (const auto &mVariant : robot_relative_measurements.vec) {
+        if (!std::holds_alternative<DCORA::RelativePosePoseMeasurement>(
+                mVariant))
+          continue;
+        const DCORA::RelativePosePoseMeasurement &m =
+            std::get<DCORA::RelativePosePoseMeasurement>(mVariant);
+        if (m.p1 + 1 != m.p2)
+          continue;
+
+        odometryAgent.push_back(m);
+      }
+
+      // Calculate odometry
+      const DCORA::PoseArray XAGentOdom =
+          DCORA::odometryInitialization(odometryAgent);
+
+      // Align odometry with ground truth of agent's first pose
+      const DCORA::StateID firstAgentGlobalStateID =
+          local_to_global_state_dicts.poses.at(DCORA::PoseID(robot_id, 0));
+      const unsigned int firstAgentGlobalStateIdx =
+          firstAgentGlobalStateID.frame_id;
+      const DCORA::Pose Tw0(ground_truth_init.pose(firstAgentGlobalStateIdx));
+      DCORA::PoseArray XAGentOdomAligned =
+          alignTrajectoryToFrame(XAGentOdom, Tw0.inverse());
+
+      // Set poses for odometry initialization
+      unsigned int n = dataset.robot_id_to_num_poses.at(robot_id);
+      for (unsigned int i = 0; i < n; ++i) {
+        XOdomInit.pose(firstAgentGlobalStateIdx + i) =
+            XAGentOdomAligned.pose(i);
+      }
+    }
+
+    // Set ground truth unit spheres
+    DCORA::PointArray XUnitSpheres(d, l);
+    XUnitSpheres.setData(
+        ground_truth_init.GetLiftedUnitSphereArray()->getData());
+    XOdomInit.setLiftedUnitSphereArray(XUnitSpheres);
+
+    // Set random landmarks
+    DCORA::PointArray XLandmarks(d, b);
+    XLandmarks.setData(DCORA::Matrix::Random(d, b));
+    XOdomInit.setLiftedLandmarkArray(XLandmarks);
+
+    // Set initial state estimate
+    Xcurr.topRows(d) = XOdomInit.getData();
+    break;
+  }
+  default:
+    // TODO(AT): Add ground truth initialization type
+    Xcurr.topRows(d) = ground_truth_init.getData();
+  }
+
+  // Log ground truth trajectory for each agent
   if (logData) {
-    DCORA::Matrix TGroundTruth =
-        ground_truth_init.GetLiftedPoseArray()->getData();
-    LOG(INFO) << "Outputting ground truth centralized trajectory.";
-    logger.logTrajectory(d, n, TGroundTruth, "dcora_gt.txt");
+    LOG(INFO) << "Outputting ground truth trajectory for each agent.";
+    for (unsigned int robot_id : dataset.robot_IDs) {
+      if (robot_id == DCORA::MAP_ID)
+        continue;
+      unsigned int n = dataset.robot_id_to_num_poses.at(robot_id);
+      const DCORA::RangeAidedArray &robot_ground_truth =
+          *robot_measurements.at(robot_id).ground_truth_init;
+      DCORA::Matrix AgentTrajectoryGroundTruth =
+          robot_ground_truth.GetLiftedPoseArray()->getData();
+
+      const std::string filename =
+          "cora_" + std::string(1, DCORA::FIRST_AGENT_SYMBOL + robot_id) +
+          "_gt.txt";
+      logger.logTrajectory(d, n, AgentTrajectoryGroundTruth, filename);
+    }
   }
 
   for (unsigned int r = r_min; r < r_max; ++r) {
@@ -142,25 +227,33 @@ int main(int argc, char **argv) {
       const DCORA::Matrix Xrefine = optimizer.optimize(Xproject);
 
       if (logData) {
-        LOG(INFO) << "Outputting rounded centralized trajectory.";
+        LOG(INFO)
+            << "Outputting rounded centralized trajectory for each agent.";
 
         // Set refined solution for trajectory output
         DCORA::RangeAidedArray X(d, n, l, b);
         X.setData(Xrefine);
 
-        // Set global anchor to first lifted pose
-        const DCORA::LiftedPoseArray &Xposes = *X.GetLiftedPoseArray();
-        const DCORA::LiftedPose Xa = DCORA::LiftedPose(Xposes.pose(0));
+        // Log rounded trajectories for each agent
+        for (unsigned int robot_id : dataset.robot_IDs) {
+          if (robot_id == DCORA::MAP_ID)
+            continue;
 
-        // Get rounded trajectory
-        DCORA::PoseArray T(d, n);
-        T.setData(Xa.rotation().transpose() * Xposes.getData());
-        const DCORA::Vector t0 = Xa.rotation().transpose() * Xa.translation();
-        for (unsigned int i = 0; i < n; ++i)
-          T.translation(i) = T.translation(i) - t0;
+          unsigned int n = dataset.robot_id_to_num_poses.at(robot_id);
+          DCORA::PoseArray XAgentTrajectory(d, n);
 
-        // Log rounded trajectory
-        logger.logTrajectory(d, n, T.getData(), "dcora_0.txt");
+          for (const auto &[local_pose_id, global_pose_id] :
+               local_to_global_state_dicts.poses) {
+            if (robot_id != local_pose_id.robot_id)
+              continue;
+            XAgentTrajectory.pose(local_pose_id.frame_id) =
+                X.pose(global_pose_id.frame_id);
+          }
+          const std::string filename =
+              "cora_" + std::string(1, DCORA::FIRST_AGENT_SYMBOL + robot_id) +
+              ".txt";
+          logger.logTrajectory(d, n, XAgentTrajectory.getData(), filename);
+        }
       }
 
       break;
