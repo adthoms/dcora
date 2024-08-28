@@ -380,7 +380,7 @@ public:
    * @return
    */
   inline unsigned problem_dimension() const {
-    return isAgentMap() ? (d + 1) + mGraph->b() : mGraph->k();
+    return isAgentMap() ? (d + 1) : mGraph->k();
   }
 
   /**

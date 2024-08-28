@@ -274,7 +274,7 @@ void Agent::initialize(const PoseArray *TrajectoryInitPtr,
     CHECK_EQ(mGraph->n(), 0) << "Error: Map cannot contain poses!";
     CHECK_EQ(num_unit_spheres(), 0)
         << "Error: Map cannot contain unit spheres!";
-    CHECK_GT(num_landmarks(), 0) << "Error: Map must contain landmarks!";
+    CHECK_EQ(num_landmarks(), 0) << "Error: Map cannot contain landmarks!";
   }
 
   // Check validity of initial estimates with respect to graph compatibility
@@ -447,9 +447,9 @@ void Agent::initialize(const PoseArray *TrajectoryInitPtr,
   // Waiting for initialization in the GLOBAL frame
   mState = AgentState::WAIT_FOR_INITIALIZATION;
 
-  // If this robot has ID zero or if cross-robot initialization is off
-  // We can initialize iterate in the global frame
-  if (mID == 0 || !mParams.multirobotInitialization)
+  // If this robot has ID zero, is the map in RA-SLAM, or if cross-robot
+  // initialization is off We can initialize iterate in the global frame
+  if (mID == 0 || isAgentMap() || !mParams.multirobotInitialization)
     initializeInGlobalFrame(Pose(d));
 
   // Start optimization thread in asynchronous mode
@@ -866,19 +866,14 @@ void Agent::updateNeighborStates(unsigned neighborID, const PoseDict &poseDict,
   if (mState != AgentState::INITIALIZED)
     return;
 
-  // Lambda function for validating dictionary entries
-  auto validateDictionaryEntry = [&](const auto &nID, const auto &var) {
-    CHECK_EQ(nID.robot_id, neighborID);
-    CHECK_EQ(var.r(), r);
-    CHECK_EQ(var.d(), d);
-  };
-
   // Save neighbor public states in local cache
   std::lock_guard<std::mutex> lock(mNeighborStatesMutex);
   for (const auto &it : poseDict) {
     const PoseID &nID = it.first;
     const LiftedPose &var = it.second;
-    validateDictionaryEntry(nID, var);
+    CHECK_EQ(nID.robot_id, neighborID);
+    CHECK_EQ(var.r(), r);
+    CHECK_EQ(var.d(), d);
     if (!mGraph->requireNeighborPose(nID))
       continue;
     if (areNeighborStatesAux)
@@ -889,7 +884,8 @@ void Agent::updateNeighborStates(unsigned neighborID, const PoseDict &poseDict,
   for (const auto &it : unitSphereDict) {
     const UnitSphereID &nID = it.first;
     const LiftedPoint &var = it.second;
-    validateDictionaryEntry(nID, var);
+    CHECK_EQ(nID.robot_id, neighborID);
+    CHECK_EQ(var.r(), r);
     if (!mGraph->requireNeighborUnitSphere(nID))
       continue;
     if (areNeighborStatesAux)
@@ -900,7 +896,8 @@ void Agent::updateNeighborStates(unsigned neighborID, const PoseDict &poseDict,
   for (const auto &it : landmarkDict) {
     const LandmarkID &nID = it.first;
     const LiftedPoint &var = it.second;
-    validateDictionaryEntry(nID, var);
+    CHECK_EQ(nID.robot_id, neighborID);
+    CHECK_EQ(var.r(), r);
     if (!mGraph->requireNeighborLandmark(nID))
       continue;
     if (areNeighborStatesAux)

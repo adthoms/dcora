@@ -242,83 +242,49 @@ TEST(testDCORA, testAgentInitializeIterateOptimizeRA) {
 }
 
 TEST(testDCORA, testAgentMapRA) {
-  for (const std::string &fileName : pyfg_datasets) {
-    // Read dataset
-    const std::string fullFileName = getFullFileDataPath(fileName);
-    const DCORA::PyFGDataset dataset = DCORA::read_pyfg_file(fullFileName);
+  // Set map id and dimensions
+  unsigned int id = DCORA::MAP_ID;
+  unsigned int d = 3;
+  unsigned int r = d;
 
-    // Parse dataset
-    const DCORA::RobotMeasurements robot_measurements =
-        DCORA::getRobotMeasurements(dataset);
-    const DCORA::Measurements map_measurements =
-        robot_measurements.at(DCORA::MAP_ID);
-    unsigned int id = DCORA::MAP_ID;
-    unsigned int d = dataset.dim;
-    unsigned int r = d;
-    unsigned int n = map_measurements.ground_truth_init->n();
-    unsigned int l = map_measurements.ground_truth_init->l();
-    unsigned int b = map_measurements.ground_truth_init->b();
-    ASSERT_EQ(n, 0);
-    ASSERT_EQ(l, 0);
-    ASSERT_GT(b, 0);
-    DCORA::RangeAidedArray XMapGroundTruth(d, 1, 0, b);
-    for (unsigned int i = 0; i < b; ++i) {
-      XMapGroundTruth.landmark(i) =
-          map_measurements.ground_truth_init->landmark(i);
-    }
+  // Construct, lift, and initialize
+  DCORA::AgentParameters options(d, r, {id},
+                                 DCORA::GraphType::RangeAidedSLAMGraph);
+  DCORA::Agent agent(id, options);
+  DCORA::Matrix liftedMatrix = DCORA::fixedStiefelVariable(r, d);
+  agent.setLiftingMatrix(liftedMatrix);
+  agent.initialize();
+  ASSERT_EQ(agent.getID(), id);
+  ASSERT_EQ(agent.relaxation_rank(), r);
+  ASSERT_EQ(agent.dimension(), d);
+  ASSERT_EQ(agent.num_poses(), 1);
+  ASSERT_EQ(agent.num_unit_spheres(), 0);
+  ASSERT_EQ(agent.num_landmarks(), 0);
 
-    // Construct and initialize
-    DCORA::AgentParameters options(d, r, {id},
-                                   DCORA::GraphType::RangeAidedSLAMGraph);
-    DCORA::Agent agent(id, options);
-    agent.setMeasurements(map_measurements.relative_measurements);
-    agent.initialize();
-    ASSERT_EQ(agent.getID(), id);
-    ASSERT_EQ(agent.relaxation_rank(), r);
-    ASSERT_EQ(agent.dimension(), d);
-    ASSERT_EQ(agent.num_poses(), n + 1); // account for dummy pose
-    ASSERT_EQ(agent.num_unit_spheres(), l);
-    ASSERT_EQ(agent.num_landmarks(), b);
+  // Check that the fixed global coordinate frame set by map is rotated by the
+  // lifting matrix
+  DCORA::Matrix XMap;
+  ASSERT_TRUE(agent.getX(&XMap));
+  ASSERT_TRUE(XMap.topLeftCorner(r, d).isApprox(liftedMatrix));
+  ASSERT_TRUE(XMap.topRightCorner(r, 1).isApprox(DCORA::Matrix::Zero(r, 1)));
 
-    // Set current iterate to ground truth
-    agent.setX(XMapGroundTruth.getData());
+  // Given that the map agent is passive, calling the iterate method will
+  // simply advance the iteration number (and the robust optimization inner
+  // iteration number, which for RA-SLAM has no meaning) and return true
+  ASSERT_TRUE(agent.iterate());
 
-    // Check initialization (local and global frames align)
-    DCORA::Matrix TrajectoryEstimated;
-    DCORA::Matrix UnitSphereEstimated;
-    DCORA::Matrix LandmarksEstimated;
-    agent.getStatesInLocalFrame(&TrajectoryEstimated, &UnitSphereEstimated,
-                                &LandmarksEstimated);
-    ASSERT_TRUE(
-        XMapGroundTruth.getPoseArray().getData().isApprox(TrajectoryEstimated));
-    ASSERT_TRUE(XMapGroundTruth.getUnitSphereArray().getData().isApprox(
-        UnitSphereEstimated));
-    ASSERT_TRUE(XMapGroundTruth.getLandmarkArray().getData().isApprox(
-        LandmarksEstimated));
+  // Check shared states (the map does not require awareness of other agents)
+  DCORA::PoseDict sharedPoseDict;
+  DCORA::UnitSphereDict sharedUnitSphereDict;
+  DCORA::LandmarkDict sharedLandmarkDict;
+  agent.getSharedStateDicts(&sharedPoseDict, &sharedUnitSphereDict,
+                            &sharedLandmarkDict);
+  ASSERT_TRUE(sharedPoseDict.empty());
+  ASSERT_TRUE(sharedUnitSphereDict.empty());
+  ASSERT_TRUE(sharedLandmarkDict.empty());
 
-    // Given that the map agent is passive, calling the iterate method will
-    // simply advance the iteration number (and the robust optimization inner
-    // iteration number, which for RA-SLAM has no meaning) and return true
-    ASSERT_TRUE(agent.iterate());
-
-    // Check shared states
-    DCORA::PoseDict sharedPoseDict;
-    DCORA::UnitSphereDict sharedUnitSphereDict;
-    DCORA::LandmarkDict sharedLandmarkDict;
-    agent.getSharedStateDicts(&sharedPoseDict, &sharedUnitSphereDict,
-                              &sharedLandmarkDict);
-    ASSERT_TRUE(sharedPoseDict.empty());
-    ASSERT_TRUE(sharedUnitSphereDict.empty());
-    ASSERT_TRUE(!sharedLandmarkDict.empty());
-    // All landmarks are owned by the map
-    for (const auto &[landmark_id, landmark] : sharedLandmarkDict) {
-      ASSERT_TRUE(XMapGroundTruth.landmark(landmark_id.frame_id)
-                      .isApprox(landmark.translation()));
-    }
-
-    // Reset
-    agent.reset();
-  }
+  // Reset
+  agent.reset();
 }
 
 TEST(testDCORA, testAgentMultiAgentRA) {
@@ -336,7 +302,7 @@ TEST(testDCORA, testAgentMultiAgentRA) {
     const DCORA::RangeAidedArray XCentralizedGroundTruth =
         *global_measurements.ground_truth_init;
     const DCORA::LocalToGlobalStateDicts local_to_global_state_dicts =
-        DCORA::getLocalToGlobalStateMapping(dataset);
+        DCORA::getLocalToGlobalStateMapping(dataset, true);
     unsigned int d = dataset.dim;
     unsigned int r = d;
     unsigned int n = XCentralizedGroundTruth.n();
@@ -363,22 +329,18 @@ TEST(testDCORA, testAgentMultiAgentRA) {
         agents.at(first_agent_id)->getLiftingMatrix(&M);
         agent->setLiftingMatrix(M);
       }
-      agent->setMeasurements(agent_measurements.relative_measurements);
+      if (robot_id != DCORA::MAP_ID) {
+        agent->setMeasurements(agent_measurements.relative_measurements);
+      }
       agent->initialize();
 
       // Set current iterate to ground truth
-      if (robot_id != DCORA::MAP_ID) {
-        agent->setX(agent_measurements.ground_truth_init->getData());
-      } else {
-        unsigned int b = agent_measurements.ground_truth_init->b();
-        DCORA::RangeAidedArray XMapGroundTruth(d, 1, 0, b);
-        for (unsigned int i = 0; i < b; ++i) {
-          XMapGroundTruth.landmark(i) =
-              agent_measurements.ground_truth_init->landmark(i);
-        }
-        agent->setX(XMapGroundTruth.getData());
-      }
-      agents[robot_id] = std::move(agent);
+      if (robot_id == DCORA::MAP_ID)
+        continue;
+      agent->setX(agent_measurements.ground_truth_init->getData());
+
+      // Push agent to map
+      agents[robot_id] = agent;
     }
 
     // Lambda function to check that agent state is within tolerance of the
