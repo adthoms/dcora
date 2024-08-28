@@ -1932,12 +1932,13 @@ double Graph::computePreconditionerRegularization(const SparseMatrix &P) {
   SpectraSymMatProd op(P);
   Spectra::SymEigsSolver<SpectraSymMatProd> eigsolver(op, 1, 6);
   eigsolver.init();
-  eigsolver.compute(Spectra::SortRule::LargestAlge);
+  eigsolver.compute(Spectra::SortRule::LargestAlge, 10000, 1e-3);
 
   // Return default regularization term if computation unsuccessful
   if (eigsolver.info() != Spectra::CompInfo::Successful) {
-    LOG(WARNING) << "Could not compute the largest eigenvalue of P. Using "
-                    "a default preconditioner regularization term of : "
+    LOG(WARNING) << "Could not compute the largest eigenvalue of P for agent "
+                 << id_
+                 << ". Using a default preconditioner regularization term of : "
                  << reg;
     return reg;
   }
@@ -1959,9 +1960,8 @@ double Graph::computePreconditionerRegularization(const SparseMatrix &P) {
   double max_eigenvalue = eigsolver.eigenvalues()[0];
   reg = max_eigenvalue / (target_precondition_number - 1);
   LOG(INFO) << "Largest eigenvalue " << max_eigenvalue
-            << " of P computed successfully. Setting "
-               "preconditioner regularization term to: "
-            << reg;
+            << " of P computed successfully for agent " << id_
+            << ". Setting preconditioner regularization term to: " << reg;
   return reg;
 }
 
