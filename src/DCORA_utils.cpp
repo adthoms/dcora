@@ -59,6 +59,18 @@ std::string InitializationMethodToString(InitializationMethod method) {
   return "";
 }
 
+std::string BlockSelectionRuleToString(BlockSelectionRule rule) {
+  switch (rule) {
+  case BlockSelectionRule::Uniform: {
+    return "Uniform";
+  }
+  case BlockSelectionRule::Greedy: {
+    return "Greedy";
+  }
+  }
+  return "";
+}
+
 std::string GraphTypeToString(const GraphType &type) {
   switch (type) {
   case GraphType::PoseGraph: {

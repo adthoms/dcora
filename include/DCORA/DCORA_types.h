@@ -49,6 +49,11 @@ constexpr unsigned int MAP_ID =
 enum class InitializationMethod { Odometry, Chordal, GNC_TLS, Random };
 
 /**
+ * @brief Block selection rules for RBCD
+ */
+enum class BlockSelectionRule { Uniform, Greedy };
+
+/**
  * @brief Graph types
  */
 enum class GraphType { PoseGraph, RangeAidedSLAMGraph };
@@ -112,6 +117,13 @@ const std::map<std::string, PyFGType> PyFGStringToType{
  * @return
  */
 std::string InitializationMethodToString(InitializationMethod method);
+
+/**
+ * @brief Convert block selection rule to string
+ * @param rule
+ * @return
+ */
+std::string BlockSelectionRuleToString(BlockSelectionRule rule);
 
 /**
  * @brief Convert graph type to string

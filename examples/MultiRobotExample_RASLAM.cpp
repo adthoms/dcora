@@ -84,6 +84,12 @@ int main(int argc, char **argv) {
   // Initialization method
   DCORA::InitializationMethod init_method =
       DCORA::InitializationMethod::Odometry;
+  DCORA::BlockSelectionRule block_selection_rule =
+      DCORA::BlockSelectionRule::Greedy;
+  std::random_device dev;
+  std::mt19937 rng(dev());
+  std::uniform_int_distribution<std::mt19937::result_type> uniform_sampling(
+      0, robot_IDs.size() - 1);
 
   // Hyperparameters
   double min_eig_num_tol = 1e-3;
@@ -278,8 +284,10 @@ int main(int argc, char **argv) {
     DCORA::LiftedRangeAidedArray XOptArray(r, d, n, l, b);
     DCORA::Matrix XOpt;
     unsigned int selected_robot_id = *robot_IDs.begin();
-    LOG(INFO) << "RBCD/RBCD++: Running a maximum of " << num_iters
-              << " iterations...";
+    LOG(INFO) << "RBCD/RBCD++";
+    LOG(INFO) << "Maximum number of iterations: " << num_iters;
+    LOG(INFO) << "Block selection rule: "
+              << DCORA::BlockSelectionRuleToString(block_selection_rule);
     LOG(INFO) << "# iter robot cost gradnorm";
     for (unsigned iter = 0; iter < num_iters; ++iter) {
       DCORA::Agent *selected_robot_ptr = agents.at(selected_robot_id);
@@ -420,16 +428,25 @@ int main(int argc, char **argv) {
           gradNorms[robot_id] = XAgentGradArray.getData().norm();
         }
 
-        auto it = std::max_element(
-            gradNorms.begin(), gradNorms.end(),
-            [](const std::pair<unsigned int, unsigned int> &a,
-               const std::pair<unsigned int, unsigned int> &b) {
-              return a.second < b.second;
-            });
-        if (it == gradNorms.end())
-          LOG(FATAL)
-              << "Error: Failed to find agent with maximum gradient norm!";
-        selected_robot_id = it->first;
+        switch (block_selection_rule) {
+        case DCORA::BlockSelectionRule::Greedy: {
+          auto it = std::max_element(
+              gradNorms.begin(), gradNorms.end(),
+              [](const std::pair<unsigned int, unsigned int> &a,
+                 const std::pair<unsigned int, unsigned int> &b) {
+                return a.second < b.second;
+              });
+          if (it == gradNorms.end())
+            LOG(FATAL)
+                << "Error: Failed to find agent with maximum gradient norm!";
+          selected_robot_id = it->first;
+        }
+        case DCORA::BlockSelectionRule::Uniform: {
+          auto it = gradNorms.begin();
+          std::advance(it, uniform_sampling(rng));
+          selected_robot_id = it->first;
+        }
+        }
       }
       totalIter++;
     }
