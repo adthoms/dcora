@@ -85,6 +85,7 @@ int main(int argc, char **argv) {
 
   // Initialize current state estimate
   DCORA::Matrix Xcurr = DCORA::Matrix::Zero(r_max, (d + 1) * n + l + b);
+  DCORA::Matrix Xlift = DCORA::fixedStiefelVariable(r_min, d);
   switch (init_method) {
   case DCORA::InitializationMethod::Odometry: {
     DCORA::RangeAidedArray XOdomInit(d, n, l, b);
@@ -147,12 +148,17 @@ int main(int argc, char **argv) {
     XOdomInit.setLiftedLandmarkArray(XLandmarks);
 
     // Set initial state estimate
-    Xcurr.topRows(d) = XOdomInit.getData();
+    Xcurr.topRows(r_min) = Xlift * XOdomInit.getData();
+    break;
+  }
+  case DCORA::InitializationMethod::Random: {
+    DCORA::Matrix M = DCORA::Matrix::Random(d, (d + 1) * n + l + b);
+    Xcurr.topRows(r_min) = Xlift * DCORA::projectToRAMatrix(M, d, d, n, l, b);
     break;
   }
   default:
     // TODO(AT): Add ground truth initialization type
-    Xcurr.topRows(d) = ground_truth_init.getData();
+    Xcurr.topRows(r_min) = Xlift * ground_truth_init.getData();
   }
 
   // Log ground truth trajectory for each agent
