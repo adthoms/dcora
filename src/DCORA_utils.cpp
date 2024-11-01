@@ -1710,8 +1710,8 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
   return R;
 }
 
-bool fastVerification(const SparseMatrix &S, double eta, double shift,
-                      double *theta, Vector *x) {
+bool fastVerification(const SparseMatrix &S, double eta, double *theta,
+                      Vector *x) {
   // Regularize dual certificate matrix
   unsigned int k = S.rows();
   const SparseMatrix I = Matrix::Identity(k, k).sparseView();
@@ -1721,8 +1721,9 @@ bool fastVerification(const SparseMatrix &S, double eta, double shift,
   bool isPSD = isSparseSymmetricMatrixPSD(M);
   if (!isPSD) {
     // Compute the minimum eigen pair
+    unsigned int max_iterations = 1000;
     auto [min_eigenvalue, min_eigenvector] =
-        computeMinimumEigenPair(M, shift, eta);
+        computeMinimumEigenPair(M, max_iterations, eta);
 
     // Calculate curvature along estimated minimum eigenvector
     *theta = min_eigenvector.dot(S * min_eigenvector);

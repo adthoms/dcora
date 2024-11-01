@@ -211,18 +211,18 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
  * value indicating whether the regularized matrix M := S + eta * I is
  * positive-semidefinite. In the event that M is *not* PSD, this function
  * additionally computes a direction of negative curvature x of S, and its
- * associated Rayleight quotient theta := x'Sx < 0 using a shift-and-invert mode
- * eigen solver. See the original implementation in SE-Sync for details, noting
- * that the shift-and-invert mode eigen solver is unique to DCORA.
+ * associated Rayleight quotient theta := x'Sx < 0 using a spectrum shifting
+ * eigen Solver. See the original implementation in SE-Sync for details, noting
+ * that a shift-and-invert mode eigen solver is used *if* the spectrum shifting
+ * method fails.
  * @param S
  * @param eta
- * @param shift
  * @param theta
  * @param x
  * @return
  */
-bool fastVerification(const SparseMatrix &S, double eta, double shift,
-                      double *theta, Vector *x);
+bool fastVerification(const SparseMatrix &S, double eta, double *theta,
+                      Vector *x);
 
 /**
  * @brief Helper function to determine if a sparse symmetric matrix S is

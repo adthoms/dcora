@@ -77,7 +77,6 @@ int main(int argc, char **argv) {
   double min_eig_num_tol = 1e-4;
   double gradient_tolerance = 1e-4;
   double preconditioned_gradient_tolerance = 1e-4;
-  double shift = -2;
 
   /**
    * @brief CORA Algorithm
@@ -208,8 +207,8 @@ int main(int argc, char **argv) {
     // Check if dual certificate matrix is PSD
     double theta;
     DCORA::Vector min_eigenvector;
-    bool global_opt = DCORA::fastVerification(S, min_eig_num_tol, shift, &theta,
-                                              &min_eigenvector);
+    bool global_opt =
+        DCORA::fastVerification(S, min_eig_num_tol, &theta, &min_eigenvector);
 
     // Check eigenvalue convergence
     if (!global_opt && theta >= -min_eig_num_tol / 2)
