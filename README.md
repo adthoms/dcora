@@ -23,7 +23,7 @@ The built executables are located in directory build/bin. For a minimal demo of 
 ```
 For a minimal demo of CORA on one of the benchmark pyfg datasets, inside the build directory run:
 ```bash
-./bin/SingleRobotExample_RASLAM ../data/tiers.pyfg
+./bin/single-robot-example-ra-slam ../data/tiers.pyfg
 ```
 
 ## Contributing
