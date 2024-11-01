@@ -439,11 +439,13 @@ int main(int argc, char **argv) {
             LOG(FATAL)
                 << "Error: Failed to find agent with maximum gradient norm!";
           selected_robot_id = it->first;
+          break;
         }
         case DCORA::BlockSelectionRule::Uniform: {
           auto it = gradNorms.begin();
           std::advance(it, uniform_sampling(rng));
           selected_robot_id = it->first;
+          break;
         }
         }
       }

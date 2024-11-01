@@ -198,6 +198,8 @@ int main(int argc, char **argv) {
     DCORA::Matrix Xopt = optimizer.optimize(Xcurr.topRows(r));
     LOG(INFO) << "Objective value at rank " << r << ": "
               << problemCentralCurrRank.f(Xopt);
+    LOG(INFO) << "Gradient norm at rank " << r << ": "
+              << problemCentralCurrRank.RieGrad(Xopt).norm();
 
     // Construct corresponding dual certificate matrix
     const DCORA::SparseMatrix &Q = graphCurrRank->quadraticMatrix();
