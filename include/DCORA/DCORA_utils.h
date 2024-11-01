@@ -248,6 +248,22 @@ std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
                                                   double sigma, double eta);
 
 /**
+ * @brief Helper function to calculate the minimum eigen pair {λ, v} of a
+ * sparse symmetric matrix S using the methods outlined in III-C of
+ * "Computational Enhancements for Certifiably Correct SLAM" by David M. Rosen
+ * and Luca Carlone. For details, see the original implementation in SE-Sync
+ * v1.0.0.
+ * @param S
+ * @param max_iterations
+ * @param min_eig_num_tol
+ * @param num_Lanczos_vectors
+ * @return
+ */
+std::pair<double, Vector> computeMinimumEigenPair(
+    const SparseMatrix &S, unsigned int max_iterations = 10000,
+    double min_eig_num_tol = 1e-6, unsigned int num_Lanczos_vectors = 20);
+
+/**
  * @brief Helper function to construct the dual certificate matrix S(X) for PGO.
  * @param X
  * @param Q

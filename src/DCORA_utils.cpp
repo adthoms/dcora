@@ -15,8 +15,10 @@
 #include <Eigen/CholmodSupport>
 #include <Eigen/Geometry>
 #include <Eigen/SPQRSupport>
+#include <Spectra/MatOp/SparseSymMatProd.h>
 #include <Spectra/MatOp/SparseSymShiftSolve.h>
 #include <Spectra/SymEigsShiftSolver.h>
+#include <Spectra/SymEigsSolver.h>
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -1748,18 +1750,24 @@ using SpectraSparseSymShiftSolve =
 std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
                                                   double sigma, double eta) {
   CHECK_LE(sigma, 0.0)
-      << "Error: The minimum eigen pair should only be computed for matrices "
-         "for which a sparse Cholesky factorization was unsuccessful, thus "
-         "implying the minimum eigenvalue is less than zero";
+      << "[Shift-and-Invert Mode Eigen-Solver] Error: The minimum eigen pair "
+         "should only be computed for matrices for which a sparse Cholesky "
+         "factorization was unsuccessful, thus implying the minimum eigenvalue "
+         "is less than zero";
   CHECK(S.isApprox(S.transpose()));
+
+  // Set convergence speed of the algorithm
+  unsigned int k = S.rows();
+  unsigned int num_Lanczos_vectors = 20;
+  unsigned int solver_convergence_speed = std::min(num_Lanczos_vectors, k);
 
   int max_iter = 10;
   double min_eigenvalue;
   Vector min_eigenvector;
   for (int i = 0; i < max_iter; i++) {
     SpectraSparseSymShiftSolve op(S);
-    Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(op, 1, 6,
-                                                                      sigma);
+    Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(
+        op, 1, solver_convergence_speed, sigma);
 
     eigsolver.init();
     eigsolver.compute(Spectra::SortRule::LargestMagn);
@@ -1768,26 +1776,121 @@ std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
       min_eigenvector = eigsolver.eigenvectors().col(0);
       break;
     } else {
-      LOG(WARNING) << "Warning: Could not compute minimum eigen pair with "
-                      "shift sigma = "
-                   << sigma << ". Halving shift and repeating computation.";
+      LOG(WARNING)
+          << "[Shift-and-Invert Mode Eigen-Solver] Warning: Could not "
+             "compute minimum eigen pair with shift: "
+          << sigma
+          << ". As a heuristic, we halve the shift and repeat the computation.";
       sigma /= 2;
     }
 
-    if (i == max_iter - 1) {
+    if (i == max_iter - 1 || sigma < -2 * eta) {
       double min_eigenvalue_within_tol = -2 * eta;
-      LOG(WARNING)
-          << "Warning: Minimum eigen pair computation was unsuccessful. "
-             "Solving minium eigen pair using two times eta = "
-          << min_eigenvalue_within_tol;
+      LOG(WARNING) << "[Shift-and-Invert Mode Eigen-Solver] Warning: Minimum "
+                      "eigen pair computation was unsuccessful. "
+                      "Solving minium eigen pair using two times eta: "
+                   << min_eigenvalue_within_tol;
       sigma = min_eigenvalue_within_tol;
     }
   }
 
   CHECK_LE(min_eigenvalue, 0.0)
-      << "Error: Calculated minimum eigenvalue is not less than zero. Try "
-         "adjusting the numerical tolerance for minimum eigenvalue "
-         "nonnegativity.";
+      << "[Shift-and-Invert Mode Eigen-Solver] Error: Calculated minimum "
+         "eigenvalue is not less than zero. Try adjusting the numerical "
+         "tolerance for minimum eigenvalue nonnegativity.";
+  LOG(INFO) << "[Shift-and-Invert Mode Eigen-Solver] min eigenvalue: "
+            << min_eigenvalue;
+  return {min_eigenvalue, min_eigenvector};
+}
+
+using SpectraSymMatProd =
+    Spectra::SparseSymMatProd<double, Eigen::Lower, Eigen::RowMajor>;
+std::pair<double, Vector>
+computeMinimumEigenPair(const SparseMatrix &S, unsigned int max_iterations,
+                        double min_eig_num_tol,
+                        unsigned int num_Lanczos_vectors) {
+  /*
+  The following implementation is adapted from:
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync/releases/tag/v1.0.0
+  */
+
+  // Initialize minimum eigen pair
+  double min_eigenvalue;
+  Vector min_eigenvector;
+
+  // Log the number of matrix-vector multiplication operations
+  unsigned int num_min_eig_mv_ops = 0;
+
+  // Set convergence speed of the algorithm
+  unsigned int k = S.rows();
+  unsigned int solver_convergence_speed = std::min(num_Lanczos_vectors, k);
+
+  // Set initial precision parameter when calculating the dominant
+  // (largest-magnitude) eigenvalue of S(X)
+  double precision_tol = 1e-4;
+
+  // Compute the dominant (largest-magnitude) eigenvalue of S(X)
+  SpectraSymMatProd lm_op(S);
+  Spectra::SymEigsSolver<SpectraSymMatProd> largest_magnitude_eigensolver(
+      lm_op, 1, solver_convergence_speed);
+  largest_magnitude_eigensolver.init();
+  largest_magnitude_eigensolver.compute(Spectra::SortRule::LargestMagn,
+                                        max_iterations, precision_tol,
+                                        Spectra::SortRule::LargestMagn);
+  if (largest_magnitude_eigensolver.info() != Spectra::CompInfo::Successful)
+    LOG(FATAL) << "[SE-Sync Spectrum shifting Eigen Solver] Error: Could not "
+                  "compute maximum-magnitude eigenvalue of S(X).";
+  num_min_eig_mv_ops += largest_magnitude_eigensolver.num_operations();
+  double lambda_lm = largest_magnitude_eigensolver.eigenvalues()[0];
+
+  if (lambda_lm < 0) {
+    // The largest-magnitude eigenvalue is negative, and therefore also the
+    // minimum eigenvalue, so just return this solution
+    min_eigenvalue = lambda_lm;
+    min_eigenvector = largest_magnitude_eigensolver.eigenvectors().col(0);
+    LOG(INFO) << "[SE-Sync Spectrum shifting Eigen Solver] min eigenvalue: "
+              << min_eigenvalue;
+    return {min_eigenvalue, min_eigenvector};
+  }
+
+  // Shift spectrum of S(X)
+  const SparseMatrix I = Matrix::Identity(k, k).sparseView();
+  const SparseMatrix C = S - 2 * lambda_lm * I;
+
+  // Set initial guess for solver
+  Vector v0 = S.row(0).transpose();
+  Vector perturbation(v0.size());
+  perturbation.setRandom();
+  perturbation.normalize();
+  Vector xinit = v0 + (.03 * v0.norm()) * perturbation; // Perturb v0 by ~3%
+
+  // Reset precision tolerance
+  precision_tol = min_eig_num_tol / lambda_lm;
+
+  // Compute the dominant (largest-magnitude) eigenvalue of C = S(X) - λ_lm × I
+  SpectraSymMatProd min_shifted_op(C);
+  Spectra::SymEigsSolver<SpectraSymMatProd> min_shifted_solver(
+      min_shifted_op, 1, solver_convergence_speed);
+  min_shifted_solver.init(xinit.data());
+  min_shifted_solver.compute(Spectra::SortRule::LargestMagn, max_iterations,
+                             precision_tol, Spectra::SortRule::LargestMagn);
+  if (min_shifted_solver.info() != Spectra::CompInfo::Successful) {
+    double sigma = -10;
+    LOG(WARNING)
+        << "[SE-Sync Spectrum shifting Eigen Solver] Error: Could not  compute "
+           "maximum-magnitude eigenvalue of spectraly shifted S(X) as the "
+           "minimum eigen value is likely near zero within a tight clustering "
+           "of other eigenvalues. Using Shift-and-Invert Mode Eigen-Solver "
+           "with a shift of: "
+        << sigma;
+    return computeMinimumEigenPair(S, sigma, min_eig_num_tol);
+  }
+  num_min_eig_mv_ops += min_shifted_solver.num_operations();
+
+  min_eigenvalue = min_shifted_solver.eigenvalues()[0] + 2 * lambda_lm;
+  min_eigenvector = min_shifted_solver.eigenvectors().col(0);
+  LOG(INFO) << "[SE-Sync Spectrum shifting Eigen Solver] min eigenvalue: "
+            << min_eigenvalue;
   return {min_eigenvalue, min_eigenvector};
 }
 
