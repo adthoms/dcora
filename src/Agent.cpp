@@ -561,8 +561,6 @@ bool Agent::iterate(bool doOptimization) {
       mStatus.state = mState;
       mStatus.instanceNumber = instance_number();
       mStatus.iterationNumber = iteration_number();
-      // TODO(AT): ask AP and DR about setting the relative change condition in
-      // RA-SLAM
       mStatus.relativeChange = LiftedArray::maxTranslationDistance(
           *X.GetLiftedPoseArray(), *XPrev.GetLiftedPoseArray());
       // Check local termination condition

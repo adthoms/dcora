@@ -74,12 +74,6 @@ bool Graph::isPGOCompatible() const {
   return true;
 }
 
-bool Graph::isAgentMap() const { return !isPGOCompatible() && id_ == MAP_ID; }
-
-bool Graph::isAgentMap(unsigned int id) const {
-  return !isPGOCompatible() && id == MAP_ID;
-}
-
 void Graph::clearNeighborStates() {
   neighbor_poses_.clear();
   neighbor_landmarks_.clear();
