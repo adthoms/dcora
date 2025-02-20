@@ -77,11 +77,9 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
 /**
  * @brief Helper function to read a dataset in .g2o format
  * @param filename
- * @param num_poses
  * @return
  */
-std::vector<RelativePosePoseMeasurement>
-read_g2o_file(const std::string &filename, size_t *num_poses);
+G2ODataset read_g2o_file(const std::string &filename);
 
 /**
  * @brief Helper function to get the dimension of the RA-SLAM problem encoded in
@@ -100,12 +98,15 @@ PyFGDataset read_pyfg_file(const std::string &filename);
 
 /**
  * @brief Helper function to get the local-to-global state indexes from a PyFG
- * dataset
+ * dataset. Optionally, the local states can be reindexed from zero (assuming
+ * state ids are contiguous).
  * @param pyfg_dataset
+ * @param reindex_local_states
  * @return
  */
 LocalToGlobalStateDicts
-getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset);
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset,
+                             bool reindex_local_states = false);
 
 /**
  * @brief Helper function to globally reindex a PyFG dataset's measurements
@@ -210,18 +211,18 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
  * value indicating whether the regularized matrix M := S + eta * I is
  * positive-semidefinite. In the event that M is *not* PSD, this function
  * additionally computes a direction of negative curvature x of S, and its
- * associated Rayleight quotient theta := x'Sx < 0 using a shift-and-invert mode
- * eigen solver. See the original implementation in SE-Sync for details, noting
- * that the shift-and-invert mode eigen solver is unique to DCORA.
+ * associated Rayleight quotient theta := x'Sx < 0 using a spectrum shifting
+ * eigen Solver. See the original implementation in SE-Sync for details, noting
+ * that a shift-and-invert mode eigen solver is used *if* the spectrum shifting
+ * method fails.
  * @param S
  * @param eta
- * @param shift
  * @param theta
  * @param x
  * @return
  */
-bool fastVerification(const SparseMatrix &S, double eta, double shift,
-                      double *theta, Vector *x);
+bool fastVerification(const SparseMatrix &S, double eta, double *theta,
+                      Vector *x);
 
 /**
  * @brief Helper function to determine if a sparse symmetric matrix S is
@@ -245,6 +246,22 @@ bool isSparseSymmetricMatrixPSD(const SparseMatrix &S);
  */
 std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
                                                   double sigma, double eta);
+
+/**
+ * @brief Helper function to calculate the minimum eigen pair {λ, v} of a
+ * sparse symmetric matrix S using the methods outlined in III-C of
+ * "Computational Enhancements for Certifiably Correct SLAM" by David M. Rosen
+ * and Luca Carlone. For details, see the original implementation in SE-Sync
+ * v1.0.0.
+ * @param S
+ * @param max_iterations
+ * @param min_eig_num_tol
+ * @param num_Lanczos_vectors
+ * @return
+ */
+std::pair<double, Vector> computeMinimumEigenPair(
+    const SparseMatrix &S, unsigned int max_iterations = 10000,
+    double min_eig_num_tol = 1e-6, unsigned int num_Lanczos_vectors = 20);
 
 /**
  * @brief Helper function to construct the dual certificate matrix S(X) for PGO.
@@ -490,5 +507,43 @@ Matrix projectToSEMatrix(const Matrix &M, unsigned int r, unsigned int d,
  */
 Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
                          unsigned int n, unsigned int l, unsigned int b);
+
+/**
+ * @brief Align trajectory with a given pose Tw0
+ * @param trajectoryInit
+ * @param Tw0
+ * @return
+ */
+PoseArray alignTrajectoryToFrame(PoseArray trajectoryInit, const Pose Tw0);
+
+/**
+ * @brief Align unit spheres with a given pose Tw0
+ * @param unitSpheresInit
+ * @param Tw0
+ * @return
+ */
+PointArray alignUnitSpheresToFrame(PointArray unitSpheresInit, const Pose Tw0);
+
+/**
+ * @brief Align landmarks with a given pose Tw0
+ * @param landmarksInit
+ * @param Tw0
+ * @return
+ */
+PointArray alignLandmarksToFrame(PointArray landmarksInit, const Pose Tw0);
+
+/**
+ * @brief Align lifted trajectory with a given pose Tw0 globally or locally
+ * @param liftedTrajectoryInit
+ * @param Tw0
+ * @param d
+ * @param n
+ * @param isGlobalAlignment
+ * @return
+ */
+PoseArray alignLiftedTrajectoryToFrame(const Matrix &liftedTrajectoryInit,
+                                       const LiftedPose Tw0, unsigned int d,
+                                       unsigned int n,
+                                       bool isGlobalAlignment = true);
 
 } // namespace DCORA

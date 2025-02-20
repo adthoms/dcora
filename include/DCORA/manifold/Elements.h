@@ -177,7 +177,9 @@ public:
 /**
  * @brief A class representing an array of "lifted" poses, unit-sphere auxiliary
  * variables, and translations in RA ordering. Internally store as
- * r-by-(d+1)n+l+b matrix: X = [Y1 ... Yn | r1 ... rn | p1 ... pn | l1 ... ln]
+ * r-by-(d+1)n+l+b matrix: X = [Y1 ... Yn | r1 ... rl | p1 ... pn | L1 ... Lb].
+ * Optionally, the graph type can be specfied to be PGO compatible, in which
+ * case this class acts as a wrapper to the LiftedPoseArray.
  */
 class LiftedRangeAidedArray {
 public:
@@ -188,9 +190,11 @@ public:
    * @param n number of poses
    * @param l number of unit spheres
    * @param b number of landmarks
+   * @param graphType type of graph
    */
   LiftedRangeAidedArray(unsigned int r, unsigned int d, unsigned int n,
-                        unsigned int l, unsigned int b);
+                        unsigned int l, unsigned int b,
+                        GraphType graphType = GraphType::RangeAidedSLAMGraph);
   /**
    * @brief Copy constructor
    * @param other
@@ -228,14 +232,17 @@ public:
    */
   unsigned int b() const { return b_; }
   /**
-   * @brief Return the underlying Eigen matrices of encapsulated arrays in RA
-   * ordering
+   * @brief Get graph type
+   * @return
+   */
+  GraphType graphType() const { return graph_type_; }
+  /**
+   * @brief Return the underlying Eigen matrices of encapsulated arrays
    * @return
    */
   Matrix getData() const;
   /**
-   * @brief Set the underlying Eigen matrices of encapsulated arrays in RA
-   * ordering
+   * @brief Set the underlying Eigen matrices of encapsulated arrays
    * @param X
    */
   void setData(const Matrix &X);
@@ -318,6 +325,21 @@ public:
    */
   Vector landmark(unsigned int index) const;
   /**
+   * @brief Set the lifted pose array
+   * @param liftedPoseArray
+   */
+  void setLiftedPoseArray(const LiftedPoseArray &liftedPoseArray);
+  /**
+   * @brief Set the lifted unit sphere array
+   * @param liftedUnitSphereArray
+   */
+  void setLiftedUnitSphereArray(const LiftedPointArray &liftedUnitSphereArray);
+  /**
+   * @brief Set the lifted landmark array
+   * @param liftedLandmarkArray
+   */
+  void setLiftedLandmarkArray(const LiftedPointArray &liftedLandmarkArray);
+  /**
    * @brief Get "lifted" pose array
    * @return
    */
@@ -335,9 +357,41 @@ public:
    */
   LiftedPointArray *GetLiftedLandmarkArray() const { return landmarks_.get(); }
 
-private:
+protected:
+  /**
+   * @brief Return true if the array is compatible with PGO
+   * @return
+   */
+  bool isPGOCompatible() const;
+  /**
+   * @brief Helper function to return the underlying Eigen matrix of the
+   * encapsulated LiftedPoseArray array in SE ordering
+   * @return
+   */
+  Matrix getDataSE() const;
+  /**
+   * @brief Helper function to return the underlying Eigen matrices of
+   * encapsulated arrays in RA ordering
+   * @return
+   */
+  Matrix getDataRA() const;
+  /**
+   * @brief Helper function to set the underlying Eigen matrix of the
+   * encapsulated LiftedPoseArray array in SE ordering
+   * @param X
+   */
+  void setDataSE(const Matrix &X);
+  /**
+   * @brief Helper function to set the underlying Eigen matrices of encapsulated
+   * arrays in RA ordering
+   * @param X
+   */
+  void setDataRA(const Matrix &X);
+
   // Dimension constants
   unsigned int r_, d_, n_, l_, b_;
+  // Graph type
+  GraphType graph_type_;
   // "Lifted" arrays
   std::unique_ptr<LiftedPoseArray> poses_;
   std::unique_ptr<LiftedPointArray> unit_spheres_;
@@ -369,13 +423,31 @@ public:
 /**
  * @brief A class representing an array of poses, unit-sphere auxiliary
  * variables, and translations in RA ordering. Internally store as
- * d-by-(d+1)n+l+b matrix: X = [X1, ... Xn | r1 ... rn | p1 ... pn | l1 ... ln]
+ * r-by-(d+1)n+l+b matrix: X = [Y1 ... Yn | r1 ... rl | p1 ... pn | L1 ... Lb].
+ * Optionally, the graph type can be specfied to be PGO compatible, in which
+ * case this class acts as a wrapper to the LiftedPoseArray.
  */
 class RangeAidedArray : public LiftedRangeAidedArray {
 public:
   RangeAidedArray(unsigned int d, unsigned int n, unsigned int l,
-                  unsigned int b)
-      : LiftedRangeAidedArray(d, d, n, l, b) {}
+                  unsigned int b,
+                  GraphType graphType = GraphType::RangeAidedSLAMGraph)
+      : LiftedRangeAidedArray(d, d, n, l, b, graphType) {}
+  /**
+   * @brief Get pose array
+   * @return
+   */
+  PoseArray getPoseArray() const;
+  /**
+   * @brief Get unit sphere array
+   * @return
+   */
+  PointArray getUnitSphereArray() const;
+  /**
+   * @brief Get landmark array
+   * @return
+   */
+  PointArray getLandmarkArray() const;
 };
 
 /**
@@ -528,14 +600,66 @@ typedef std::map<PoseID, LiftedPose, CompareStateID> PoseDict;
 // Ordered set of PoseID
 typedef std::set<PoseID, CompareStateID> PoseSet;
 
+// A utility function for streaming PoseDict to cout
+inline std::ostream &operator<<(std::ostream &os, const PoseDict &pose_dict) {
+  for (const auto &[pose_id, lifted_pose] : pose_dict) {
+    os << "ID: " << pose_id << std::endl;
+    os << "Variable:\n" << lifted_pose.pose() << std::endl;
+  }
+  return os;
+}
+
+// A utility function for streaming PoseSet to cout
+inline std::ostream &operator<<(std::ostream &os, const PoseSet &pose_set) {
+  for (const auto &pose_id : pose_set)
+    os << "ID: " << pose_id << std::endl;
+  return os;
+}
+
 // Ordered map of LandmarkID to LiftedPoint object
 typedef std::map<LandmarkID, LiftedPoint, CompareStateID> LandmarkDict;
 // Ordered set of LandmarkID
 typedef std::set<LandmarkID, CompareStateID> LandmarkSet;
 
+// A utility function for streaming LandmarkDict to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const LandmarkDict &landmark_dict) {
+  for (const auto &[landmark_id, lifted_landmark] : landmark_dict) {
+    os << "ID: " << landmark_id << std::endl;
+    os << "Variable:\n" << lifted_landmark.translation() << std::endl;
+  }
+  return os;
+}
+
+// A utility function for streaming LandmarkSet to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const LandmarkSet &landmark_set) {
+  for (const auto &landmark_id : landmark_set)
+    os << "ID: " << landmark_id << std::endl;
+  return os;
+}
+
 // Ordered map of UnitSphereID to LiftedPoint object
 typedef std::map<UnitSphereID, LiftedPoint, CompareStateID> UnitSphereDict;
 // Ordered set of UnitSphereID
 typedef std::set<UnitSphereID, CompareStateID> UnitSphereSet;
+
+// A utility function for streaming UnitSphereDict to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const UnitSphereDict &unit_sphere_dict) {
+  for (const auto &[unit_sphere_id, lifted_unit_sphere] : unit_sphere_dict) {
+    os << "ID: " << unit_sphere_id << std::endl;
+    os << "Variable:\n" << lifted_unit_sphere.translation() << std::endl;
+  }
+  return os;
+}
+
+// A utility function for streaming UnitSphereSet to cout
+inline std::ostream &operator<<(std::ostream &os,
+                                const UnitSphereSet &unit_sphere_set) {
+  for (const auto &unit_sphere_id : unit_sphere_set)
+    os << "ID: " << unit_sphere_id << std::endl;
+  return os;
+}
 
 } // namespace DCORA

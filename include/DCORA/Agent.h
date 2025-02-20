@@ -17,9 +17,6 @@
 #include <DCORA/Measurements.h>
 #include <DCORA/QuadraticProblem.h>
 #include <DCORA/manifold/Elements.h>
-#include <DCORA/manifold/LiftedManifold.h>
-#include <DCORA/manifold/LiftedVariable.h>
-#include <DCORA/manifold/LiftedVector.h>
 
 #include <Eigen/Dense>
 #include <glog/logging.h>
@@ -35,24 +32,27 @@
 #include <utility>
 #include <vector>
 
-#include "Manifolds/Element.h"
-#include "Manifolds/Manifold.h"
-
 namespace DCORA {
 
 /**
- * @brief This class contains parameter settings for PGOAgent
+ * @brief This class contains parameter settings for Agent
  */
-class PGOAgentParameters {
+class AgentParameters {
 public:
   // Problem dimension
-  unsigned d;
+  unsigned int d;
 
   // Relaxed rank in Riemannian optimization
-  unsigned r;
+  unsigned int r;
+
+  // Set of robot IDs
+  std::set<unsigned int> robotIDs;
 
   // Total number of robots
-  unsigned numRobots;
+  unsigned int numRobots;
+
+  // Type of graph to use
+  GraphType graphType;
 
   // Run in asynchronous mode
   bool asynchronous;
@@ -110,20 +110,24 @@ public:
   std::string logDirectory;
 
   // Default constructor
-  PGOAgentParameters(unsigned dIn, unsigned rIn, unsigned numRobotsIn = 1,
-                     ROptParameters local_opt_params = ROptParameters(),
-                     bool accel = false, unsigned restartInt = 30,
-                     RobustCostParameters costParams = RobustCostParameters(),
-                     int robust_opt_num_weight_updates = 10,
-                     int robust_opt_num_resets = 0,
-                     int robust_opt_inner_iters = 30,
-                     double robust_opt_min_convergence_ratio = 0.8,
-                     unsigned robust_init_min_inliers = 2,
-                     unsigned maxIters = 500, double changeTol = 5e-3,
-                     bool v = false, bool log = false, std::string logDir = "")
+  AgentParameters(unsigned int dIn, unsigned int rIn,
+                  std::set<unsigned int> robotIDsIn = {0},
+                  GraphType graphTypeIn = GraphType::PoseGraph,
+                  ROptParameters local_opt_params = ROptParameters(),
+                  bool accel = false, unsigned restartInt = 30,
+                  RobustCostParameters costParams = RobustCostParameters(),
+                  int robust_opt_num_weight_updates = 10,
+                  int robust_opt_num_resets = 0,
+                  int robust_opt_inner_iters = 30,
+                  double robust_opt_min_convergence_ratio = 0.8,
+                  unsigned robust_init_min_inliers = 2, unsigned maxIters = 500,
+                  double changeTol = 5e-3, bool v = false, bool log = false,
+                  std::string logDir = "")
       : d(dIn),
         r(rIn),
-        numRobots(numRobotsIn),
+        robotIDs(robotIDsIn),
+        numRobots(robotIDsIn.size()),
+        graphType(graphTypeIn),
         asynchronous(false),
         asynchronousOptimizationRate(1),
         localOptimizationParams(local_opt_params),
@@ -144,15 +148,20 @@ public:
         logDirectory(std::move(logDir)) {}
 
   inline friend std::ostream &operator<<(std::ostream &os,
-                                         const PGOAgentParameters &params) {
+                                         const AgentParameters &params) {
     // clang-format off
-    os << "PGOAgent parameters: " << std::endl;
+    os << "Agent parameters: " << std::endl;
     os << "Dimension: " << params.d << std::endl;
     os << "Relaxation rank: " << params.r << std::endl;
+    os << "Robot IDs: ";
+    for (const auto &robot_id : params.robotIDs)
+      os << robot_id << " ";
+    os << std::endl;
     os << "Number of robots: " << params.numRobots << std::endl;
+    os << "Graph type: " << GraphTypeToString(params.graphType) << std::endl;
     os << "Asynchronous: " << params.asynchronous << std::endl;
     os << "Asynchronous optimization rate: " << params.asynchronousOptimizationRate << std::endl; // NOLINT
-    os << "Local initialization method: " << InitializationMethodToString(params.localInitializationMethod) << std::endl; // NOLINT
+    os << "Local trajectory initialization method: " << InitializationMethodToString(params.localInitializationMethod) << std::endl; // NOLINT
     os << "Use multi-robot initialization: " << params.multirobotInitialization << std::endl; // NOLINT
     os << "Use Nesterov acceleration: " << params.acceleration << std::endl;
     os << "Fixed restart interval: " << params.restartInterval << std::endl;
@@ -176,24 +185,24 @@ public:
 };
 
 /**
- * @brief Defines the possible states of a PGOAgent. Each state can only
+ * @brief Defines the possible states of an Agent. Each state can only
  * transition to the state below
  */
-enum PGOAgentState {
-  WAIT_FOR_DATA,           // waiting to receive pose graph
-  WAIT_FOR_INITIALIZATION, // waiting to initialize trajectory estimate
-  INITIALIZED,             // trajectory initialized and ready to update
+enum AgentState {
+  WAIT_FOR_DATA,           // waiting to receive graph
+  WAIT_FOR_INITIALIZATION, // waiting to initialize state estimate
+  INITIALIZED,             // state initialized and ready to update
 };
 
 /**
  * @brief Status of an agent to be shared with its peers
  */
-struct PGOAgentStatus {
+struct AgentStatus {
   // Unique ID of this agent
   unsigned agentID;
 
   // Current state of this agent
-  PGOAgentState state;
+  AgentState state;
 
   // Current problem instance number
   unsigned instanceNumber;
@@ -208,11 +217,11 @@ struct PGOAgentStatus {
   double relativeChange;
 
   // Constructor
-  explicit PGOAgentStatus(unsigned id = 0,
-                          PGOAgentState s = PGOAgentState::WAIT_FOR_DATA,
-                          unsigned instance = 0, unsigned iteration = 0,
-                          bool ready_to_terminate = false,
-                          double relative_change = 0)
+  explicit AgentStatus(unsigned id = 0,
+                       AgentState s = AgentState::WAIT_FOR_DATA,
+                       unsigned instance = 0, unsigned iteration = 0,
+                       bool ready_to_terminate = false,
+                       double relative_change = 0)
       : agentID(id),
         state(s),
         instanceNumber(instance),
@@ -221,8 +230,8 @@ struct PGOAgentStatus {
         relativeChange(relative_change) {}
 
   inline friend std::ostream &operator<<(std::ostream &os,
-                                         const PGOAgentStatus &status) {
-    os << "PGOAgent status: " << std::endl;
+                                         const AgentStatus &status) {
+    os << "Agent status: " << std::endl;
     os << "ID: " << status.agentID << std::endl;
     os << "State: " << status.state << std::endl;
     os << "Instance number: " << status.instanceNumber << std::endl;
@@ -234,25 +243,25 @@ struct PGOAgentStatus {
 } __attribute__((aligned(32)));
 
 /**
- * @brief This class implements a single robot in the distributed pose graph
- * optimization problem
+ * @brief This class implements a single robot in the distributed pose graph or
+ * RA-SLAM optimization problem
  */
-class PGOAgent {
+class Agent {
 public:
   /**
    * @brief Constructor
    * @param ID
    * @param params
    */
-  PGOAgent(unsigned ID, const PGOAgentParameters &params);
+  Agent(unsigned ID, const AgentParameters &params);
 
   /**
    * @brief Destructor
    */
-  ~PGOAgent();
+  ~Agent();
 
   /**
-   * @brief Set measurements (pose graph) for this agent
+   * @brief Set measurements for this agent
    * @param inputOdometry
    * @param inputPrivateLoopClosures
    * @param inputSharedLoopClosures
@@ -263,7 +272,20 @@ public:
       const std::vector<RelativePosePoseMeasurement> &inputSharedLoopClosures);
 
   /**
-   * @brief Add a single measurement to this agent's pose graph. Do nothing if
+   * @brief Set measurements for this agent
+   * @param inputMeasurements
+   */
+  void setMeasurements(
+      const std::vector<RelativePosePoseMeasurement> &inputMeasurements);
+
+  /**
+   * @brief Set measurements for this agent
+   * @param inputMeasurements
+   */
+  void setMeasurements(const RelativeMeasurements &inputMeasurements);
+
+  /**
+   * @brief Add a single measurement to this agent's graph. Do nothing if
    * the input factor already exists.
    * @param factor
    */
@@ -272,19 +294,32 @@ public:
   /**
    * @brief Perform local initialization for this robot. After this function
    * call, the robot is initialized in its LOCAL frame where its first pose is
-   * set to identity. Initialization in global frame is still needed by calling
-   * initializeInGlobalFrame().
-   * @param TInitPtr an optional trajectory estimate in an arbitrary local
-   * frame. If the dimension of number of poses of the provided initial guess
-   * does not match what is expected, this initial guess will be ignored and
-   * this function will instead use the built in local initialization method
-   * (e.g., odometry)
+   * set to identity. Initialization in the global frame is still needed by
+   * calling initializeInGlobalFrame(). If the dimension and number of states of
+   * a provided initial guess does not match what is expected, the initial
+   * guess will be ignored and this function will instead use its built in local
+   * initialization methods for trajectory and random initialization for unit
+   * spheres and landmarks. If initial guesses for unit spheres or landmarks
+   * are provided and the local graph is not PGO compatible, an error will be
+   * thrown. Further, if initial guesses for unit spheres or landmarks
+   * are provided, an initial guess for the trajectory must also be provided.
+   * @param TrajectoryInitPtr an optional trajectory estimate in an arbitrary
+   * local frame.
+   * @param UnitSphereInitPtr an optional estimate of the unit sphere variables
+   * in the same local frame as the trajectory estimate (this condition is not
+   * enforced).
+   * @param LandmarkInitPtr an optional estimate of the landmark variables in
+   * the same local frame as the trajectory estimate (this condition is not
+   * enforced).
    */
-  void initialize(const PoseArray *TInitPtr = nullptr);
+  void initialize(const PoseArray *TrajectoryInitPtr = nullptr,
+                  const PointArray *UnitSphereInitPtr = nullptr,
+                  const PointArray *LandmarkInitPtr = nullptr);
 
   /**
-   * @brief Initialize this robot's trajectory estimate in the global frame.
-   * This function must be called after initialize().
+   * @brief Initialize this robot's trajectory estimate (and unit sphere and
+   * landmark estimates if performing distributed RA-SLAM optimization) in the
+   * global frame. This function must be called after initialize().
    * @param T_world_robot d+1 by d+1 transformation from robot (local) frame
    * to the world frame. By convention, the robot local frame is one in
    * which the first pose of this robot is set to identity
@@ -300,7 +335,7 @@ public:
   bool iterate(bool doOptimization = true);
 
   /**
-   * @brief Reset this agent to have empty pose graph
+   * @brief Reset this agent to have an empty graph
    */
   virtual void reset();
 
@@ -311,30 +346,42 @@ public:
   inline unsigned getID() const { return mID; }
 
   /**
-   * @brief Return number of poses of this robot
-   * @return
-   */
-  inline unsigned num_poses() const { return mPoseGraph->n(); }
-
-  /**
-   * @brief Get dimension
-   * @return
-   */
-  inline unsigned dimension() const { return mPoseGraph->d(); }
-
-  /**
    * @brief Get relaxation rank
    * @return
    */
-  inline unsigned relaxation_rank() const { return mPoseGraph->r(); }
+  inline unsigned relaxation_rank() const { return r; }
+
+  /**
+   * @brief Get dimension (2 or 3)
+   * @return
+   */
+  inline unsigned dimension() const { return d; }
+
+  /**
+   * @brief Get number of poses of this robot
+   * @return
+   */
+  inline unsigned num_poses() const { return isAgentMap() ? 1 : mGraph->n(); }
+
+  /**
+   * @brief Get number of unit spheres of this robot
+   * @return
+   */
+  inline unsigned num_unit_spheres() const { return mGraph->l(); }
+
+  /**
+   * @brief Get number of landmarks of this robot
+   * @return
+   */
+  inline unsigned num_landmarks() const { return mGraph->b(); }
 
   /**
    * @brief Get problem dimension
    * @return
    */
-  inline unsigned problem_dimension() const { return mPoseGraph->k(); }
-
-  // TODO(AT): Add supporting getters for graph dims l,b
+  inline unsigned problem_dimension() const {
+    return isAgentMap() ? (d + 1) : mGraph->k();
+  }
 
   /**
    * @brief Get current instance number
@@ -349,10 +396,35 @@ public:
   inline unsigned iteration_number() const { return mIterationNumber; }
 
   /**
+   * @brief Return true if this agent is compatible with PGO
+   * @return
+   */
+  inline bool isPGOCompatible() const {
+    return mGraph->isPGOCompatible() &&
+           mParams.graphType == GraphType::PoseGraph;
+  }
+
+  /**
+   * @brief Return true if this agent is the map in RA-SLAM
+   * @return
+   */
+  inline bool isAgentMap() const {
+    return !mGraph->isPGOCompatible() && mID == MAP_ID;
+  }
+
+  /**
+   * @brief Return true if the provided agent is the map in RA-SLAM
+   * @return
+   */
+  inline bool isAgentMap(unsigned int ID) const {
+    return !mGraph->isPGOCompatible() && ID == MAP_ID;
+  }
+
+  /**
    * @brief Get the current status of this agent
    * @return
    */
-  inline PGOAgentStatus getStatus() {
+  inline AgentStatus getStatus() {
     mStatus.agentID = getID();
     mStatus.state = mState;
     mStatus.instanceNumber = instance_number();
@@ -373,7 +445,7 @@ public:
    * @param neighborID
    * @return
    */
-  inline PGOAgentStatus getNeighborStatus(unsigned neighborID) const {
+  inline AgentStatus getNeighborStatus(unsigned neighborID) const {
     CHECK(hasNeighborStatus(neighborID));
     return mTeamStatus.at(neighborID);
   }
@@ -382,13 +454,13 @@ public:
    * @brief Set the status of a neighbor
    * @param status
    */
-  inline void setNeighborStatus(const PGOAgentStatus &status) {
+  inline void setNeighborStatus(const AgentStatus &status) {
     mTeamStatus[status.agentID] = status;
   }
 
   /**
-   * @brief Return true if the input robot is a neighbor (i.e., has inter-robot
-   * loop closure with this robot)
+   * @brief Return true if the input robot is a neighbor (i.e., has shared loop
+   * closure with this robot)
    * @return
    */
   bool hasNeighbor(unsigned neighborID) const;
@@ -406,6 +478,17 @@ public:
    * @return
    */
   bool getTrajectoryInLocalFrame(Matrix *Trajectory);
+
+  /**
+   * @brief State estimate of this robot in local frame, with its first
+   * pose set to identity
+   * @param Trajectory
+   * @param UnitSpheres
+   * @param Landmarks
+   * @return
+   */
+  bool getStatesInLocalFrame(Matrix *Trajectory, Matrix *UnitSpheres = nullptr,
+                             Matrix *Landmarks = nullptr);
 
   /**
    * @brief Trajectory estimate of this robot in global frame, with the first
@@ -445,8 +528,8 @@ public:
    * @brief Get a single public pose of this robot. Note that currently, this
    * method does not check that the requested pose is a public pose. Return true
    * if the requested pose exists
-   * @param index: index of the requested pose
-   * @param Mout: actual value of the pose
+   * @param index index of the requested pose
+   * @param Mout actual value of the pose
    * @return
    */
   bool getSharedPose(unsigned index, Matrix *Mout);
@@ -461,12 +544,18 @@ public:
   bool getAuxSharedPose(unsigned index, Matrix *Mout);
 
   /**
-   * @brief Get a map of all public poses of this robot. Return true if the
+   * @brief Get maps for of all public states of this robot. Return true if the
    * agent is initialized
-   * @param map PoseDict object whose content will be filled
+   * @param poseDict PoseDict object whose content will be filled
+   * @param unitSphereDict (optional) UnitSphereDict object whose content will
+   * be filled
+   * @param landmarkDict (optional) LandmarkDict object whose content will be
+   * filled
    * @return
    */
-  bool getSharedPoseDict(PoseDict *map);
+  bool getSharedStateDicts(PoseDict *poseDict,
+                           UnitSphereDict *unitSphereDict = nullptr,
+                           LandmarkDict *landmarkDict = nullptr);
 
   /**
    * @brief Get a map of all public poses of this robot with the specified
@@ -476,14 +565,6 @@ public:
    * @return
    */
   bool getSharedPoseDictWithNeighbor(PoseDict *map, unsigned neighborID);
-
-  /**
-   * @brief Get a map of all auxiliary variables associated with public poses of
-   * this robot. Return true if agent is initialized
-   * @param map
-   * @return
-   */
-  bool getAuxSharedPoseDict(PoseDict *map);
 
   /**
    * @brief Get a map of all auxiliary public poses of this robot with the
@@ -569,18 +650,21 @@ public:
   void setGlobalAnchor(const Matrix &M);
 
   /**
-   * @brief Update local copy of a neighbor agent's pose
+   * @brief Update local copy of a neighbor agent's states or auxiliary states
    * @param neighborID the ID of the neighbor agent
    * @param poseDict the pose dictionary of the neighbor agent
+   * @param areNeighborStatesAux (optional) true if the neighbor states are
+   * auxiliary
+   * @param unitSphereDict (optional) the unit sphere dictionary of the neighbor
+   * agent
+   * @param landmarkDict (optional) the landmark dictionary of the neighbor
+   * agent
    */
-  void updateNeighborPoses(unsigned neighborID, const PoseDict &poseDict);
-
-  /**
-   * @brief Update local copy of a neighbor's auxiliary pose
-   * @param neighborID
-   * @param poseDict
-   */
-  void updateAuxNeighborPoses(unsigned neighborID, const PoseDict &poseDict);
+  void
+  updateNeighborStates(unsigned neighborID, const PoseDict &poseDict,
+                       bool areNeighborStatesAux = false,
+                       const UnitSphereDict &unitSphereDict = UnitSphereDict(),
+                       const LandmarkDict &landmarkDict = LandmarkDict());
 
   /**
    * @brief Clear local caches of all neighbors' states
@@ -588,9 +672,9 @@ public:
   void clearNeighborStates();
 
   /**
-   * @brief Clear local caches of all active neighbors' poses
+   * @brief Clear local caches of all active neighbors' states
    */
-  void clearActiveNeighborPoses();
+  void clearActiveNeighborStates();
 
   /**
    * @brief Perform local PGO using the standard L2 (least-squares) cost
@@ -602,33 +686,33 @@ public:
 
 protected:
   // The unique ID associated to this robot
-  unsigned mID;
+  unsigned int mID;
 
   // Dimension
-  unsigned d;
+  unsigned int d;
 
   // Relaxed rank in Riemannian optimization problem
-  unsigned r;
+  unsigned int r;
 
   // Internal optimization iterate (before rounding)
-  LiftedPoseArray X;
+  LiftedRangeAidedArray X;
 
   // Parameter settings
-  const PGOAgentParameters mParams;
+  const AgentParameters mParams;
 
   // Current state of this agent
-  PGOAgentState mState;
+  AgentState mState;
 
   // Current status of this agent (to be shared with others)
-  PGOAgentStatus mStatus;
+  AgentStatus mStatus;
 
   // Robust cost function
   RobustCost mRobustCost;
 
-  // Pointer to pose graph
-  std::shared_ptr<Graph> mPoseGraph;
+  // Pointer to graph
+  std::shared_ptr<Graph> mGraph;
 
-  // Current PGO instance
+  // Current optimization instance
   unsigned mInstanceNumber;
 
   // Current global iteration counter (this is only meaningful in synchronous
@@ -654,13 +738,13 @@ protected:
   Logger mLogger;
 
   // Store status of peer agents
-  std::unordered_map<unsigned, PGOAgentStatus> mTeamStatus;
+  std::unordered_map<unsigned, AgentStatus> mTeamStatus;
 
   // Store if robots are actively participating in optimization
-  std::vector<bool> mTeamRobotActive;
+  std::map<unsigned, bool> mTeamRobotActive;
 
-  // Request to publish public poses
-  bool mPublishPublicPosesRequested = false;
+  // Request to publish public states
+  bool mPublishPublicStatesRequested = false;
 
   // Request to publish in asynchronous mode
   bool mPublishAsynchronousRequested = false;
@@ -669,10 +753,18 @@ protected:
   bool mEndLoopRequested = false;
 
   // Initial iterate
-  std::optional<LiftedPoseArray> XInit;
+  std::optional<LiftedRangeAidedArray> XInit;
 
-  // Initial solution TInit = [R1 t1 ... Rn tn] in an arbitrary coordinate frame
-  std::optional<PoseArray> TLocalInit;
+  // Initial trajectory [R1 t1 ... Rn tn] in an arbitrary coordinate frame
+  std::optional<PoseArray> TrajectoryLocalInit;
+
+  // Initial unit spheres [r1 ... rl] in the same local frame as the trajectory
+  // estimate.
+  std::optional<PointArray> UnitSphereLocalInit;
+
+  // Initial landmarks [L1 ... Lb] in the same local frame as the trajectory
+  // estimate.
+  std::optional<PointArray> LandmarkLocalInit;
 
   // Lifting matrix shared by all agents
   std::optional<Matrix> YLift;
@@ -680,18 +772,24 @@ protected:
   // Anchor matrix shared by all agents
   std::optional<LiftedPose> globalAnchor;
 
-  // This dictionary stores poses owned by other robots that is connected to
+  // This dictionary stores poses owned by other robots that are connected to
   // this robot by loop closure
   PoseDict neighborPoseDict;
 
-  // Implement locking to synchronize read & write of trajectory estimate
-  // TODO(AT): Rename as mStatesMutex as all states should be locked
-  std::mutex mPosesMutex;
+  // This dictionary stores unit spheres owned by other robots that are
+  // connected to this robot by loop closure
+  UnitSphereDict neighborUnitSphereDict;
 
-  // Implement locking to synchronize read & write of shared poses from
+  // This dictionary stores landmarks owned by other robots that are connected
+  // to this robot by loop closure
+  LandmarkDict neighborLandmarkDict;
+
+  // Implement locking to synchronize read & write of state estimate
+  std::mutex mStatesMutex;
+
+  // Implement locking to synchronize read & write of shared states from
   // neighbors
-  // TODO(AT): Rename as mNeighborPosesMutex as all states should be locked
-  std::mutex mNeighborPosesMutex;
+  std::mutex mNeighborStatesMutex;
 
   // Implement locking on measurements
   std::mutex mMeasurementsMutex;
@@ -734,8 +832,7 @@ protected:
                                       Pose *T_world_robot);
 
   /**
-   * @brief Spawn a separate thread that optimizes the local pose graph in a
-   * loop
+   * @brief Spawn a separate thread that optimizes the local graph in a loop
    */
   void runOptimizationLoop();
 
@@ -768,7 +865,7 @@ protected:
                                   double *residual) const;
 
   /**
-   * @brief Set weight for measurement in the pose graph. Return false if the
+   * @brief Set weight for measurement in the graph. Return false if the
    * specified public measurement does not exist
    * @param edgeID
    * @param weight
@@ -820,8 +917,17 @@ protected:
   bool anchorFirstPose(const LiftedPose &prior);
 
 private:
-  // Stores the auxiliary variables from neighbors (only used in acceleration)
+  // Stores the auxiliary pose variables from neighbors (only used in
+  // acceleration)
   PoseDict neighborAuxPoseDict;
+
+  // Stores the auxiliary unit sphere variables from neighbors (only used in
+  // acceleration)
+  UnitSphereDict neighborAuxUnitSphereDict;
+
+  // Stores the auxiliary landmark variables from neighbors (only used in
+  // acceleration)
+  LandmarkDict neighborAuxLandmarkDict;
 
   // Auxiliary scalar used in acceleration
   double gamma;
@@ -830,13 +936,13 @@ private:
   double alpha;
 
   // Auxiliary variable used in acceleration
-  LiftedPoseArray Y;
+  LiftedRangeAidedArray Y;
 
   // Auxiliary variable used in acceleration
-  LiftedPoseArray V;
+  LiftedRangeAidedArray V;
 
   // Save previous iteration (for restarting)
-  LiftedPoseArray XPrev;
+  LiftedRangeAidedArray XPrev;
 
   /**
    * @brief Update gamma variable
@@ -876,6 +982,13 @@ private:
    */
   Pose computeNeighborTransform(const RelativePosePoseMeasurement &measurement,
                                 const LiftedPose &neighbor_pose);
+
+  /**
+   * @brief Project matrix M to the manifold underlying the local graph
+   * @param M
+   * @return
+   */
+  Matrix projectToManifold(const Matrix &M);
 };
 
 } // namespace DCORA

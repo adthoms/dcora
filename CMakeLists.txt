@@ -175,13 +175,10 @@ if(BUILD_DCORA_TESTS)
   add_executable(
     testDCORA
     tests/testUtils.cpp
-    tests/testCORA.cpp
+    tests/testRobust.cpp
     tests/testElements.cpp
     tests/testManifold.cpp
-    tests/testConstruction.cpp
-    tests/testLineGraph.cpp
-    tests/testTriangleGraph.cpp
-    tests/testOptimizationThread.cpp
+    tests/testAgent.cpp
   )
   target_include_directories(testDCORA PUBLIC
     ${EXTERNAL_INCLUDES}

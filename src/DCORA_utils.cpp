@@ -15,8 +15,10 @@
 #include <Eigen/CholmodSupport>
 #include <Eigen/Geometry>
 #include <Eigen/SPQRSupport>
+#include <Spectra/MatOp/SparseSymMatProd.h>
 #include <Spectra/MatOp/SparseSymShiftSolve.h>
 #include <Spectra/SymEigsShiftSolver.h>
+#include <Spectra/SymEigsSolver.h>
 #include <glog/logging.h>
 
 #include <algorithm>
@@ -54,6 +56,30 @@ std::string InitializationMethodToString(InitializationMethod method) {
   }
   case InitializationMethod::Random: {
     return "Random";
+  }
+  }
+  return "";
+}
+
+std::string BlockSelectionRuleToString(BlockSelectionRule rule) {
+  switch (rule) {
+  case BlockSelectionRule::Uniform: {
+    return "Uniform";
+  }
+  case BlockSelectionRule::Greedy: {
+    return "Greedy";
+  }
+  }
+  return "";
+}
+
+std::string GraphTypeToString(const GraphType &type) {
+  switch (type) {
+  case GraphType::PoseGraph: {
+    return "PoseGraph";
+  }
+  case GraphType::RangeAidedSLAMGraph: {
+    return "RangeAidedSLAMGraph";
   }
   }
   return "";
@@ -150,20 +176,18 @@ void writeSparseMatrixToFile(const SparseMatrix &M,
   file.close();
 }
 
-std::vector<RelativePosePoseMeasurement>
-read_g2o_file(const std::string &filename, size_t *num_poses) {
+G2ODataset read_g2o_file(const std::string &filename) {
   /*
   The following implementation is adapted from:
   SE-Sync: https://github.com/david-m-rosen/SE-Sync.git
   Cartan-Sync: https://bitbucket.org/jesusbriales/cartan-sync/src
   */
 
-  // Preallocate output vector
-  std::vector<DCORA::RelativePosePoseMeasurement> measurements;
+  // Initialize g2o dataset
+  G2ODataset g2o_dataset;
 
   // A single measurement, whose values we will fill in
   DCORA::RelativePosePoseMeasurement measurement;
-  measurement.weight = 1.0;
 
   // A string used to contain the contents of a single line
   std::string line;
@@ -180,8 +204,11 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
   // Open the file for reading
   std::ifstream infile(filename);
 
-  *num_poses = 0;
+  // Initialize dimension and number of poses
+  unsigned int dim = 0;
+  unsigned int num_poses = 0;
 
+  // Read ground truth and measurements
   while (std::getline(infile, line)) {
     // Construct a stream from the string
     std::stringstream strstrm(line);
@@ -189,7 +216,50 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
     // Extract the first token from the string
     strstrm >> token;
 
-    if (token == "EDGE_SE2") {
+    if (token == "VERTEX_SE2") {
+      // Set dimension
+      if (dim == 0)
+        dim = 2;
+
+      // Extract formatted output
+      strstrm >> i >> dx >> dy >> dtheta;
+
+      // Populate ground truth
+      Pose gt_pose = Pose(2);
+      gt_pose.translation() = Eigen::Matrix<double, 2, 1>(dx, dy);
+      gt_pose.rotation() = Eigen::Rotation2Dd(dtheta).toRotationMatrix();
+
+      const PoseID pose_id = PoseID(0, i);
+      if (g2o_dataset.ground_truth_poses.find(pose_id) !=
+          g2o_dataset.ground_truth_poses.end()) {
+        LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+      }
+      g2o_dataset.ground_truth_poses[pose_id] = gt_pose;
+      continue;
+
+    } else if (token == "VERTEX_SE3:QUAT") {
+      // Set dimension
+      if (dim == 0)
+        dim = 3;
+
+      // Extract formatted output
+      strstrm >> i >> dx >> dy >> dz >> dqx >> dqy >> dqz >> dqw;
+
+      // Populate ground truth
+      Pose gt_pose = Pose(3);
+      gt_pose.translation() = Eigen::Matrix<double, 3, 1>(dx, dy, dz);
+      gt_pose.rotation() =
+          Eigen::Quaterniond(dqw, dqx, dqy, dqz).toRotationMatrix();
+
+      const PoseID pose_id = PoseID(0, i);
+      if (g2o_dataset.ground_truth_poses.find(pose_id) !=
+          g2o_dataset.ground_truth_poses.end()) {
+        LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+      }
+      g2o_dataset.ground_truth_poses[pose_id] = gt_pose;
+      continue;
+
+    } else if (token == "EDGE_SE2") {
       // This is a 2D pose measurement
 
       /** The g2o format specifies a 2D relative pose measurement in the
@@ -262,14 +332,14 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
 
       // Compute precisions
 
-      // Compute and store the optimal (information-divergence-minimizing) value
-      // of the parameter tau
+      // Compute and store the optimal (information-divergence-minimizing)
+      // value of the parameter tau
       Eigen::Matrix3d TranCov;
       TranCov << I11, I12, I13, I12, I22, I23, I13, I23, I33;
       measurement.tau = 3 / TranCov.inverse().trace();
 
-      // Compute and store the optimal (information-divergence-minimizing value
-      // of the parameter kappa
+      // Compute and store the optimal (information-divergence-minimizing
+      // value of the parameter kappa
 
       Eigen::Matrix3d RotCov;
       RotCov << I44, I45, I46, I45, I55, I56, I46, I56, I66;
@@ -281,25 +351,27 @@ read_g2o_file(const std::string &filename, size_t *num_poses) {
         measurement.fixedWeight = false;
       }
 
-    } else if ((token == "VERTEX_SE2") || (token == "VERTEX_SE3:QUAT")) {
-      // This is just initialization information, so do nothing
-      continue;
     } else {
       LOG(FATAL) << "Error: unrecognized type: " << token << "!";
     }
 
     // Update maximum value of poses found so far
-    size_t max_pair = std::max<double>(measurement.p1, measurement.p2);
+    unsigned int max_pair =
+        std::max<unsigned int>(measurement.p1, measurement.p2);
 
-    *num_poses = ((max_pair > *num_poses) ? max_pair : *num_poses);
-    measurements.push_back(measurement);
-  } // while
+    num_poses = ((max_pair > num_poses) ? max_pair : num_poses);
+    g2o_dataset.pose_pose_measurements.push_back(measurement);
+  }
+  CHECK(dim == 2 || dim == 3);
 
   infile.close();
 
-  (*num_poses)++; // Account for the use of zero-based indexing
+  num_poses++; // Account for the use of zero-based indexing
 
-  return measurements;
+  g2o_dataset.dim = dim;
+  g2o_dataset.num_poses = num_poses;
+
+  return g2o_dataset;
 }
 
 int getDimFromPyfgFirstLine(const std::string &filename) {
@@ -363,13 +435,27 @@ int getDimFromPyfgFirstLine(const std::string &filename) {
 }
 
 PyFGDataset read_pyfg_file(const std::string &filename) {
-  /*
-  The following implementation is adapted from:
-  CORA: https://github.com/MarineRoboticsGroup/cora
-  */
+  // Initialize PyFG dataset
+  PyFGDataset pyfg_dataset;
+
+  // Get dimension of PyFG file
+  pyfg_dataset.dim = getDimFromPyfgFirstLine(filename);
+
+  // Initialize measurements, whose values we will fill in
+  PosePrior pose_prior;
+  LandmarkPrior landmark_prior;
+  RelativePosePoseMeasurement pose_pose_measurement;
+  RelativePoseLandmarkMeasurement pose_landmark_measurement;
+  RangeMeasurement range_measurement;
+
+  // Initialize map for indexing unit spheres according to robot ID
+  std::map<unsigned int, unsigned int> robot_id_to_unit_sphere_idx = {};
+
+  // Initialize map to maintain unique range edges
+  EdgeIDMap range_edge_id_to_index;
+  size_t range_edge_index = 0;
 
   // Define helper lambda functions
-
   auto readScalar = [](std::istringstream &strstrm) -> double {
     double result;
     if (strstrm >> result) {
@@ -425,9 +511,9 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         } else {
           LOG(WARNING) << "Warning: attempted to parse covariance matrix. i: "
                        << i << " j:" << j << " val:" << val;
-          LOG(FATAL)
-              << "Error: could not read covariance matrix from string stream: "
-              << strstrm.str() << "!";
+          LOG(FATAL) << "Error: could not read covariance matrix from string "
+                        "stream: "
+                     << strstrm.str() << "!";
         }
       }
     }
@@ -502,7 +588,7 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
     if (sym[0] == LANDMARK_SYMBOL) {
       // Symbol is a landmark
       if (std::isupper(sym[1])) {
-        if (sym[1] == MAP_ID) {
+        if (sym[1] == MAP_SYMBOL) {
           // Landmark is associated with the map, though does not obey PyFG
           // formatting.
           LOG(WARNING)
@@ -511,16 +597,16 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
                  "'L#'.";
         }
         // Landmark is associated with a robot according to PyFG formatting
-        robotID = static_cast<unsigned int>(sym[1] - FIRST_AGENT_ID);
+        robotID = static_cast<unsigned int>(sym[1] - FIRST_AGENT_SYMBOL);
         stateID = std::stoi(sym.substr(2));
       } else {
         // Landmark is associated with the map
-        robotID = static_cast<unsigned int>(MAP_ID - FIRST_AGENT_ID);
+        robotID = static_cast<unsigned int>(MAP_SYMBOL - FIRST_AGENT_SYMBOL);
         stateID = std::stoi(sym.substr(1));
       }
     } else if (std::isupper(sym[0])) {
       // Symbol is a pose
-      robotID = static_cast<unsigned int>(sym[0] - FIRST_AGENT_ID);
+      robotID = static_cast<unsigned int>(sym[0] - FIRST_AGENT_SYMBOL);
       stateID = std::stoi(sym.substr(1));
     } else {
       LOG(FATAL) << "Error: could not read robot and state ID from symbol: "
@@ -552,25 +638,56 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
     return T;
   };
 
-  // Initialize PyFG dataset
-  PyFGDataset pyfg_dataset;
+  auto updateGroundTruthPoses = [&](const PoseID &pose_id,
+                                    const Pose &gt_pose) {
+    if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
+        pyfg_dataset.ground_truth.poses.end()) {
+      LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
+    }
+    pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+  };
 
-  // Get dimension of PyFG file
-  pyfg_dataset.dim = getDimFromPyfgFirstLine(filename);
+  auto updateGroundTruthLandmarks = [&](const LandmarkID &landmark_id,
+                                        const Point &gt_landmark) {
+    if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
+        pyfg_dataset.ground_truth.landmarks.end()) {
+      LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
+    }
+    pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+  };
 
-  // Initialize measurements, whose values we will fill in
-  PosePrior pose_prior;
-  LandmarkPrior landmark_prior;
-  RelativePosePoseMeasurement pose_pose_measurement;
-  RelativePoseLandmarkMeasurement pose_landmark_measurement;
-  RangeMeasurement range_measurement;
+  auto updateFirstPoseIdx = [&](unsigned int robotID, const PoseID &pose_id) {
+    if (pyfg_dataset.robot_id_to_first_pose_idx.find(robotID) !=
+        pyfg_dataset.robot_id_to_first_pose_idx.end()) {
+      unsigned int prev_min_pose_idx =
+          pyfg_dataset.robot_id_to_first_pose_idx.at(robotID);
+      unsigned int min_pose_idx = std::min(prev_min_pose_idx, pose_id.frame_id);
+      pyfg_dataset.robot_id_to_first_pose_idx.at(robotID) = min_pose_idx;
+    } else {
+      pyfg_dataset.robot_id_to_first_pose_idx[robotID] = pose_id.frame_id;
+    }
+  };
 
-  // Initialize map for indexing unit spheres according to robot ID
-  std::map<unsigned int, unsigned int> robot_id_to_unit_sphere_idx = {};
+  auto updateFirstLandmarkIdx = [&](unsigned int robotID,
+                                    const LandmarkID &landmark_id) {
+    if (pyfg_dataset.robot_id_to_first_landmark_idx.find(robotID) !=
+        pyfg_dataset.robot_id_to_first_landmark_idx.end()) {
+      unsigned int prev_min_landmark_idx =
+          pyfg_dataset.robot_id_to_first_landmark_idx.at(robotID);
+      unsigned int min_landmark_idx =
+          std::min(prev_min_landmark_idx, landmark_id.frame_id);
+      pyfg_dataset.robot_id_to_first_landmark_idx.at(robotID) =
+          min_landmark_idx;
+    } else {
+      pyfg_dataset.robot_id_to_first_landmark_idx[robotID] =
+          landmark_id.frame_id;
+    }
+  };
 
-  // Initialize map to maintain unique range edges
-  EdgeIDMap range_edge_id_to_index;
-  size_t range_edge_index = 0;
+  /*
+  The following implementation is adapted from:
+  CORA: https://github.com/MarineRoboticsGroup/cora
+  */
 
   // A string used to contain the contents of a single line
   std::string line;
@@ -612,14 +729,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const PoseID pose_id = PoseID(robotID, stateID);
         const Matrix T = getTransformFromRotationAndTranslation(R, t);
         const Pose gt_pose = Pose(T);
-        if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
-            pyfg_dataset.ground_truth.poses.end()) {
-          LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
-        }
-        pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+        updateGroundTruthPoses(pose_id, gt_pose);
 
         // Increment number of poses for this robot
         pyfg_dataset.robot_id_to_num_poses[robotID]++;
+
+        // Set first pose idx
+        updateFirstPoseIdx(robotID, pose_id);
 
       } else {
         LOG(FATAL) << "Error: could not read pose variable from line: " << line
@@ -641,14 +757,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         const PoseID pose_id = PoseID(robotID, stateID);
         const Matrix T = getTransformFromRotationAndTranslation(R, t);
         const Pose gt_pose = Pose(T);
-        if (pyfg_dataset.ground_truth.poses.find(pose_id) !=
-            pyfg_dataset.ground_truth.poses.end()) {
-          LOG(FATAL) << "Error: duplicate pose ID: " << pose_id << "!";
-        }
-        pyfg_dataset.ground_truth.poses[pose_id] = gt_pose;
+        updateGroundTruthPoses(pose_id, gt_pose);
 
         // Increment number of poses for this robot
         pyfg_dataset.robot_id_to_num_poses[robotID]++;
+
+        // Set first pose idx
+        updateFirstPoseIdx(robotID, pose_id);
 
       } else {
         LOG(FATAL) << "Error: could not read pose variable from line: " << line
@@ -724,14 +839,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Populate ground truth
         const LandmarkID landmark_id = LandmarkID(robotID, stateID);
         const Point gt_landmark = Point(t);
-        if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
-            pyfg_dataset.ground_truth.landmarks.end()) {
-          LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
-        }
-        pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+        updateGroundTruthLandmarks(landmark_id, gt_landmark);
 
         // Increment number of landmarks for this robot
         pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
+
+        // Set first pose idx
+        updateFirstLandmarkIdx(robotID, landmark_id);
 
       } else {
         LOG(FATAL) << "Error: could not read landmark variable from line: "
@@ -751,14 +865,13 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
         // Populate ground truth
         const LandmarkID landmark_id = LandmarkID(robotID, stateID);
         const Point gt_landmark = Point(t);
-        if (pyfg_dataset.ground_truth.landmarks.find(landmark_id) !=
-            pyfg_dataset.ground_truth.landmarks.end()) {
-          LOG(FATAL) << "Error: duplicate landmark ID: " << landmark_id << "!";
-        }
-        pyfg_dataset.ground_truth.landmarks[landmark_id] = gt_landmark;
+        updateGroundTruthLandmarks(landmark_id, gt_landmark);
 
         // Increment number of landmarks for this robot
         pyfg_dataset.robot_id_to_num_landmarks[robotID]++;
+
+        // Set first pose idx
+        updateFirstLandmarkIdx(robotID, landmark_id);
 
       } else {
         LOG(FATAL) << "Error: could not read landmark variable from line: "
@@ -789,7 +902,8 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
       }
       break;
     case LANDMARK_PRIOR_3D:
-      // VERTEX_XYZ:PRIOR ts sym x y z cov_11 cov_12 cov_13 cov_22 cov_23 cov_33
+      // VERTEX_XYZ:PRIOR ts sym x y z cov_11 cov_12 cov_13 cov_22 cov_23
+      // cov_33
       if (strstrm >> timestamp >> sym1) {
         // Read string stream
         const Vector t = readVector(strstrm, 3);
@@ -1053,9 +1167,10 @@ PyFGDataset read_pyfg_file(const std::string &filename) {
 }
 
 LocalToGlobalStateDicts
-getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
+getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset,
+                             bool reindex_local_states) {
   LocalToGlobalStateDicts local_to_global_state_dicts;
-  const unsigned int global_robot_id = 0;
+  const unsigned int global_robot_id = CENTRALIZED_AGENT_ID;
 
   // Get ground truth dictionaries
   const PoseDict &gt_pose_dict = pyfg_dataset.ground_truth.poses;
@@ -1066,18 +1181,31 @@ getLocalToGlobalStateMapping(const PyFGDataset &pyfg_dataset) {
   // Assign local to global state mapping
   unsigned int global_pose_idx = 0;
   for (const auto &[local_pose_id, pose] : gt_pose_dict) {
+    // Reindex
+    PoseID local_pose_id_reindexed = local_pose_id;
+    if (reindex_local_states) {
+      local_pose_id_reindexed.frame_id -=
+          pyfg_dataset.robot_id_to_first_pose_idx.at(local_pose_id.robot_id);
+    }
     // Populate map
     const PoseID global_pose_id(global_robot_id, global_pose_idx);
-    local_to_global_state_dicts.poses[local_pose_id] = global_pose_id;
+    local_to_global_state_dicts.poses[local_pose_id_reindexed] = global_pose_id;
 
     // Increment
     global_pose_idx++;
   }
   unsigned int global_landmark_idx = 0;
   for (const auto &[local_landmark_id, landmark] : gt_landmark_dict) {
+    // Reindex
+    LandmarkID local_landmark_id_reindexed = local_landmark_id;
+    if (reindex_local_states) {
+      local_landmark_id_reindexed.frame_id -=
+          pyfg_dataset.robot_id_to_first_landmark_idx.at(
+              local_landmark_id.robot_id);
+    }
     // Populate map
     const LandmarkID global_landmark_id(global_robot_id, global_landmark_idx);
-    local_to_global_state_dicts.landmarks[local_landmark_id] =
+    local_to_global_state_dicts.landmarks[local_landmark_id_reindexed] =
         global_landmark_id;
 
     // Increment
@@ -1549,7 +1677,7 @@ Matrix projectToRotationGroup(const Matrix &M) {
 Matrix projectToStiefelManifold(const Matrix &M) {
   size_t r = M.rows();
   size_t d = M.cols();
-  CHECK(r >= d);
+  CHECK_GE(r, d);
   Eigen::JacobiSVD<Matrix> svd(M, Eigen::ComputeThinU | Eigen::ComputeThinV);
   return svd.matrixU() * svd.matrixV().transpose();
 }
@@ -1582,8 +1710,8 @@ Matrix symBlockDiagProduct(const Matrix &A, const Matrix &BT, const Matrix &C,
   return R;
 }
 
-bool fastVerification(const SparseMatrix &S, double eta, double shift,
-                      double *theta, Vector *x) {
+bool fastVerification(const SparseMatrix &S, double eta, double *theta,
+                      Vector *x) {
   // Regularize dual certificate matrix
   unsigned int k = S.rows();
   const SparseMatrix I = Matrix::Identity(k, k).sparseView();
@@ -1593,8 +1721,9 @@ bool fastVerification(const SparseMatrix &S, double eta, double shift,
   bool isPSD = isSparseSymmetricMatrixPSD(M);
   if (!isPSD) {
     // Compute the minimum eigen pair
+    unsigned int max_iterations = 1000;
     auto [min_eigenvalue, min_eigenvector] =
-        computeMinimumEigenPair(M, shift, eta);
+        computeMinimumEigenPair(M, max_iterations, eta);
 
     // Calculate curvature along estimated minimum eigenvector
     *theta = min_eigenvector.dot(S * min_eigenvector);
@@ -1622,18 +1751,24 @@ using SpectraSparseSymShiftSolve =
 std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
                                                   double sigma, double eta) {
   CHECK_LE(sigma, 0.0)
-      << "Error: The minimum eigen pair should only be computed for matrices "
-         "for which a sparse Cholesky factorization was unsuccessful, thus "
-         "implying the minimum eigenvalue is less than zero";
+      << "[Shift-and-Invert Mode Eigen-Solver] Error: The minimum eigen pair "
+         "should only be computed for matrices for which a sparse Cholesky "
+         "factorization was unsuccessful, thus implying the minimum eigenvalue "
+         "is less than zero";
   CHECK(S.isApprox(S.transpose()));
+
+  // Set convergence speed of the algorithm
+  unsigned int k = S.rows();
+  unsigned int num_Lanczos_vectors = 20;
+  unsigned int solver_convergence_speed = std::min(num_Lanczos_vectors, k);
 
   int max_iter = 10;
   double min_eigenvalue;
   Vector min_eigenvector;
   for (int i = 0; i < max_iter; i++) {
     SpectraSparseSymShiftSolve op(S);
-    Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(op, 1, 6,
-                                                                      sigma);
+    Spectra::SymEigsShiftSolver<SpectraSparseSymShiftSolve> eigsolver(
+        op, 1, solver_convergence_speed, sigma);
 
     eigsolver.init();
     eigsolver.compute(Spectra::SortRule::LargestMagn);
@@ -1643,25 +1778,120 @@ std::pair<double, Vector> computeMinimumEigenPair(const SparseMatrix &S,
       break;
     } else {
       LOG(WARNING)
-          << "Warning: Could not compute minimum eigen pair with shift sigma = "
-          << sigma << ". Halving shift and repeating computation.";
+          << "[Shift-and-Invert Mode Eigen-Solver] Warning: Could not "
+             "compute minimum eigen pair with shift: "
+          << sigma
+          << ". As a heuristic, we halve the shift and repeat the computation.";
       sigma /= 2;
     }
 
-    if (i == max_iter - 1) {
+    if (i == max_iter - 1 || sigma < -2 * eta) {
       double min_eigenvalue_within_tol = -2 * eta;
-      LOG(WARNING)
-          << "Warning: Minimum eigen pair computation was unsuccessful. "
-             "Solving minium eigen pair using two times eta = "
-          << min_eigenvalue_within_tol;
+      LOG(WARNING) << "[Shift-and-Invert Mode Eigen-Solver] Warning: Minimum "
+                      "eigen pair computation was unsuccessful. "
+                      "Solving minium eigen pair using two times eta: "
+                   << min_eigenvalue_within_tol;
       sigma = min_eigenvalue_within_tol;
     }
   }
 
   CHECK_LE(min_eigenvalue, 0.0)
-      << "Error: Calculated minimum eigenvalue is not less than zero. Try "
-         "adjusting the numerical tolerance for minimum eigenvalue "
-         "nonnegativity.";
+      << "[Shift-and-Invert Mode Eigen-Solver] Error: Calculated minimum "
+         "eigenvalue is not less than zero. Try adjusting the numerical "
+         "tolerance for minimum eigenvalue nonnegativity.";
+  LOG(INFO) << "[Shift-and-Invert Mode Eigen-Solver] min eigenvalue: "
+            << min_eigenvalue;
+  return {min_eigenvalue, min_eigenvector};
+}
+
+using SpectraSymMatProd =
+    Spectra::SparseSymMatProd<double, Eigen::Lower, Eigen::RowMajor>;
+std::pair<double, Vector>
+computeMinimumEigenPair(const SparseMatrix &S, unsigned int max_iterations,
+                        double min_eig_num_tol,
+                        unsigned int num_Lanczos_vectors) {
+  /*
+  The following implementation is adapted from:
+  SE-Sync: https://github.com/david-m-rosen/SE-Sync/releases/tag/v1.0.0
+  */
+
+  // Initialize minimum eigen pair
+  double min_eigenvalue;
+  Vector min_eigenvector;
+
+  // Log the number of matrix-vector multiplication operations
+  unsigned int num_min_eig_mv_ops = 0;
+
+  // Set convergence speed of the algorithm
+  unsigned int k = S.rows();
+  unsigned int solver_convergence_speed = std::min(num_Lanczos_vectors, k);
+
+  // Set initial precision parameter when calculating the dominant
+  // (largest-magnitude) eigenvalue of S(X)
+  double precision_tol = 1e-4;
+
+  // Compute the dominant (largest-magnitude) eigenvalue of S(X)
+  SpectraSymMatProd lm_op(S);
+  Spectra::SymEigsSolver<SpectraSymMatProd> largest_magnitude_eigensolver(
+      lm_op, 1, solver_convergence_speed);
+  largest_magnitude_eigensolver.init();
+  largest_magnitude_eigensolver.compute(Spectra::SortRule::LargestMagn,
+                                        max_iterations, precision_tol,
+                                        Spectra::SortRule::LargestMagn);
+  if (largest_magnitude_eigensolver.info() != Spectra::CompInfo::Successful)
+    LOG(FATAL) << "[SE-Sync Spectrum shifting Eigen Solver] Error: Could not "
+                  "compute maximum-magnitude eigenvalue of S(X).";
+  num_min_eig_mv_ops += largest_magnitude_eigensolver.num_operations();
+  double lambda_lm = largest_magnitude_eigensolver.eigenvalues()[0];
+
+  if (lambda_lm < 0) {
+    // The largest-magnitude eigenvalue is negative, and therefore also the
+    // minimum eigenvalue, so just return this solution
+    min_eigenvalue = lambda_lm;
+    min_eigenvector = largest_magnitude_eigensolver.eigenvectors().col(0);
+    LOG(INFO) << "[SE-Sync Spectrum shifting Eigen Solver] min eigenvalue: "
+              << min_eigenvalue;
+    return {min_eigenvalue, min_eigenvector};
+  }
+
+  // Shift spectrum of S(X)
+  const SparseMatrix I = Matrix::Identity(k, k).sparseView();
+  const SparseMatrix C = S - 2 * lambda_lm * I;
+
+  // Set initial guess for solver
+  Vector v0 = S.row(0).transpose();
+  Vector perturbation(v0.size());
+  perturbation.setRandom();
+  perturbation.normalize();
+  Vector xinit = v0 + (.03 * v0.norm()) * perturbation; // Perturb v0 by ~3%
+
+  // Reset precision tolerance
+  precision_tol = min_eig_num_tol / lambda_lm;
+
+  // Compute the dominant (largest-magnitude) eigenvalue of C = S(X) - λ_lm × I
+  SpectraSymMatProd min_shifted_op(C);
+  Spectra::SymEigsSolver<SpectraSymMatProd> min_shifted_solver(
+      min_shifted_op, 1, solver_convergence_speed);
+  min_shifted_solver.init(xinit.data());
+  min_shifted_solver.compute(Spectra::SortRule::LargestMagn, max_iterations,
+                             precision_tol, Spectra::SortRule::LargestMagn);
+  if (min_shifted_solver.info() != Spectra::CompInfo::Successful) {
+    double sigma = -10;
+    LOG(WARNING)
+        << "[SE-Sync Spectrum shifting Eigen Solver] Error: Could not  compute "
+           "maximum-magnitude eigenvalue of spectraly shifted S(X) as the "
+           "minimum eigen value is likely near zero within a tight clustering "
+           "of other eigenvalues. Using Shift-and-Invert Mode Eigen-Solver "
+           "with a shift of: "
+        << sigma;
+    return computeMinimumEigenPair(S, sigma, min_eig_num_tol);
+  }
+  num_min_eig_mv_ops += min_shifted_solver.num_operations();
+
+  min_eigenvalue = min_shifted_solver.eigenvalues()[0] + 2 * lambda_lm;
+  min_eigenvector = min_shifted_solver.eigenvectors().col(0);
+  LOG(INFO) << "[SE-Sync Spectrum shifting Eigen Solver] min eigenvalue: "
+            << min_eigenvalue;
   return {min_eigenvalue, min_eigenvector};
 }
 
@@ -1739,7 +1969,7 @@ constructDualCertificateMatrixRASLAM(const Matrix &X, const SparseMatrix &Q,
                               stiefel_Lambda_blocks(r, i * d + c));
 
   // Add the diagonal block for the Oblique constraints
-  for (auto i = 0; i < l; ++i)
+  for (unsigned int i = 0; i < l; ++i)
     elements.emplace_back(rot_mat_size + i, rot_mat_size + i,
                           oblique_Lambda_blocks(i));
 
@@ -1987,6 +2217,75 @@ Matrix projectToRAMatrix(const Matrix &M, unsigned int r, unsigned int d,
   auto [X_SE_R_proj, X_SE_t_proj] = partitionSEMatrix(X_SE_proj, r, d, n);
   return createRAMatrix(X_SE_R_proj, projectToObliqueManifold(X_OB),
                         X_SE_t_proj, X_E);
+}
+
+PoseArray alignTrajectoryToFrame(PoseArray trajectoryInit, const Pose Tw0) {
+  unsigned int d = trajectoryInit.d();
+  unsigned int n = trajectoryInit.n();
+  CHECK_EQ(d, Tw0.d());
+  PoseArray trajectoryTransformed(d, n);
+  for (unsigned int i = 0; i < n; ++i) {
+    const Pose Twi(trajectoryInit.pose(i));
+    const Pose T0i = Tw0.inverse() * Twi;
+    trajectoryTransformed.pose(i) = T0i.pose();
+  }
+  return trajectoryTransformed;
+}
+
+PointArray alignUnitSpheresToFrame(PointArray unitSpheresInit, const Pose Tw0) {
+  unsigned int d = unitSpheresInit.d();
+  unsigned int l = unitSpheresInit.n();
+  CHECK_EQ(d, Tw0.d());
+  PointArray unitSpheresTransformed(d, l);
+  const Matrix R0 = Tw0.rotation();
+  for (unsigned int i = 0; i < l; ++i) {
+    unitSpheresTransformed.translation(i) =
+        R0.transpose() * unitSpheresInit.translation(i);
+  }
+  return unitSpheresTransformed;
+}
+
+PointArray alignLandmarksToFrame(PointArray landmarksInit, const Pose Tw0) {
+  unsigned int d = landmarksInit.d();
+  unsigned int b = landmarksInit.n();
+  CHECK_EQ(d, Tw0.d());
+  PointArray landmarksTransformed(d, b);
+  Pose Twi = Pose::Identity(d);
+  for (unsigned int i = 0; i < b; ++i) {
+    Twi.translation() = landmarksInit.translation(i);
+    const Pose T0i = Tw0.inverse() * Twi;
+    landmarksTransformed.translation(i) = T0i.translation();
+  }
+  return landmarksTransformed;
+}
+
+PoseArray alignLiftedTrajectoryToFrame(const Matrix &liftedTrajectoryInit,
+                                       const LiftedPose Tw0, unsigned int d,
+                                       unsigned int n, bool isGlobalAlignment) {
+  unsigned int r = liftedTrajectoryInit.rows();
+  unsigned int k = liftedTrajectoryInit.cols();
+  CHECK_EQ(r, Tw0.r());
+  CHECK_EQ(d, Tw0.d());
+  CHECK_EQ(k, (d + 1) * n);
+
+  // Rotate trajectory to global or local frame
+  const Matrix &R0T = Tw0.rotation().transpose();
+  PoseArray liftedTrajectoryTransformed(d, n);
+  liftedTrajectoryTransformed.setData(R0T * liftedTrajectoryInit);
+  const Vector &ta = isGlobalAlignment
+                         ? Vector(Tw0.translation())
+                         : Vector(liftedTrajectoryTransformed.translation(0));
+  const Vector &t0 = R0T * ta;
+
+  // Project each rotation block to the rotation group, and make the first
+  // translation zero
+  for (unsigned int i = 0; i < n; ++i) {
+    liftedTrajectoryTransformed.rotation(i) =
+        projectToRotationGroup(liftedTrajectoryTransformed.rotation(i));
+    liftedTrajectoryTransformed.translation(i) =
+        liftedTrajectoryTransformed.translation(i) - t0;
+  }
+  return liftedTrajectoryTransformed;
 }
 
 } // namespace DCORA

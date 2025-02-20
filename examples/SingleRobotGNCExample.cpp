@@ -40,11 +40,12 @@ int main(int argc, char **argv) {
       << "Single robot robust pose-graph optimization demo using graduated "
          "non-convexity (GNC). "
       << std::endl;
-  size_t num_poses;
+  const DCORA::G2ODataset dataset = DCORA::read_g2o_file(argv[1]);
   std::vector<DCORA::RelativePosePoseMeasurement> measurements =
-      DCORA::read_g2o_file(argv[1], &num_poses);
+      dataset.pose_pose_measurements;
+
   CHECK(!measurements.empty());
-  unsigned int dimension = measurements[0].t.size();
+  unsigned int dimension = dataset.dim;
   auto pose_graph = std::make_shared<DCORA::Graph>(0, dimension, dimension);
   pose_graph->setMeasurements(measurements);
 

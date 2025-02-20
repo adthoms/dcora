@@ -205,27 +205,12 @@ public:
   /**
    * @brief Set neighbor states
    * @param pose_dict
-   * @param landmark_dict
    * @param unit_sphere_dict
+   * @param landmark_dict
    */
   void setNeighborStates(const PoseDict &pose_dict,
-                         const LandmarkDict &landmark_dict,
-                         const UnitSphereDict &unit_sphere_dict);
-  /**
-   * @brief Set neighbor poses
-   * @param pose_dict
-   */
-  void setNeighborPoses(const PoseDict &pose_dict);
-  /**
-   * @brief Set neighbor landmarks
-   * @param landmark_dict
-   */
-  void setNeighborLandmarks(const LandmarkDict &landmark_dict);
-  /**
-   * @brief Set neighbor unit spheres
-   * @param unit_sphere_dict
-   */
-  void setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict);
+                         const UnitSphereDict &unit_sphere_dict,
+                         const LandmarkDict &landmark_dict);
   /**
    * @brief Get quadratic cost matrix
    * @return
@@ -541,16 +526,20 @@ protected:
                                size_t *i, size_t *j);
   /**
    * @brief Helper function to determine if a state (which is either the source
-   * or destination state of a relative measurement) is owned by an inactive
-   * neighbor. Return true if the neighbor is inactive and if the query
-   * neighborStateID belongs to the neighbor. If the neighbor is active, return
-   * false. If the neighbor is inactive but the query neighborStateID does not
-   * belong to the neighbor, return std::nullopt
+   * or destination state of a relative measurement) is owned by an active
+   * neighbor. Return true if the neighbor is active and if the query
+   * neighborStateID belongs to the neighbor. If the neighbor is inactive,
+   * return false. If a measurement is taken with an inactive neighbors or if
+   * the query neighborStateID does not belong to the neighbor, return
+   * std::nullopt. Note that, in the context of the Graph class, a neighbor is
+   * considered "active" if it shares a loop closure with the agent associated
+   * with this graph. "Active" in this context has no notion of whether or not
+   * the neighbor is actively participating in distributed optimization.
    * @param neighborStateID
    * @return
    */
   std::optional<bool>
-  isStateOwnedByInactiveNeighbor(const StateID &neighborStateID);
+  isStateOwnedByActiveNeighbor(const StateID &neighborStateID);
   /**
    * @brief Helper function to return the lifted data matrix of the fixed public
    * variable (associated with neighborStateID) owned by a neighbor of this

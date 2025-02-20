@@ -38,20 +38,19 @@ int main(int argc, char **argv) {
 
   std::cout << "Single robot pose-graph optimization demo. " << std::endl;
 
-  size_t num_poses;
-  std::vector<DCORA::RelativePosePoseMeasurement> dataset =
-      DCORA::read_g2o_file(argv[1], &num_poses);
+  const DCORA::G2ODataset dataset = DCORA::read_g2o_file(argv[1]);
+  const std::vector<DCORA::RelativePosePoseMeasurement> &measurements =
+      dataset.pose_pose_measurements;
 
   /**
   ###########################################
-  Set parameters for PGOAgent
+  Set parameters for Agent
   ###########################################
   */
 
-  unsigned int d, r;
-  d = (!dataset.empty() ? dataset[0].t.size() : 0);
-  r = d;
-  DCORA::PGOAgentParameters options(d, r, 1);
+  unsigned int d = (!measurements.empty() ? dataset.dim : 0);
+  unsigned int r = d;
+  DCORA::AgentParameters options(d, r);
   options.verbose = true;
   options.logDirectory = "/home/alex/data/dcora_dpgo_examples/"
                          "dcora_examples/single_robot_example_pgo/";
@@ -60,7 +59,7 @@ int main(int argc, char **argv) {
   std::vector<DCORA::RelativePosePoseMeasurement> odometry;
   std::vector<DCORA::RelativePosePoseMeasurement> private_loop_closures;
   std::vector<DCORA::RelativePosePoseMeasurement> shared_loop_closure;
-  for (const auto &mIn : dataset) {
+  for (const auto &mIn : measurements) {
     unsigned srcIdx = mIn.p1;
     unsigned dstIdx = mIn.p2;
 
@@ -78,7 +77,7 @@ int main(int argc, char **argv) {
 
   // Construct the centralized PGO problem (used for evaluation)
   auto pose_graph = std::make_shared<DCORA::Graph>(0, d, d);
-  pose_graph->setMeasurements(dataset);
+  pose_graph->setMeasurements(measurements);
   DCORA::QuadraticProblem problemCentral(pose_graph);
 
   /**
@@ -87,7 +86,7 @@ int main(int argc, char **argv) {
   ###########################################
   */
 
-  auto *agent = new DCORA::PGOAgent(0, options);
+  auto *agent = new DCORA::Agent(0, options);
   agent->setMeasurements(odometry, private_loop_closures, shared_loop_closure);
   agent->initialize();
 

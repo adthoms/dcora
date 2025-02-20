@@ -611,7 +611,7 @@ private:
   }
 
   /**
-   * Add a relative pose-pose measurement.
+   * @brief Add a relative pose-pose measurement.
    * @param relative_measurement
    */
   void addPosePoseMeasurement(const RelativeMeasurement &relative_measurement) {
@@ -622,7 +622,7 @@ private:
   }
 
   /**
-   * Add a relative pose-landmark measurement.
+   * @brief Add a relative pose-landmark measurement.
    * @param relative_measurement
    */
   void
@@ -634,7 +634,7 @@ private:
   }
 
   /**
-   * Add a range measurement.
+   * @brief Add a range measurement.
    * @param relative_measurement
    */
   void addRangeMeasurement(const RelativeMeasurement &relative_measurement) {
@@ -712,27 +712,26 @@ struct GroundTruth {
                                          const GroundTruth &ground_truth) {
     os << "Ground Truth:" << std::endl;
     os << "Poses:" << std::endl;
-    for (const auto &[pose_id, pose] : ground_truth.poses) {
-      os << "ID: " << pose_id << std::endl;
-      os << "Variable:\n " << pose.pose() << std::endl;
-    }
+    os << ground_truth.poses;
     os << "Landmarks:" << std::endl;
-    for (const auto &[landmark_id, landmark] : ground_truth.landmarks) {
-      os << "ID: " << landmark_id << std::endl;
-      os << "Variable:\n " << landmark.translation() << std::endl;
-    }
+    os << ground_truth.landmarks;
     os << "Unit Spheres:" << std::endl;
-    for (const auto &[unit_sphere_id, unit_sphere] :
-         ground_truth.unit_spheres) {
-      os << "ID: " << unit_sphere_id << std::endl;
-      os << "Variable:\n " << unit_sphere.translation() << std::endl;
-    }
+    os << ground_truth.unit_spheres;
     return os;
   }
 };
 
 // Ordered map of local and global states
 typedef std::map<StateID, StateID, CompareStateID> LocalToGlobalStateDict;
+
+// A utility function for streaming LocalToGlobalStateDict to cout
+inline std::ostream &
+operator<<(std::ostream &os,
+           const LocalToGlobalStateDict &local_to_global_state_dict) {
+  for (const auto &[local_id, global_id] : local_to_global_state_dict)
+    os << local_id << " --> " << global_id << std::endl;
+  return os;
+}
 
 /**
  * @brief A simple struct that contains local to global state mappings.
@@ -751,20 +750,64 @@ struct LocalToGlobalStateDicts {
              const LocalToGlobalStateDicts &local_to_global_state_dicts) {
     os << "Local to Global State:" << std::endl;
     os << "Poses:" << std::endl;
-    for (const auto &[local_id, global_id] :
-         local_to_global_state_dicts.poses) {
-      os << local_id << " --> " << global_id << std::endl;
-    }
+    os << local_to_global_state_dicts.poses;
     os << "Landmarks:" << std::endl;
-    for (const auto &[local_id, global_id] :
-         local_to_global_state_dicts.landmarks) {
-      os << local_id << " --> " << global_id << std::endl;
-    }
+    os << local_to_global_state_dicts.landmarks;
     os << "Unit Spheres:" << std::endl;
-    for (const auto &[local_id, global_id] :
-         local_to_global_state_dicts.unit_spheres) {
-      os << local_id << " --> " << global_id << std::endl;
+    os << local_to_global_state_dicts.unit_spheres;
+    return os;
+  }
+};
+
+/**
+ * @brief A simple struct that contains the elements of a G2O dataset.
+ */
+struct G2ODataset {
+  unsigned int dim;       // Dimension (2 or 3)
+  unsigned int num_poses; // Number of poses
+
+  // Relative pose-pose measurements
+  std::vector<RelativePosePoseMeasurement> pose_pose_measurements;
+
+  // Ground truth (assuming g2o initialization represents ground truth)
+  PoseDict ground_truth_poses;
+
+  // Simple default constructor; does nothing
+  G2ODataset() = default;
+
+  /**
+   * @brief Get ground truth poses as a PoseArray
+   * @return
+   */
+  PoseArray getGroundTruthPoseArray() const {
+    if (ground_truth_poses.empty()) {
+      LOG(WARNING) << "Warning: g2o dataset ground truth poses are empty! "
+                      "Returning empty PoseArray.";
+      return PoseArray(3, 0);
     }
+
+    CHECK_EQ(ground_truth_poses.size(), num_poses);
+    CHECK(dim == 2 || dim == 3);
+    PoseArray T(dim, num_poses);
+    for (const auto &[pose_id, pose] : ground_truth_poses) {
+      T.pose(pose_id.frame_id) = pose.pose();
+    }
+
+    return T;
+  }
+
+  // A utility function for streaming this struct to cout
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const G2ODataset &g2o_dataset) {
+    os << "G2ODataset:" << std::endl;
+    os << "Dimension: " << g2o_dataset.dim << std::endl;
+    os << "Number of Poses: " << g2o_dataset.num_poses << std::endl;
+    os << "Relative Pose-Pose Measurements:" << std::endl;
+    for (const auto &m : g2o_dataset.pose_pose_measurements) {
+      os << m << std::endl;
+    }
+    os << "GroundTruth Poses:" << std::endl;
+    os << g2o_dataset.ground_truth_poses;
     return os;
   }
 };
@@ -780,6 +823,10 @@ struct PyFGDataset {
   std::map<unsigned int, unsigned int> robot_id_to_num_poses;
   std::map<unsigned int, unsigned int> robot_id_to_num_landmarks;
   std::map<unsigned int, unsigned int> robot_id_to_num_unit_spheres;
+
+  // Ordered maps of robot id to first state idx
+  std::map<unsigned int, unsigned int> robot_id_to_first_pose_idx;
+  std::map<unsigned int, unsigned int> robot_id_to_first_landmark_idx;
 
   // Measurements
   Measurements measurements;
@@ -812,6 +859,18 @@ struct PyFGDataset {
     for (const auto &[robot_id, num_unit_spheres] :
          pyfg_dataset.robot_id_to_num_unit_spheres) {
       std::cout << "Robot ID: " << robot_id << ", Count: " << num_unit_spheres
+                << std::endl;
+    }
+    os << "First Pose Index: " << std::endl;
+    for (const auto &[robot_id, first_pose_idx] :
+         pyfg_dataset.robot_id_to_first_pose_idx) {
+      std::cout << "Robot ID: " << robot_id << ", Index: " << first_pose_idx
+                << std::endl;
+    }
+    os << "First Landmark Index: " << std::endl;
+    for (const auto &[robot_id, first_landmark_idx] :
+         pyfg_dataset.robot_id_to_first_landmark_idx) {
+      std::cout << "Robot ID: " << robot_id << ", Index: " << first_landmark_idx
                 << std::endl;
     }
     os << "Measurements:" << std::endl;

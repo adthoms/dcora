@@ -68,11 +68,9 @@ void Graph::reset() {
 bool Graph::isPGOCompatible() const {
   if (graph_type == GraphType::RangeAidedSLAMGraph)
     return false;
-
   if (l_ > 0 || b_ > 0)
     LOG(FATAL)
         << "Error: Pose graph cannot contain unit spheres and landmarks!";
-
   return true;
 }
 
@@ -333,27 +331,12 @@ void Graph::setPrior(unsigned index, const LiftedPoint &ti) {
 }
 
 void Graph::setNeighborStates(const PoseDict &pose_dict,
-                              const LandmarkDict &landmark_dict,
-                              const UnitSphereDict &unit_sphere_dict) {
+                              const UnitSphereDict &unit_sphere_dict,
+                              const LandmarkDict &landmark_dict) {
   neighbor_poses_ = pose_dict;
-  neighbor_landmarks_ = landmark_dict;
   neighbor_unit_spheres_ = unit_sphere_dict;
+  neighbor_landmarks_ = landmark_dict;
   G_.reset(); // Setting neighbor states requires re-computing linear matrix
-}
-
-void Graph::setNeighborPoses(const PoseDict &pose_dict) {
-  neighbor_poses_ = pose_dict;
-  G_.reset();
-}
-
-void Graph::setNeighborLandmarks(const LandmarkDict &landmark_dict) {
-  neighbor_landmarks_ = landmark_dict;
-  G_.reset();
-}
-
-void Graph::setNeighborUnitSpheres(const UnitSphereDict &unit_sphere_dict) {
-  neighbor_unit_spheres_ = unit_sphere_dict;
-  G_.reset();
 }
 
 bool Graph::hasNeighbor(unsigned int robot_id) const {
@@ -361,19 +344,16 @@ bool Graph::hasNeighbor(unsigned int robot_id) const {
 }
 
 bool Graph::isNeighborActive(unsigned int neighbor_id) const {
-  if (!hasNeighbor(neighbor_id)) {
+  if (!hasNeighbor(neighbor_id))
     return false;
-  }
   return neighbor_active_.at(neighbor_id);
 }
 
 void Graph::setNeighborActive(unsigned int neighbor_id, bool active) {
-  if (!hasNeighbor(neighbor_id)) {
+  if (!hasNeighbor(neighbor_id))
     return;
-  }
-  if (neighbor_active_.at(neighbor_id) != active) {
+  if (neighbor_active_.at(neighbor_id) != active)
     clearDataMatrices();
-  }
   neighbor_active_[neighbor_id] = active;
 }
 
@@ -1252,8 +1232,8 @@ bool Graph::constructLinearCostTermRASLAM() {
    *
    *      dn_b       l_b    n_b + b_b
    *   -------------------------------             ^
-   *   | Q_cb_11 |    0    | Q_cb_13 |  dn_c       |
-   *   |    0    | Q_cb_22 | Q_cb_23 |  l_c       row
+   *   | Q_cb_11 | Q_cb_12 | Q_cb_13 |  dn_c       |
+   *   | Q_cb_21 | Q_cb_22 | Q_cb_23 |  l_c       row
    *   | Q_cb_31 | Q_cb_32 | Q_cb_33 |  n_c + b_c  |
    *   -------------------------------             v
    *
@@ -1497,7 +1477,7 @@ bool Graph::constructLinearCostTermRASLAM() {
     for (unsigned i = 0; i < d_; ++i)
       OmegaRho(i, i) = meas.weight * meas.kappa;
 
-    OmegaTau(1, 1) = meas.weight * meas.tau;
+    OmegaTau(0, 0) = meas.weight * meas.tau;
 
     // Set indices according to pose ownership
     std::optional<bool> are_indices_set =
@@ -1517,10 +1497,10 @@ bool Graph::constructLinearCostTermRASLAM() {
       // Set incidence and data matrices
       AbRhoT.noalias() = -R; // Leaving node i of agent b
       TbT.noalias() = -t;
-      AbTauT(1, 1) = -1;
+      AbTauT(0, 0) = -1;
       AcRhoT.noalias() = I_dxd; // Entering node j of agent c
       TcT.noalias() = Zero_dx1;
-      AcTauT(1, 1) = +1;
+      AcTauT(0, 0) = +1;
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborPoseToLocalPose();
@@ -1535,10 +1515,10 @@ bool Graph::constructLinearCostTermRASLAM() {
       // Set incidence and data matrices
       AbRhoT.noalias() = I_dxd; // Entering node j of agent b
       TbT.noalias() = Zero_dx1;
-      AbTauT(1, 1) = +1;
+      AbTauT(0, 0) = +1;
       AcRhoT.noalias() = -R; // Leaving node i of agent c
       TcT.noalias() = -t;
-      AcTauT(1, 1) = -1;
+      AcTauT(0, 0) = -1;
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborPoseToLocalPose();
@@ -1546,7 +1526,8 @@ bool Graph::constructLinearCostTermRASLAM() {
     }
   }
 
-  // Reset rotation weight matrix to zero
+  // Reset rotation weight matrix to zero. In doing so, the cost contribution
+  // from the last pose-pose measurement is set to zero
   OmegaRho.setZero();
 
   // Iterate over all shared pose-landmark loop closures
@@ -1558,7 +1539,7 @@ bool Graph::constructLinearCostTermRASLAM() {
     t.noalias() = meas.t;
 
     // Update measurement weight matrix
-    OmegaTau(1, 1) = meas.weight * meas.tau;
+    OmegaTau(0, 0) = meas.weight * meas.tau;
 
     // Set indices according to pose/landmark ownership
     std::optional<bool> are_indices_set =
@@ -1577,9 +1558,9 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       // Set incidence and data matrices
       TbT.noalias() = -t; // Leaving node i of agent b
-      AbTauT(1, 1) = -1;
+      AbTauT(0, 0) = -1;
       TcT.noalias() = Zero_dx1; // Entering node j of agent c
-      AcTauT(1, 1) = +1;
+      AcTauT(0, 0) = +1;
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborLandmarkToLocalPose();
@@ -1593,9 +1574,9 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       // Set incidence and data matrices
       TbT.noalias() = Zero_dx1; // Entering node j of agent b
-      AbTauT(1, 1) = +1;
+      AbTauT(0, 0) = +1;
       TcT.noalias() = -t; // Leaving node i of agent c
-      AcTauT(1, 1) = -1;
+      AcTauT(0, 0) = -1;
 
       // Add measurement contribution to linear cost
       updateLinearCostFromFixedNeighborPoseToLocalLandmark();
@@ -1603,7 +1584,8 @@ bool Graph::constructLinearCostTermRASLAM() {
     }
   }
 
-  // Reset translation weight matrix to zero
+  // Reset translation weight matrix to zero. In doing so, the cost contribution
+  // from the last pose-landmark measurement is set to zero
   OmegaTau.setZero();
 
   // Iterate over all shared range loop closures
@@ -1612,10 +1594,10 @@ bool Graph::constructLinearCostTermRASLAM() {
     size_t j = IDX_NOT_SET;
 
     // Update measurement range matrix
-    DT(1, 1) = meas.range;
+    DT(0, 0) = meas.range;
 
     // Update measurement weight matrix
-    OmegaRange(1, 1) = meas.weight * meas.precision;
+    OmegaRange(0, 0) = meas.weight * meas.precision;
 
     // Set indices according to pose/landmark ownership
     std::optional<bool> are_indices_set =
@@ -1632,12 +1614,12 @@ bool Graph::constructLinearCostTermRASLAM() {
       const Matrix XcT = getNeighborFixedVariableLiftedData(neighborDstStateID);
 
       // Set incidence and data matrices
-      CbT(1, 1) = -1; // Leaving node i of agent b
-      CcT(1, 1) = +1; // Entering node j of agent c
+      CbT(0, 0) = -1; // Leaving node i of agent b
+      CcT(0, 0) = +1; // Entering node j of agent c
 
       // Update selection matrices (unit sphere variable is owned by agent b)
-      PbT(1, 1) = 1;
-      PcT(1, 1) = 0;
+      PbT(0, 0) = 1;
+      PcT(0, 0) = 0;
 
       // Set unit sphere variable index
       const unsigned int l = meas.l;
@@ -1664,7 +1646,6 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       } else {
         CHECK(neighborDstStateID.isLandmark());
-
         // Neighbor's fixed state is a lifted landmark
         XcT_landmark.noalias() = XcT;
 
@@ -1688,8 +1669,8 @@ bool Graph::constructLinearCostTermRASLAM() {
        *
        * For shared range loop closures that leave node i of agent b and enter
        * node j of agent c, the unit sphere variables associated with these
-       * edges belong to this agent. As such, there are no fixed neighbor unit
-       * sphere variables
+       * edges belong to this agent. Thus, they are not fixed neighbor unit
+       * sphere variables and do not contribute to the linear cost
        */
       continue;
 
@@ -1700,12 +1681,12 @@ bool Graph::constructLinearCostTermRASLAM() {
       const Matrix XcT = getNeighborFixedVariableLiftedData(neighborSrcStateID);
 
       // set incidence and data matrices
-      CbT(1, 1) = +1; // Entering node j of agent b
-      CcT(1, 1) = -1; // Leaving node i of agent c
+      CbT(0, 0) = +1; // Entering node j of agent b
+      CcT(0, 0) = -1; // Leaving node i of agent c
 
       // Update selection matrices (unit sphere variable is owned by agent c)
-      PbT(1, 1) = 0;
-      PcT(1, 1) = 1;
+      PbT(0, 0) = 0;
+      PcT(0, 0) = 1;
 
       // Add measurement contribution to linear cost
       const StateID &localDstStateID = meas.getDstID();
@@ -1725,7 +1706,6 @@ bool Graph::constructLinearCostTermRASLAM() {
 
       } else {
         CHECK(neighborSrcStateID.isLandmark());
-
         // Neighbor's fixed state is a lifted landmark
         XcT_landmark.noalias() = XcT;
 
@@ -1744,24 +1724,34 @@ bool Graph::constructLinearCostTermRASLAM() {
        * @brief Fixed neighbor poses/landmarks do not contributed to the linear
        * cost associated with local unit sphere variables
        *
-       * Note: Since Pb^T= 0, Q_32 = 0 and we have no contributions from fixed
-       * neighbor poses/landmarks to this agent's unit sphere variables.
-       * Intuitively, this makes sense as the neighbor poses/landmarks are
-       * connected with local poses/landmarks via an edge with a unit sphere
-       * variables associated with the neighbor
+       * Note: Since Pb^T= 0, Q_32 = 0 and thus we have no linear cost
+       * contributions from fixed neighbor poses/landmarks to this agent's unit
+       * sphere variables. Intuitively, this makes sense as the neighbor
+       * poses/landmarks are connected with local poses/landmarks via an edge
+       * with a unit sphere variables associated with the neighbor
        */
 
       /**
        * @brief Unit sphere variables belonging to neighbor agent
        *
-       * For shared range loop closures that enter node j of agent b and
-       * leave node i of agent c, the unit sphere variables associated with
-       * these edges belong to the neighbors of this agent. As such, we get the
-       * fixed unit sphere variable of the neighbor
+       * For shared range loop closures that enter node j of agent b and leave
+       * node i of agent c, the unit sphere variables associated with these
+       * edges belong to the neighbors of this agent. As such, we get the fixed
+       * unit sphere variable of the neighbor
        */
       const StateID &neighborUnitSphereID = meas.getUnitSphereID();
       XcT_unit_sphere.noalias() =
           getNeighborFixedVariableLiftedData(neighborUnitSphereID);
+
+      /**
+       * @brief Fixed neighbor unit spheres do not contributed to the linear
+       * cost associated with local unit sphere variables
+       *
+       * Note: Since Pb^T= 0, Q_22 = 0 and thus we have no linear cost
+       * contributions from fixed neighbor unit spheres to this agent's unit
+       * sphere variables. Intuitively, this makes sense as unit spheres are
+       * associated with unique edges
+       */
 
       // Add measurement contribution to linear cost
       if (localDstStateID.isPose()) {
@@ -1784,17 +1774,17 @@ bool Graph::constructLinearCostTermRASLAM() {
 std::optional<bool>
 Graph::setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
                                     size_t *i, size_t *j) {
-  std::optional<bool> is_state_owned_by_inactive_neighbor;
+  std::optional<bool> is_state_owned_by_active_neighbor;
   if (measurement.r1 == id_ && measurement.r2 != id_) {
     // Measurement is an outgoing shared loop closure. Check if the
     // measurement destination state belongs to this agent's neighbor and is
-    // inactive
+    // active
     const StateID &neighborDstStateID = measurement.getDstID();
-    is_state_owned_by_inactive_neighbor =
-        isStateOwnedByInactiveNeighbor(neighborDstStateID);
-    if (is_state_owned_by_inactive_neighbor == true)
+    is_state_owned_by_active_neighbor =
+        isStateOwnedByActiveNeighbor(neighborDstStateID);
+    if (is_state_owned_by_active_neighbor == true)
       *i = measurement.p1;
-    else if (is_state_owned_by_inactive_neighbor == false)
+    else if (is_state_owned_by_active_neighbor == false)
       return false;
     else
       return std::nullopt;
@@ -1802,13 +1792,13 @@ Graph::setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
   } else if (measurement.r1 != id_ && measurement.r2 == id_) {
     // Measurement is an incoming shared loop closure. Check if the
     // measurement source state belongs to this agent's neighbor and is
-    // inactive
+    // active
     const StateID &neighborSrcStateID = measurement.getSrcID();
-    is_state_owned_by_inactive_neighbor =
-        isStateOwnedByInactiveNeighbor(neighborSrcStateID);
-    if (is_state_owned_by_inactive_neighbor == true)
+    is_state_owned_by_active_neighbor =
+        isStateOwnedByActiveNeighbor(neighborSrcStateID);
+    if (is_state_owned_by_active_neighbor == true)
       *j = measurement.p2;
-    else if (is_state_owned_by_inactive_neighbor == false)
+    else if (is_state_owned_by_active_neighbor == false)
       return false;
     else
       return std::nullopt;
@@ -1824,7 +1814,7 @@ Graph::setIndicesFromStateOwnership(const RelativeMeasurement &measurement,
 }
 
 std::optional<bool>
-Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
+Graph::isStateOwnedByActiveNeighbor(const StateID &neighborStateID) {
   // Check for neighbor state
   bool has_neighbor_state;
   executeStateDependantFunctionals(
@@ -1840,7 +1830,7 @@ Graph::isStateOwnedByInactiveNeighbor(const StateID &neighborStateID) {
       },
       neighborStateID.state_type);
 
-  // Check if neighbor is inactive
+  // Check if neighbor is active
   if (isNeighborActive(neighborStateID.robot_id)) {
     // Measurement with active neighbor
     if (!has_neighbor_state) {
@@ -1936,12 +1926,13 @@ double Graph::computePreconditionerRegularization(const SparseMatrix &P) {
   SpectraSymMatProd op(P);
   Spectra::SymEigsSolver<SpectraSymMatProd> eigsolver(op, 1, 6);
   eigsolver.init();
-  eigsolver.compute(Spectra::SortRule::LargestAlge);
+  eigsolver.compute(Spectra::SortRule::LargestAlge, 10000, 1e-3);
 
   // Return default regularization term if computation unsuccessful
   if (eigsolver.info() != Spectra::CompInfo::Successful) {
-    LOG(WARNING) << "Could not compute the largest eigenvalue of P. Using "
-                    "a default preconditioner regularization term of : "
+    LOG(WARNING) << "Could not compute the largest eigenvalue of P for agent "
+                 << id_
+                 << ". Using a default preconditioner regularization term of : "
                  << reg;
     return reg;
   }
@@ -1963,9 +1954,8 @@ double Graph::computePreconditionerRegularization(const SparseMatrix &P) {
   double max_eigenvalue = eigsolver.eigenvalues()[0];
   reg = max_eigenvalue / (target_precondition_number - 1);
   LOG(INFO) << "Largest eigenvalue " << max_eigenvalue
-            << " of P computed successfully. Setting "
-               "preconditioner regularization term to: "
-            << reg;
+            << " of P computed successfully for agent " << id_
+            << ". Setting preconditioner regularization term to: " << reg;
   return reg;
 }
 

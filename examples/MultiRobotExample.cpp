@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   std::cout << "Multi-robot pose graph optimization example. " << std::endl;
 
   // Set number of robots
-  int num_robots = atoi(argv[1]);
+  unsigned int num_robots = atoi(argv[1]);
   if (num_robots <= 0) {
     std::cout << "Number of robots must be positive!" << std::endl;
     exit(1);
@@ -41,14 +41,15 @@ int main(int argc, char **argv) {
   std::cout << "Simulating " << num_robots << " robots." << std::endl;
 
   // Load G2O dataset
-  size_t n, d;
-  std::vector<DCORA::RelativePosePoseMeasurement> dataset =
-      DCORA::read_g2o_file(argv[2], &n);
-  if (dataset.empty()) {
+  const DCORA::G2ODataset dataset = DCORA::read_g2o_file(argv[2]);
+  const std::vector<DCORA::RelativePosePoseMeasurement> &measurements =
+      dataset.pose_pose_measurements;
+  if (measurements.empty()) {
     std::cout << "G2O Dataset is empty. Exiting program." << std::endl;
     exit(1);
   }
-  d = dataset[0].t.size();
+  size_t d = dataset.dim;
+  size_t n = dataset.num_poses;
   std::cout << "Loaded dataset from file " << argv[2] << "." << std::endl;
 
   // Check valid number of robots
@@ -60,6 +61,12 @@ int main(int argc, char **argv) {
         << std::endl;
     exit(1);
   }
+
+  // Create set of robot IDs
+  // Note: this example assume consecutive robot IDs from 0 to num_robots - 1
+  std::set<unsigned int> robot_IDs;
+  for (unsigned int i = 0; i <= (num_robots - 1); ++i)
+    robot_IDs.insert(i);
 
   // Create mapping from global pose index to local pose index
   std::map<unsigned, DCORA::PoseID> PoseMap;
@@ -82,7 +89,7 @@ int main(int argc, char **argv) {
       private_loop_closures(num_robots);
   std::vector<std::vector<DCORA::RelativePosePoseMeasurement>>
       shared_loop_closure(num_robots);
-  for (auto mIn : dataset) {
+  for (auto mIn : measurements) {
     DCORA::PoseID src = PoseMap[mIn.p1];
     DCORA::PoseID dst = PoseMap[mIn.p2];
 
@@ -123,7 +130,6 @@ int main(int argc, char **argv) {
   double min_eig_num_tol = 1e-3;
   double gradient_tolerance = 1e-6;
   double preconditioned_gradient_tolerance = 1e-6;
-  double shift = -10;
   double RGradNormTol = 0.1;
   DCORA::InitializationMethod init_method = DCORA::InitializationMethod::Random;
   bool rbcd_only = false;
@@ -137,7 +143,7 @@ int main(int argc, char **argv) {
   switch (init_method) {
   case DCORA::InitializationMethod::Odometry: {
     std::vector<DCORA::RelativePosePoseMeasurement> odometryCentral;
-    for (auto mIn : dataset) {
+    for (auto mIn : measurements) {
       if (mIn.p1 + 1 != mIn.p2)
         continue;
 
@@ -148,7 +154,7 @@ int main(int argc, char **argv) {
     break;
   }
   case DCORA::InitializationMethod::Chordal: {
-    DCORA::PoseArray TChordal = DCORA::chordalInitialization(dataset);
+    DCORA::PoseArray TChordal = DCORA::chordalInitialization(measurements);
     Xcurr.topRows(d) = TChordal.getData();
     break;
   }
@@ -167,25 +173,25 @@ int main(int argc, char **argv) {
     // Construct the centralized problem (used for evaluation)
     std::shared_ptr<DCORA::Graph> poseGraphCurrRank =
         std::make_shared<DCORA::Graph>(0, r, d);
-    poseGraphCurrRank->setMeasurements(dataset);
+    poseGraphCurrRank->setMeasurements(measurements);
     DCORA::QuadraticProblem problemCentralCurrRank(poseGraphCurrRank);
 
     std::shared_ptr<DCORA::Graph> poseGraphNextRank =
         std::make_shared<DCORA::Graph>(0, r + 1, d);
-    poseGraphNextRank->setMeasurements(dataset);
+    poseGraphNextRank->setMeasurements(measurements);
     DCORA::QuadraticProblem problemCentralNextRank(poseGraphNextRank);
 
     // Initialize agents
-    std::vector<DCORA::PGOAgent *> agents;
+    std::vector<DCORA::Agent *> agents;
     for (unsigned robot = 0; robot < static_cast<unsigned int>(num_robots);
          ++robot) {
-      DCORA::PGOAgentParameters options(d, r, num_robots);
+      DCORA::AgentParameters options(d, r, robot_IDs);
       options.acceleration = acceleration;
       options.verbose = verbose;
       options.logDirectory = logDirectory;
       options.logData = logData;
 
-      auto *agent = new DCORA::PGOAgent(robot, options);
+      auto *agent = new DCORA::Agent(robot, options);
 
       // All agents share a special, common matrix called the 'lifting matrix'
       // which the first agent will generate
@@ -215,7 +221,7 @@ int main(int argc, char **argv) {
     unsigned selectedRobot = 0;
     std::cout << "Running " << numIters << " iterations..." << std::endl;
     for (unsigned iter = 0; iter < numIters; ++iter) {
-      DCORA::PGOAgent *selectedRobotPtr = agents[selectedRobot];
+      DCORA::Agent *selectedRobotPtr = agents[selectedRobot];
 
       // Non-selected robots perform an iteration
       for (auto *robotPtr : agents) {
@@ -231,11 +237,10 @@ int main(int argc, char **argv) {
         if (robotPtr->getID() == selectedRobot)
           continue;
         DCORA::PoseDict sharedPoses;
-        if (!robotPtr->getSharedPoseDict(&sharedPoses)) {
+        if (!robotPtr->getSharedStateDicts(&sharedPoses))
           continue;
-        }
         selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
-        selectedRobotPtr->updateNeighborPoses(robotPtr->getID(), sharedPoses);
+        selectedRobotPtr->updateNeighborStates(robotPtr->getID(), sharedPoses);
       }
 
       // When using acceleration, selected robot also requests auxiliary poses
@@ -244,12 +249,11 @@ int main(int argc, char **argv) {
           if (robotPtr->getID() == selectedRobot)
             continue;
           DCORA::PoseDict auxSharedPoses;
-          if (!robotPtr->getAuxSharedPoseDict(&auxSharedPoses)) {
+          if (!robotPtr->getSharedStateDicts(&auxSharedPoses))
             continue;
-          }
           selectedRobotPtr->setNeighborStatus(robotPtr->getStatus());
-          selectedRobotPtr->updateAuxNeighborPoses(robotPtr->getID(),
-                                                   auxSharedPoses);
+          selectedRobotPtr->updateNeighborStates(robotPtr->getID(),
+                                                 auxSharedPoses, acceleration);
         }
       }
 
@@ -322,8 +326,8 @@ int main(int argc, char **argv) {
     // Check if dual certificate matrix is PSD
     double theta;
     DCORA::Vector min_eigenvector;
-    bool global_opt = DCORA::fastVerification(S, min_eig_num_tol, shift, &theta,
-                                              &min_eigenvector);
+    bool global_opt =
+        DCORA::fastVerification(S, min_eig_num_tol, &theta, &min_eigenvector);
 
     // Check eigenvalue convergence
     if (!global_opt && theta >= -min_eig_num_tol / 2)
