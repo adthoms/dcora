@@ -42,3 +42,16 @@ Run the unit tests via
 ```bash
 ./bin/testDCORA
 ```
+
+## References
+
+If you use this code in your research, please cite the following paper:
+
+```bibtex
+@article{thoms2025distributed,
+  title={Distributed Certifiably Correct Range-Aided SLAM},
+  author={Thoms, Alexander and Papalia, Alan and Velasquez, Jared and Rosen, David M and Narasimhan, Sriram},
+  journal={arXiv preprint arXiv:2503.03192},
+  year={2025}
+}
+```
