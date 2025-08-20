@@ -52,8 +52,7 @@ int main(int argc, char **argv) {
   unsigned int r = d;
   DCORA::AgentParameters options(d, r);
   options.verbose = true;
-  options.logDirectory = "/home/alex/data/dcora_dpgo_examples/"
-                         "dcora_examples/single_robot_example_pgo/";
+  options.logDirectory = std::string(getenv("HOME")) + "/dcora/results/single_robot_example_pgo/";
   options.logData = true;
 
   std::vector<DCORA::RelativePosePoseMeasurement> odometry;

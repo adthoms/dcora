@@ -121,8 +121,7 @@ int main(int argc, char **argv) {
   bool acceleration = true;
   bool verbose = false;
   unsigned numIters = 1000;
-  std::string logDirectory = "/home/alex/data/dcora_dpgo_examples/"
-                             "dcora_examples/multi_robot_example_pgo/";
+  std::string logDirectory = std::string(getenv("HOME")) + "/dcora/results/multi_robot_example_pgo/";
   std::string debug_filename;
   bool logData = true;
   unsigned int r_min = 5;
