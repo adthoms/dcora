@@ -48,6 +48,14 @@ if (GLOG_FOUND)
 else (GLOG_FOUND)
   message(FATAL_ERROR "Can't find Google Logging. Please set GLOG_INCLUDE_DIR & GLOG_LIBRARY")
 endif (GLOG_FOUND)
+include(FetchContent)
+FetchContent_Declare(
+    cli11_lib
+    QUIET
+    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+    GIT_TAG v2.3.2
+)
+FetchContent_MakeAvailable(cli11_lib)
 
 # Enable OpenMP (if available)
 set(ENABLE_OPENMP OFF CACHE BOOL "Enable OpenMP (if available)")
@@ -131,7 +139,7 @@ target_link_libraries(multi-robot-example-ra-slam DCORA)
 
 add_executable(single-robot-example-ra-slam
   examples/SingleRobotExample_RASLAM.cpp)
-target_link_libraries(single-robot-example-ra-slam DCORA)
+target_link_libraries(single-robot-example-ra-slam DCORA CLI11::CLI11)
 
 ############################### TESTS ##########################################
 ### Add testing

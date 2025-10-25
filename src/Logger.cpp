@@ -24,6 +24,11 @@ void Logger::logMeasurements(
   if (measurements.empty())
     return;
 
+  std::filesystem::path dir(logDirectory);
+  if (!std::filesystem::exists(dir)) {
+    std::filesystem::create_directories(dir);
+  }
+
   std::ofstream file;
   file.open(logDirectory + filename);
   if (!file.is_open()) {
@@ -105,7 +110,7 @@ void Logger::logMeasurements(const RelativeMeasurements &measurements,
 }
 
 void Logger::logTrajectory(unsigned int d, unsigned int n, const Matrix &T,
-                           const std::string &filename) {
+                           const std::string &filename) const {
   CHECK_EQ(T.rows(), d);
   CHECK_EQ(T.cols(), (d + 1) * n);
   std::ofstream file;

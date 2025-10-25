@@ -14,6 +14,7 @@
 #include <DCORA/DCORA_types.h>
 #include <DCORA/Measurements.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -42,7 +43,7 @@ public:
    * @param filename filename
    */
   void logTrajectory(unsigned d, unsigned n, const Matrix &T,
-                     const std::string &filename);
+                     const std::string &filename) const;
 
   /**
    * @brief Log pose-pose measurements to file
