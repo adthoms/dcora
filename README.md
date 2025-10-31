@@ -48,10 +48,15 @@ Run the unit tests via
 If you use this code in your research, please cite the following paper:
 
 ```bibtex
-@article{thoms2025distributed,
-  title={Distributed Certifiably Correct Range-Aided SLAM},
-  author={Thoms, Alexander and Papalia, Alan and Velasquez, Jared and Rosen, David M and Narasimhan, Sriram},
-  journal={arXiv preprint arXiv:2503.03192},
-  year={2025}
+@inproceedings{thoms2025distributed,
+  booktitle = {2025 IEEE International Conference on Robotics and Automation (ICRA)},
+  isbn = {9798331541392},
+  keywords = {Distributed algorithms ;  Noise},
+  language = {eng},
+  pages = {6190-6197},
+  publisher = {IEEE},
+  title = {Distributed Certifiably Correct Range-Aided SLAM},
+  year = {2025},
+  author = {Thoms, Alexander and Papalia, Alan and Velasquez, Jared and Rosen, David M. and Narasimhan, Sriram},
 }
 ```
