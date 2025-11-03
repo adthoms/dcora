@@ -65,8 +65,7 @@ int main(int argc, char **argv) {
 
   // Logging
   bool logData = true;
-  std::string logDirectory = "/home/alex/data/dcora_dpgo_examples/"
-                             "dcora_examples/single_robot_example_ra_slam/";
+  std::string logDirectory = std::string(getenv("HOME")) + "/dcora/results/single_robot_example_ra_slam/";
   DCORA::Logger logger(logDirectory);
 
   // Initialization method

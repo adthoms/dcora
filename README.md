@@ -1,30 +1,58 @@
 # Distributed Certifiably Correct Range-Aided SLAM (DCORA)
 
-## Building
+## Installation
 
-Install dependencies
+Install the required system dependencies:
+
 ```bash
-sudo apt-get install build-essential cmake-gui libsuitesparse-dev libboost-all-dev libeigen3-dev libgoogle-glog-dev
+sudo apt-get update
+sudo apt-get install build-essential cmake-gui libsuitesparse-dev \
+    libboost-all-dev libeigen3-dev libgoogle-glog-dev
+
+Clone the repository and build:
+
+```bash
+cd ~ && git clone https://github.com/adthoms/dcora.git
+cd ~/dcora/
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
 ```
 
-Inside the C++ directory, execute the following commands
-```bash
-mkdir build
-cd build
-cmake ../
-make
-```
+The compiled executables will be placed in `build/bin`.
 
 ## Usage
 
-The built executables are located in directory build/bin. For a minimal demo of DC2-PGO on one of the benchmark g2o datasets, inside the build directory run:
+### Multi-Robot Demo (DC2-PGO)
+
+Run distributed certifiably correct pose-graph optimization on a benchmark `.g2o` dataset:
+
 ```bash
+cd build
 ./bin/multi-robot-example 5 ../data/smallGrid3D.g2o
 ```
-For a minimal demo of CORA on one of the benchmark pyfg datasets, inside the build directory run:
+
+Here, 5 specifies the number of robots.
+
+### Single-Robot Demo (CORA)
+
+Run certifiably correct range-aided SLAM on a benchmark `.pyfg` dataset:
+
 ```bash
+cd build
 ./bin/single-robot-example-ra-slam ../data/tiers.pyfg
 ```
+
+## Testing
+
+To run the unit tests:
+
+```bash
+cd build
+./bin/testDCORA
+```
+
+All tests must pass before submitting contributions.
 
 ## Contributing
 
@@ -32,15 +60,8 @@ Any contributions should pass all checks in our `.pre-commit-config.yaml` file. 
 ```bash
 pip install pre-commit
 sudo apt-get install cppcheck
-cd /path/to/dcora
+cd ~/dcora
 pre-commit install
-```
-
-## Testing
-
-Run the unit tests via
-```bash
-./bin/testDCORA
 ```
 
 ## References
@@ -60,3 +81,7 @@ If you use this code in your research, please cite the following paper:
   author = {Thoms, Alexander and Papalia, Alan and Velasquez, Jared and Rosen, David M. and Narasimhan, Sriram},
 }
 ```
+
+## License
+
+This project is licensed under the MIT License

@@ -1,3 +1,6 @@
+# Ignore results directory
+results/*
+
 # Ignore C++ build directory
 build/*
 
